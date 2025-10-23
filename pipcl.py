@@ -110,6 +110,7 @@ class Package:
         ...                         'bar.i',
         ...                         'setup.py',
         ...                         'pipcl.py',
+        ...                         'pyproject.toml',
         ...                         'wdev.py',
         ...                         'README',
         ...                         (b'Hello word2', 'hw2.txt'),
@@ -135,8 +136,20 @@ class Package:
         ...                 p.handle_argv(sys.argv)
         ...             """))
 
-    Create the files required by the above `setup.py` - the SWIG `.i` input
-    file, the README file, and copies of `pipcl.py` and `wdev.py`.
+    Create the files required by the above `setup.py` - pyproject.toml, the
+    SWIG `.i` input file, the README file, and copies of `pipcl.py` and
+    `wdev.py`.
+
+        >>> with open('pipcl_test/pyproject.toml', 'w') as f:
+        ...     _ = f.write(textwrap.dedent("""
+        ...             [build-system]
+        ...             requires = []
+        ...
+        ...             # See pep-517.
+        ...             #
+        ...             build-backend = "setup"
+        ...             backend-path = ["."]
+        ...             """))
 
         >>> with open('pipcl_test/foo.i', 'w') as f:
         ...     _ = f.write(textwrap.dedent("""
@@ -1483,7 +1496,7 @@ class Package:
             if '\n' in self.description:
                 description_text = self.description.strip()
             else:
-                with open(self.description) as f:
+                with open(self.description, encoding='utf8') as f:
                     description_text = f.read()
             ret += '\n' # Empty line separates headers from body.
             ret += description_text
@@ -2039,6 +2052,58 @@ def base_linker(vs=None, pythonflags=None, cpp=False, use_env=True):
     return linker, pythonflags
 
 
+def fs_ensure_empty_dir(path):
+    os.makedirs(path, exist_ok=True)
+    fs_remove_dir_contents( path)
+
+
+def fs_ensure_parent_dir(path):
+    parent = os.path.dirname(path)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+
+
+def fs_filesize( filename, default=0):
+    try:
+        return os.path.getsize( filename)
+    except OSError:
+        return default
+
+
+def fs_read(path, binary=False):
+    with open(path, 'rb' if binary else 'r') as f:
+        return f.read()
+
+
+def fs_remove(path):
+    '''
+    Removes file or directory, without raising exception if it doesn't exist.
+
+    We assert-fail if the path still exists when we return, in case of
+    permission problems etc.
+    '''
+    try:
+        os.remove(path)
+    except Exception:
+        pass
+    shutil.rmtree(path, ignore_errors=1)
+    assert not os.path.exists(path)
+
+
+def fs_remove_dir_contents(path):
+    '''
+    Removes all items in directory `path`; does not remove `path` itself.
+    '''
+    for leaf in os.listdir(path):
+        path2 = os.path.join(path, leaf)
+        fs_remove(path2)
+
+
+def fs_write(path, data, binary=False):
+    with open(path, 'wb' if binary else 'w') as f:
+        return f.write( data)
+
+
 def git_info( directory):
     '''
     Returns `(sha, comment, diff, branch)`, all items are str or None if not
@@ -2145,8 +2210,8 @@ def git_get(
             If starts with 'git:':
                 The remaining text should be a command-line
                 style string containing some or all of these args:
-                    --branch <branch>
-                    --tag <tag>
+                    -b|--branch <branch>
+                    --t|-tag <tag>
                     <remote>
                 These overrides <branch>, <tag> and <remote>.
             Otherwise:
@@ -2172,7 +2237,7 @@ def git_get(
             If true, we clone with `--recursive --shallow-submodules` and run
             `git submodule update --init --recursive` before returning.
     '''
-    log0(f'{remote=} {local=} {branch=} {tag=} {text=}')
+    log0(f'{os.getcwd()=} {remote=} {local=} {branch=} {tag=} {text=} {env_extra=} {update=} {submodules=}')
     
     if text:
         if text.startswith('git:'):
@@ -2182,12 +2247,14 @@ def git_get(
                     arg = next(args)
                 except StopIteration:
                     break
-                if arg == '--branch':
+                if arg in ('-b', '--branch'):
                     branch = next(args)
                     tag = None
-                elif arg == '--tag':
+                elif arg in ('-t', '--tag'):
                     tag = next(args)
                     branch = None
+                elif arg.startswith('-'):
+                    assert 0, f'Unrecognised {arg=} in {text=}.'
                 else:
                     remote = arg
             assert remote, f'<remote> unset and no remote specified in {text=}.'
@@ -2204,7 +2271,11 @@ def git_get(
         # This seems to pull in the entire repository.
         log0(f'do_update(): attempting to update {local=}.')
         # Remove any local changes.
-        run(f'cd {local} && git reset --hard', env_extra=env_extra)
+        run(
+                f'cd {local} && git reset --hard',
+                env_extra=env_extra,
+                prefix='git reset: ',
+                )
         if tag:
             # `-u` avoids `fatal: Refusing to fetch into current branch`.
             # Using '+' and `revs/tags/` prefix seems to avoid errors like:
@@ -2213,12 +2284,28 @@ def git_get(
             #   06c4ae5fe39a03b37a25a8b95214d9f8f8a867b8 to branch
             #   'refs/heads/v3.16.44'
             #
-            run(f'cd {local} && git fetch -fuv{depth_arg} {remote} +refs/tags/{tag}:refs/tags/{tag}', env_extra=env_extra)
-            run(f'cd {local} && git checkout {tag}', env_extra=env_extra)
+            run(
+                    f'cd {local} && git fetch -fuv{depth_arg} {remote} +refs/tags/{tag}:refs/tags/{tag}',
+                    env_extra=env_extra,
+                    prefix='git fetch: ',
+                    )
+            run(
+                    f'cd {local} && git checkout {tag}',
+                    env_extra=env_extra,
+                    prefix='git checkout: ',
+                    )
         if branch:
             # `-u` avoids `fatal: Refusing to fetch into current branch`.
-            run(f'cd {local} && git fetch -fuv{depth_arg} {remote} {branch}:{branch}', env_extra=env_extra)
-            run(f'cd {local} && git checkout {branch}', env_extra=env_extra)
+            run(
+                    f'cd {local} && git fetch -fuv{depth_arg} {remote} {branch}:{branch}',
+                    env_extra=env_extra,
+                    prefix='git fetch: ',
+                    )
+            run(
+                    f'cd {local} && git checkout {branch}',
+                    env_extra=env_extra,
+                    prefix='git checkout: ',
+                    )
     
     do_clone = True
     if os.path.isdir(f'{local}/.git'):
@@ -2235,23 +2322,36 @@ def git_get(
     if do_clone:
         # No existing git checkout, so do a fresh clone.
         #_fs_remove(local)
+        log0(f'{os.getcwd()=}')
         log0(f'Cloning to: {local}')
         command = f'git clone --config core.longpaths=true{depth_arg}'
         if submodules:
             command += f' --recursive --shallow-submodules'
         if branch:
             command += f' -b {branch}'
-        if tag:
-            command += f' -b {tag}'
+        #if tag:
+        #    command += f' -t {tag}'
         command += f' {remote} {local}'
-        run(command, env_extra=env_extra)
+        run(
+                command,
+                env_extra=env_extra,
+                prefix='git clone: ',
+                )
         do_update()
     
     if submodules:
-        run(f'cd {local} && git submodule update --init --recursive', env_extra=env_extra)
+        run(
+                f'cd {local} && git submodule update --init --recursive',
+                env_extra=env_extra,
+                prefix='git submodule update: ',
+                )
 
     # Show sha of checkout.
-    run( f'cd {local} && git show --pretty=oneline|head -n 1', check=False)
+    run(
+            f'cd {local} && git show --pretty=oneline|head -n 1',
+            check=False,
+            prefix='git show: ',
+            )
     return os.path.abspath(local)
     
 
@@ -3168,7 +3268,8 @@ class NewFiles:
         exactly <n>.
         '''
         ret = self.get()
-        assert len(ret) == n, f'{len(ret)=}: {ret}'
+        sep = '\n    '
+        assert len(ret) == n, f'{len(ret)=} != {n=}:{sep}{sep.join(ret)}'
         return ret
     def get_one(self):
         '''
@@ -3206,6 +3307,8 @@ def swig_get(swig, quick, swig_local='pipcl-swig-git'):
     Args:
         swig:
             If starts with 'git:', passed as <text> arg to git_get().
+            #If starts with 'pip:' we do: `pip install swig<swig[4:]>`. E.g.
+            #'pip:==4.3.1'
         quick:
             If true, we do not update/build local checkout if the binary is
             already present.
@@ -3252,6 +3355,14 @@ def swig_get(swig, quick, swig_local='pipcl-swig-git'):
             run(f'cd {swig_local} && make install', env_extra=swig_env_extra)
         assert os.path.isfile(swig_binary)
         return swig_binary
+    # Disabled support for installing a specific swig with pip, because it
+    # will be overridden by individual projects' specification of swig in
+    # get_requires_for_build_wheel() or pyproject.toml.
+    #
+    #elif swig.startswith('pip:'):
+    #    run(f'pip uninstall -y swig', check=0)
+    #    run(f'pip install swig{swig[4:]}')
+    #    return 'swig'
     else:
         return swig
 
