@@ -15,33 +15,45 @@ Args:
 
 Examples:
 
-    aptest.py -p pip: -P pip: -l pip: build test
+    ./aptest/aptest.py -p PyMuPDF -P PyMuPDFPro -m mupdf -l sce build test
     
-        Installs pymupdf, pymupdfpro and pymupdf_layout from pypi.org and runs
-        tests on each of them.
+        Build, install and test pymupdf, pymupdfpro and pymupdf_layout using
+        local checkouts.
     
-    aptest.py -p PyMuPDF -P PyMuPDFPro -m mupdf -l sce build test
+    ./aptest/aptest.py -p git: -P git: -l git: build test
     
-        Builds and installs pymupdf, pymupdfpro and pymupdf_layout from local
-        directories. Then runs tests on each of them.
-    
-    aptest.py -p git: -P git: -l git: build test
+        Build, install and test pymupdf, pymupdfpro and pymupdf_layout using
+        central git repositories.
     
         * Clones/updates local git repositories for each of pymupdf, pymupdfpro
           and pymupdf_layout.
         * Build/install/test each package.
     
-    aptest.py -r @github -p git: -P git -l git: cibw
-        * Runs aptest.py on Github.
-        * Uses latest code in default git repositories.
+    ./aptest/aptest.py -r @github -p git: -P git -l git: cibw
+        Build, install and test pymupdf, pymupdfpro and pymupdf_layout using
+        central git repositories.
+        
+        * Runs on Github.
         * Downloads the logs and wheels from Github to local machine.
     
-    aptest.py -g -p git: -P git -l git: cibw upload
+    ./aptest/aptest.py -p git: -P git -l git: cibw upload
         * Runs cibuildwheel on Github to build wheels and test pymupdf,
           pymupdfpro and pymupdf-layout wheels, using latest code in default git
           repositories.
         * Downloads wheels from Github artifacts to local machine.
-        * Uploads wheels to pypi.org.
+        * Uploads wheels to pypi.org (after asking for confirmation).
+
+    ./aptest/aptest.py -r @github -p pip: -P PyMuPDFPlus -l git: cibw
+        This demontrates getting packages from different locations.
+        
+        Build/test pymupdf, pymupdfpro and pymupdf-layout using cibuildwheel.
+        
+        * Installs pymupdf from pypi.org. (We will not run pymupdf tests.)
+        * For pymupdfpro we use local checkout.
+        * Gets pymupdf_layout from central git.
+        
+        (We will fail if pypi.org's pymupdf is a different version from
+        pymupdfpro / pymupdf-layout.)
 
 Args:
 
@@ -136,7 +148,7 @@ Args:
                     Install from pypi.org using pip.
                 `pip:==<version>`
                     Install specified version from pypi.org.
-                `git:[-b <branch>] [-t <tag>] [<remote>]`
+                `'git:[-b <branch>] [-t <tag>] [<remote>]'`
                     Clone/update from git remote, optionally overriding default
                     branch/tag/remote.
 
@@ -146,9 +158,11 @@ Args:
                     Local directory, typically a git checkout.
 
         -l <location>
+        --layout <location>
             Alias for `-i layout <location>
         
         -m <location>
+        --mupdf <location>
             Alias for `-i mupdf <location>
         
         -o <os_names>
@@ -157,9 +171,11 @@ Args:
             insensitive.
         
         -p <location>
+        --pymupdf <location>
             Alias for `-i pymupdf <location>
         
         -P <location>
+        --pro <location>
             Alias for `-i pro <location>
         
         -r <remote>
@@ -192,7 +208,7 @@ Args:
                   using rsync, then `git clean -f` is run on the remote.
 
                 * On success wheels are copied back into local directory
-                  aptest/wheelhouse/.
+                  aptest-wheelhouse/.
         
         -t <packages>
             Comma-separated ordered list of modifications to the list of
@@ -285,8 +301,12 @@ Args:
         --system-site-packages 0|1
             If 1, use `--system-site-packages` when creating venv. Defaults is 0.
         
+        --ticker <delay>
+            Use ticker with specified delay. Disabled if delay==0. Default is
+            0.5.
+        
         --github-upload 0|1
-            If 1, if `-r @github` is used then on sccess we ask the user to
+            If 1, if `-r @github` is used then on success we ask the user to
             confirm and then upload wheels to pypi.org.
         
     Commands:
@@ -433,7 +453,7 @@ def sync_reverse(remote, remote_dir, path_remote, path_local, ssh_command, filte
     command += (
             f':{remote_dir}/{path_remote} {path_local}'
             )
-    pipcl.run(command, prefix=f'reverse sync {path_remote} => {path_local}: ')
+    pipcl.run(command, prefix=f'reverse sync {path_remote} => {path_local}: ', log=1)
         
 
 def sync(remote, remote_dir, path, ssh_command, verbose):
@@ -480,7 +500,7 @@ def sync(remote, remote_dir, path, ssh_command, verbose):
         pipcl.run(command, prefix=f'sync {path}: ')
     finally:
         if filenames_path:
-            fs_remove(filenames_path)
+            pipcl.fs_remove(filenames_path)
     return ret
 
 
@@ -541,6 +561,7 @@ def main(argv):
     remote_ssh = None
     show_help = False
     venv = 2
+    ticker = 0.5
     
     class State:
         pass
@@ -566,7 +587,7 @@ def main(argv):
     state.pytest_options = ''
     state.pytest_wrap = None
     state.sdists = False
-    state.swig = 'pip:==4.3.1'
+    state.swig = None
     state.swig_quick = None
     state.system_packages = True if os.environ.get('GITHUB_ACTIONS') == 'true' else False
     state.system_site_packages = False
@@ -704,10 +725,10 @@ def main(argv):
             _location = next(args)
             add_package(_name, _location, args.pos - 1)
         
-        elif arg == '-l':
+        elif arg in ('-l', '--layout'):
             add_package('layout', next(args), args.pos - 1)
         
-        elif arg == '-m':
+        elif arg in ('-m', '--mupdf'):
             add_package('mupdf', next(args), args.pos - 1)
         
             #_mupdf = next(args)
@@ -727,10 +748,10 @@ def main(argv):
         elif arg == '-o':
             state.os_names += next(args).lower().split(',')
         
-        elif arg == '-p':
+        elif arg in ('-p', '--pymupdf'):
             add_package('pymupdf', next(args), args.pos - 1)
         
-        elif arg == '-P':
+        elif arg in ('-P', '--pro'):
             add_package('pro', next(args), args.pos - 1)
         
         elif arg == '-p':
@@ -789,6 +810,9 @@ def main(argv):
         
         elif arg == '--system-site-packages':
             state.system_site_packages = int(next(args))
+        
+        elif arg == '--ticker':
+            ticker = float(next(args))
         
         elif arg == '--github-upload':
             state.github_upload = int(next(args))
@@ -912,8 +936,10 @@ def main(argv):
             elif remote_ssh:
                 ssh_command = remote
                 remote = None
+                label = ssh_command
             else:
                 ssh_command = 'ssh'
+                label = remote
             pipcl.log(f'{ssh_command=}')
 
             if remote_do:
@@ -953,14 +979,23 @@ def main(argv):
                 remote_command += f'{os.path.basename(g_root_abs)}/aptest.py {shlex.join(argv)}'
 
                 command = f'{ssh_command} {remote if remote else ""} {shlex.quote(remote_command)}'
-                #if tee_out is None:
-                #    tee_out = f'out-{remote}'
                 pipcl.log(f'{command=}')
                 pipcl.log(f'{ssh_command=}')
 
-                #with open(tee_out, 'w') as f:
-                #    jlib.system(command, prefix=f'{remote}: ', out=['log', f])
-                pipcl.run(command, prefix=f'{remote}: ')
+                tee_simple = f'out-{remote}'
+                tee = f'{tee_simple}-{time.strftime("%F-%H-%M-%S")}'
+                try:
+                    pipcl.run(
+                            command,
+                            prefix=f'{label}: ',
+                            out='log',
+                            tee=tee,
+                            ticker=ticker,
+                            )
+                finally:
+                    # Update softlink after remote command has finished. Avoids
+                    # continuoue updates.
+                    pipcl.run(f'ln -sf {tee} {tee_simple}')
 
             if 1:
                 # Copy remote wheels back to local machine.
@@ -972,8 +1007,8 @@ def main(argv):
                 filters.append('--exclude=*')
                 sync_reverse(
                         remote, remote_dir,
-                        f'{g_root}/wheelhouse/',
-                        f'{g_root}/wheelhouse/',
+                        f'aptest-wheelhouse/',
+                        f'aptest-wheelhouse/',
                         ssh_command=ssh_command,
                         filters=filters,
                         )
@@ -1023,16 +1058,19 @@ def main(argv):
                             clean=(venv>=3),
                             )
                 sys.exit(e)
+    
     elif not remote_github_workflow_id:
         pipcl.log(f'Warning, no commands specified so nothing to do.')
     
     # Clone/update/build swig if specified.
     swig_binary = pipcl.swig_get(state.swig, state.swig_quick)
-    #state.env_extra['PYMUPDF_SETUP_SWIG'] = swig_binary
-    #state.env_extra['PYMUPDFPRO_SETUP_SWIG'] = swig_binary
-    #state.env_extra['PYMUPDF_LAYOUT_SETUP_SWIG'] = swig_binary
-    #if swig_binary:
-    #    os.environ['PYMUPDF_SETUP_SWIG'] = swig_binary
+    pipcl.log(f'{state.swig=}')
+    pipcl.log(f'{swig_binary=}')
+    if swig_binary:
+        # Prevent individual builds from installing default swig.
+        state.env_extra['PYMUPDF_SETUP_SWIG'] = swig_binary
+        state.env_extra['PYMUPDFPRO_SETUP_SWIG'] = swig_binary
+        state.env_extra['PYMUPDF_LAYOUT_SETUP_SWIG'] = swig_binary
     
     # Set environment variables to give access to required git repositories.
     #
@@ -1102,9 +1140,10 @@ def main(argv):
 
                 pipcl.run(f'pip install --upgrade piprepo setuptools')
                 pypi_local = os.path.abspath(f'aptest-pypi')
+                wheelhouse_local = os.path.abspath(f'aptest-wheelhouse')
                 pipcl.fs_ensure_empty_dir(pypi_local)
+                pipcl.fs_ensure_empty_dir(wheelhouse_local)
                 pipcl.run(f'piprepo build {pypi_local}')
-                os.makedirs(f'{g_root_abs}/wheelhouse', exist_ok=1)
 
                 for package in state.packages_build:
                     pipcl.log(f'{package=}')
@@ -1175,20 +1214,20 @@ def main(argv):
                                 # builds pro/layout later on.
                                 state.env_extra['PIPCL_GRAAL_NATIVE_VENV'] = os.path.abspath(venv_native)
 
-                            new_files = pipcl.NewFiles(f'{g_root_abs}/wheelhouse/{info.name_full}*.whl')
+                            new_files = pipcl.NewFiles(f'{wheelhouse_local}/{info.name_full}*.whl')
                             pipcl.run(
-                                    f'pip wheel -v --extra-index-url file://{pypi_local}/simple -w {g_root_abs}/wheelhouse {directory_abs}',
+                                    f'pip wheel -v --extra-index-url file://{pypi_local}/simple --no-cache-dir -w {wheelhouse_local} {directory_abs}',
                                     env_extra=state.env_extra,
                                     prefix=f'build {package}: ',
                                     )
                             wheel = new_files.get_one()
                             pipcl.run(
-                                    f'pip install -v --extra-index-url file://{pypi_local}/simple {wheel}',
+                                    f'pip install -v --extra-index-url file://{pypi_local}/simple --no-cache-dir {wheel}',
                                     env_extra=state.env_extra,
                                     prefix=f'install {package}: ',
                                     )
                         pipcl.run(
-                                f'piprepo sync {g_root_abs}/wheelhouse {pypi_local}',
+                                f'piprepo sync {wheelhouse_local} {pypi_local}',
                                 prefix='piprepo sync: ',
                                 )
 
@@ -1322,13 +1361,6 @@ def main(argv):
                     # testing.
                     #state.env_extra['CIBW_TEST_COMMAND'] = f'pytest {{project}}/tests'
 
-                    #if cibw_sdist and platform.system() == 'Linux':
-                    #    pipcl.log(f'Building sdist.')
-                    #    run(f'cd {pymupdf_dir_abs} && {sys.executable} setup.py -d wheelhouse sdist', env_extra=env_extra)
-                    #    sdists = glob.glob(f'{pymupdf_dir_abs}/wheelhouse/pymupdf-*.tar.gz')
-                    #    pipcl.log(f'{sdists=}')
-                    #    assert sdists
-
                     # Use a copy of state.env_extra because we modify it if
                     # using manylinux docker.
                     #
@@ -1336,15 +1368,20 @@ def main(argv):
                     
                     if platform.system() == 'Linux':
                         prefix = '/host'
-                        # Update GIT_SSH_COMMAND if set, to be within /host
-                        # in manylinux docker. Otherwise for example tests
-                        # that access remote git repositories will not use the
-                        # appropriate key.
+                        # Update GIT_SSH_COMMAND and
+                        # PYMUPDFPRO_SETUP_SOT_KEY_PATH if set, to be within
+                        # /host in manylinux docker. Otherwise for example
+                        # tests that access remote git repositories will not
+                        # use the appropriate key.
                         GIT_SSH_COMMAND_0 = env_extra.get('GIT_SSH_COMMAND')
                         if GIT_SSH_COMMAND_0:
                             GIT_SSH_COMMAND = f'ssh -i {prefix}{state.ssh_key_path_abs} -o StrictHostKeyChecking=no'
                             pipcl.log(f'Changing GIT_SSH_COMMAND from {GIT_SSH_COMMAND_0!r} to {GIT_SSH_COMMAND!r}.')
                             env_extra['GIT_SSH_COMMAND'] = GIT_SSH_COMMAND
+                        
+                        PYMUPDFPRO_SETUP_SOT_KEY_PATH = env_extra.get('PYMUPDFPRO_SETUP_SOT_KEY_PATH')
+                        if PYMUPDFPRO_SETUP_SOT_KEY_PATH:
+                            env_extra['PYMUPDFPRO_SETUP_SOT_KEY_PATH'] = f'{prefix}{os.path.abspath(PYMUPDFPRO_SETUP_SOT_KEY_PATH)}'
                     else:
                         prefix = ''
                     
@@ -1360,19 +1397,10 @@ def main(argv):
                     # miss any settings in the original environment.
                     CIBW_ENVIRONMENT_PASS_LINUX = env_extra.keys()
                     CIBW_ENVIRONMENT_PASS_LINUX = list(CIBW_ENVIRONMENT_PASS_LINUX)
+                    CIBW_ENVIRONMENT_PASS_LINUX.append('PYMUPDFPRO_SETUP_SOT_KEY')  # This can be set in os.environ.
                     CIBW_ENVIRONMENT_PASS_LINUX.sort()
                     CIBW_ENVIRONMENT_PASS_LINUX = ' '.join(CIBW_ENVIRONMENT_PASS_LINUX)
                     env_extra['CIBW_ENVIRONMENT_PASS_LINUX'] = CIBW_ENVIRONMENT_PASS_LINUX
-
-                    #if cibw_test_project:
-                    #    cibw_do_test_project(
-                    #            env_extra,
-                    #            CIBW_BUILD,
-                    #            cibw_pyodide,
-                    #            cibw_pyodide_args,
-                    #            cibw_test_project_setjmp,
-                    #            )
-                    #    return
 
                     pipcl.run(
                             f'cd {directory} && cibuildwheel{cibw_pyodide_args} --output-dir {g_root_abs}/wheelhouse',
@@ -1407,6 +1435,9 @@ def main(argv):
                 pipcl.log(f'packages_test:')
                 for i in state.packages_test:
                     pipcl.log(f'    {i!r}')
+                
+                failed_packages = list()
+                
                 for package in state.packages_test:
                     location, _ = state.packages[package]
                     if not location:
@@ -1427,6 +1458,9 @@ def main(argv):
                         else:
                             directory = location
                         command = f'pytest {directory}/tests {state.pytest_options}'
+                        if state.pytest_wrap in ('valgrind', 'helgrind'):
+                            if not state.pytest_options:
+                                command += ' -sv'
                         if state.pytest_wrap:
                             if state.pytest_wrap == 'gdb':
                                 command = f'gdb --args {command}'
@@ -1435,7 +1469,7 @@ def main(argv):
                                 state.env_extra['PYTHONMALLOC'] = 'malloc'
                                 command = (
                                         f' valgrind'
-                                        f' --suppressions={pymupdf_dir_abs}/valgrind.supp'
+                                        f' --suppressions={g_root_abs}/valgrind.supp'
                                         f' --trace-children=no'
                                         f' --num-callers=20'
                                         f' --error-exitcode=100'
@@ -1457,24 +1491,19 @@ def main(argv):
                                         )
                             else:
                                 assert 0, f'Unrecognised {state.pytest_wrap=}.'
-                        pipcl.run(
+                        e = pipcl.run(
                                 command,
                                 env_extra=state.env_extra,
                                 prefix=f'pytest {package}: ',
+                                check=0,
                                 )
-
-                if 0: test(
-                        env_extra=env_extra,
-                        implementations=implementations,
-                        test_names=test_names,
-                        pytest_options=pytest_options,
-                        test_timeout=test_timeout,
-                        pytest_prefix=pytest_prefix,
-                        test_fitz=test_fitz,
-                        pybind=pybind,
-                        system_packages=system_packages,
-                        venv=venv,
-                        )
+                        if e:
+                            failed_packages.append(package)
+                    if failed_packages:
+                        pipcl.log(f'Tests failed for these packages:')
+                        for package in failed_packages:
+                            pipcl.log(f'    {package}')
+                        raise Exception(f'Packages failed tests: {failed_packages}')
 
             elif command == 'pyodide':
                 build_pyodide_wheel(pyodide_build_version=pyodide_build_version)
@@ -1483,533 +1512,7 @@ def main(argv):
                 assert 0, f'{command=}'
     finally:
         for path in paths_to_delete:
-            fs_remove(path)
-
-
-def get_env_bool(name, default=0):
-    v = os.environ.get(name)
-    if v in ('1', 'true'):
-        return 1
-    elif v in ('0', 'false'):
-        return 0
-    elif v is None:
-        return default
-    else:
-        assert 0, f'Bad environ {name=} {v=}'
-
-def show_help():
-    print(__doc__)
-    print(venv_info())
-
-
-def cibw_do_test_project(
-        env_extra,
-        CIBW_BUILD,
-        cibw_pyodide,
-        cibw_pyodide_args,
-        cibw_test_project_setjmp,
-        ):
-    testdir = f'{pymupdf_dir_abs}/cibw_test'
-    shutil.rmtree(testdir, ignore_errors=1)
-    os.mkdir(testdir)
-    with open(f'{testdir}/setup.py', 'w') as f:
-        f.write(textwrap.dedent(f'''
-                import shutil
-                import sys
-                import os
-                import pipcl
-
-                def build():
-                    so_leaf = pipcl.build_extension(
-                            name = 'foo',
-                            path_i = 'foo.i',
-                            outdir = 'build',
-                            source_extra = 'qwerty.cpp',
-                            py_limited_api = True,
-                            )
-                    
-                    return [
-                            ('build/foo.py', 'foo/__init__.py'),
-                            (f'build/{{so_leaf}}', f'foo/'),
-                            ]
-
-                p = pipcl.Package(
-                        name = 'pymupdf-test',
-                        version = '1.2.3',
-                        fn_build = build,
-                        py_limited_api=True,
-                        )
-
-                def get_requires_for_build_wheel(config_settings=None):
-                    return ['swig']
-                
-                build_wheel = p.build_wheel
-                build_sdist = p.build_sdist
-                
-                # Handle old-style setup.py command-line usage:
-                if __name__ == '__main__':
-                    p.handle_argv(sys.argv)
-                '''))
-    with open(f'{testdir}/foo.i', 'w') as f:
-        if cibw_test_project_setjmp:
-            f.write(textwrap.dedent('''
-                    %{
-                    #include <stdexcept>
-
-                    #include <assert.h>
-                    #include <setjmp.h>
-                    #include <stdio.h>
-                    #include <string.h>
-
-                    int qwerty(void);
-
-                    static sigjmp_buf jmpbuf;
-                    static int bar0(const char* text)
-                    {
-                        printf("bar0(): text: %s\\n", text);
-
-                        int q = qwerty();
-                        printf("bar0(): q=%i\\n", q);
-
-                        int len = (int) strlen(text);
-                        printf("bar0(): len=%i\\n", len);
-                        printf("bar0(): calling longjmp().\\n");
-                        fflush(stdout);
-                        longjmp(jmpbuf, 1);
-                        assert(0);
-                    }
-                    int bar1(const char* text)
-                    {
-                        int ret = 0;
-                        if (setjmp(jmpbuf) == 0)
-                        {
-                            ret = bar0(text);
-                        }
-                        else
-                        {
-                            printf("bar1(): setjmp() returned non-zero.\\n");
-                            throw std::runtime_error("deliberate exception");
-                        }
-                        assert(0);
-                    }
-                    int bar(const char* text)
-                    {
-                        int ret = 0;
-                        try
-                        {
-                            ret = bar1(text);
-                        }
-                        catch(std::exception& e)
-                        {
-                            printf("bar1(): received exception: %s\\n", e.what());
-                        }
-                        return ret;
-                    }
-                    %}
-                    int bar(const char* text);
-                    '''))
-        else:
-            f.write(textwrap.dedent('''
-                    %{
-                    #include <stdexcept>
-
-                    #include <assert.h>
-                    #include <stdio.h>
-                    #include <string.h>
-
-                    int qwerty(void);
-
-                    int bar(const char* text)
-                    {
-                        qwerty();
-                        return strlen(text);
-                    }
-                    %}
-                    int bar(const char* text);
-                    '''))
-    
-    with open(f'{testdir}/qwerty.cpp', 'w') as f:
-        f.write(textwrap.dedent('''
-                #include <stdio.h>
-                int qwerty(void)
-                {
-                    printf("qwerty()\\n");
-                    return 3;
-                }
-                '''))
-
-    with open(f'{testdir}/pyproject.toml', 'w') as f:
-        f.write(textwrap.dedent('''
-                [build-system]
-                # We define required packages in setup.py:get_requires_for_build_wheel().
-                requires = []
-
-                # See pep-517.
-                #
-                build-backend = "setup"
-                backend-path = ["."]
-                '''))
-        
-    shutil.copy2(f'{pymupdf_dir_abs}/pipcl.py', f'{testdir}/pipcl.py')
-    shutil.copy2(f'{pymupdf_dir_abs}/wdev.py', f'{testdir}/wdev.py')
-
-    env_extra['CIBW_BUILD'] = CIBW_BUILD
-    CIBW_TEST_COMMAND = ''
-    if cibw_pyodide:
-        CIBW_TEST_COMMAND += 'pyodide xbuildenv search --all; '
-    CIBW_TEST_COMMAND += 'python -c "import foo; foo.bar(\\"some text\\")"'
-    env_extra['CIBW_TEST_COMMAND'] = CIBW_TEST_COMMAND
-    #env_extra['CIBW_TEST_COMMAND'] = ''
-    
-    pipcl.run(f'cd {testdir} && cibuildwheel --output-dir ../wheelhouse{cibw_pyodide_args}',
-            env_extra=env_extra,
-            prefix='cibw: ',
-            )
-    pipcl.run(f'ls -ldt {pymupdf_dir_abs}/wheelhouse/*')
-        
-
-def build_pyodide_wheel(pyodide_build_version=None):
-    '''
-    Build Pyodide wheel.
-
-    This runs `pyodide build` inside the PyMuPDF directory, which in turn runs
-    setup.py in a Pyodide build environment.
-    '''
-    pipcl.log(f'## Building Pyodide wheel.')
-
-    # Our setup.py does not know anything about Pyodide; we set a few
-    # required environmental variables here.
-    #
-    env_extra = dict()
-
-    # Disable libcrypto because not available in Pyodide.
-    env_extra['HAVE_LIBCRYPTO'] = 'no'
-
-    # Tell MuPDF to build for Pyodide.
-    env_extra['OS'] = 'pyodide'
-
-    # Build a single wheel without a separate PyMuPDFb wheel.
-    env_extra['PYMUPDF_SETUP_FLAVOUR'] = 'pb'
-    
-    # 2023-08-30: We set PYMUPDF_SETUP_MUPDF_BUILD_TESSERACT=0 because
-    # otherwise mupdf thirdparty/tesseract/src/ccstruct/dppoint.cpp fails to
-    # build because `#include "errcode.h"` finds a header inside emsdk. This is
-    # pyodide bug https://github.com/pyodide/pyodide/issues/3839. It's fixed in
-    # https://github.com/pyodide/pyodide/pull/3866 but the fix has not reached
-    # pypi.org's pyodide-build package. E.g. currently in tag 0.23.4, but
-    # current devuan pyodide-build is pyodide_build-0.23.4.
-    #
-    env_extra['PYMUPDF_SETUP_MUPDF_TESSERACT'] = '0'
-    setup = pyodide_setup(pymupdf_dir, pyodide_build_version=pyodide_build_version)
-    command = f'{setup} && echo "### Running pyodide build" && pyodide build --exports whole_archive'
-    
-    command = command.replace(' && ', '\n && ')
-    
-    pipcl.run(command, env_extra=env_extra)
-    
-    # Copy wheel into `wheelhouse/` so it is picked up as a workflow
-    # artifact.
-    #
-    pipcl.run(f'ls -l {pymupdf_dir}/dist/')
-    pipcl.run(f'mkdir -p {pymupdf_dir}/wheelhouse && cp -p {pymupdf_dir}/dist/* {pymupdf_dir}/wheelhouse/')
-    pipcl.run(f'ls -l {pymupdf_dir}/wheelhouse/')    
-
-
-def pyodide_setup(
-        directory,
-        clean=False,
-        pyodide_build_version=None,
-        ):
-    '''
-    Returns a command that will set things up for a pyodide build.
-    
-    Args:
-        directory:
-            Our command cd's into this directory.
-        clean:
-            If true we create an entirely new environment. Otherwise
-            we reuse any existing emsdk repository and venv.
-        pyodide_build_version:
-            Version of Python package pyodide-build; if None we use latest
-            available version.
-            2025-02-13: pyodide_build_version='0.29.3' works.
-    
-    The returned command does the following:
-    
-    * Checkout latest emsdk from https://github.com/emscripten-core/emsdk.git:
-      * Clone emsdk repository to `emsdk` if not already present.
-      * Run `git pull -r` inside emsdk checkout.
-    * Create venv `venv_pyodide_<python_version>` if not already present.
-    * Activate venv `venv_pyodide_<python_version>`.
-    * Install/upgrade package `pyodide-build`.
-    * Run emsdk install scripts and enter emsdk environment.
-    
-    Example usage in a build function:
-    
-        command = pyodide_setup()
-        command += ' && pyodide build --exports pyinit'
-        subprocess.run(command, shell=1, check=1)
-    '''
-    
-    pv = platform.python_version_tuple()[:2]
-    assert pv == ('3', '12'), f'Pyodide builds need to be run with Python-3.12 but current Python is {platform.python_version()}.'
-    command = f'cd {directory}'
-    
-    # Clone/update emsdk. We always use the latest emsdk with `git pull`.
-    #
-    # 2025-02-13: this works: 2514ec738de72cebbba7f4fdba0cf2fabcb779a5
-    #
-    dir_emsdk = 'emsdk'
-    if clean:
-        shutil.rmtree(dir_emsdk, ignore_errors=1)
-        # 2024-06-25: old `.pyodide-xbuildenv` directory was breaking build, so
-        # important to remove it here.
-        shutil.rmtree('.pyodide-xbuildenv', ignore_errors=1)
-    if not os.path.exists(f'{directory}/{dir_emsdk}'):
-        command += f' && echo "### Cloning emsdk.git"'
-        command += f' && git clone https://github.com/emscripten-core/emsdk.git {dir_emsdk}'
-    command += f' && echo "### Updating checkout {dir_emsdk}"'
-    command += f' && (cd {dir_emsdk} && git pull -r)'
-    command += f' && echo "### Checkout {dir_emsdk} is:"'
-    command += f' && (cd {dir_emsdk} && git show -s --oneline)'
-    
-    # Create and enter Python venv.
-    #
-    python = sys.executable
-    venv_pyodide = f'venv_pyodide_{sys.version_info[0]}.{sys.version_info[1]}'
-    
-    if not os.path.exists( f'{directory}/{venv_pyodide}'):
-        command += f' && echo "### Creating venv {venv_pyodide}"'
-        command += f' && {python} -m venv {venv_pyodide}'
-    command += f' && . {venv_pyodide}/bin/activate'
-    command += f' && echo "### Installing Python packages."'
-    command += f' && python -m pip install --upgrade pip wheel pyodide-build'
-    if pyodide_build_version:
-        command += f'=={pyodide_build_version}'
-    
-    # Run emsdk install scripts and enter emsdk environment.
-    #
-    command += f' && cd {dir_emsdk}'
-    command += ' && PYODIDE_EMSCRIPTEN_VERSION=$(pyodide config get emscripten_version)'
-    command += ' && echo "### PYODIDE_EMSCRIPTEN_VERSION is: $PYODIDE_EMSCRIPTEN_VERSION"'
-    command += ' && echo "### Running ./emsdk install"'
-    command += ' && ./emsdk install ${PYODIDE_EMSCRIPTEN_VERSION}'
-    command += ' && echo "### Running ./emsdk activate"'
-    command += ' && ./emsdk activate ${PYODIDE_EMSCRIPTEN_VERSION}'
-    command += ' && echo "### Running ./emsdk_env.sh"'
-    command += ' && . ./emsdk_env.sh'   # Need leading `./` otherwise weird 'Not found' error.
-    
-    command += ' && cd ..'
-    return command
-
-
-def test(
-        *,
-        env_extra,
-        implementations,
-        venv=False,
-        test_names=None,
-        pytest_options=None,
-        test_timeout=None,
-        pytest_prefix=None,
-        test_fitz=True,
-        pytest_k=None,
-        pybind=False,
-        system_packages=False,
-        ):
-    if pybind:
-        cpp_path = 'pymupdf_test_pybind.cpp'
-        cpp_exe = 'pymupdf_test_pybind.exe'
-        cpp = textwrap.dedent('''
-                #include <pybind11/embed.h>
-                
-                int main()
-                {
-                    pybind11::scoped_interpreter guard{};
-                    pybind11::exec(R"(
-                            print('Hello world', flush=1)
-                            import pymupdf
-                            pymupdf.JM_mupdf_show_warnings = 1
-                            print(f'{pymupdf.version=}', flush=1)
-                            doc = pymupdf.Document()
-                            pymupdf.mupdf.fz_warn('Dummy warning.')
-                            pymupdf.mupdf.fz_warn('Dummy warning.')
-                            pymupdf.mupdf.fz_warn('Dummy warning.')
-                            print(f'{doc=}', flush=1)
-                            )");
-                }
-                ''')
-        def fs_read(path):
-            try:
-                with open(path) as f:
-                    return f.read()
-            except Exception:
-                return
-        def fs_remove(path):
-            try:
-                os.remove(path)
-            except Exception:
-                pass
-        cpp_existing = fs_read(cpp_path)
-        if cpp == cpp_existing:
-            pipcl.log(f'Not creating {cpp_exe} because unchanged: {cpp_path}')
-        else:
-            with open(cpp_path, 'w') as f:
-                f.write(cpp)
-        def getmtime(path):
-            try:
-                return os.path.getmtime(path)
-            except Exception:
-                return 0
-        python_config = f'{os.path.realpath(sys.executable)}-config'
-        # `--embed` adds `-lpython3.11` to the link command, which appears to
-        # be necessary when building an executable.
-        flags = pipcl.run(f'{python_config} --cflags --ldflags --embed', capture=1)
-        build_command = f'c++ {cpp_path} -o {cpp_exe} -g -W -Wall {flags}'
-        build_path = f'{cpp_exe}.cmd'
-        build_command_prev = fs_read(build_path)
-        if build_command != build_command_prev or getmtime(cpp_path) >= getmtime(cpp_exe):
-            fs_remove(build_path)
-            pipcl.run(build_command)
-            with open(build_path, 'w') as f:
-                f.write(build_command)
-        pipcl.run(f'./{cpp_exe}')
-        return
-    
-    pymupdf_dir_rel = gh_release.relpath(pymupdf_dir)
-    if not pytest_options and pytest_prefix == 'valgrind':
-        pytest_options = '-sv'
-    if pytest_k:
-        pytest_options += f' -k {shlex.quote(pytest_k)}'
-    pytest_arg = ''
-    if test_names:
-        for test_name in test_names:
-            pytest_arg += f' {pymupdf_dir_rel}/{test_name}'
-    else:
-        pytest_arg += f' {pymupdf_dir_rel}/tests'
-    python = gh_release.relpath(sys.executable)
-    pipcl.log('Running tests with tests/run_compound.py and pytest.')
-    
-    PYODIDE_ROOT = os.environ.get('PYODIDE_ROOT')
-    if PYODIDE_ROOT is not None:
-        # We can't install packages with `pip install`; setup.py will have
-        # specified pytest in the wheels's <requires_dist>, so it will be
-        # already installed.
-        #
-        pipcl.log(f'Not installing test packages because {PYODIDE_ROOT=}.')
-        command = f'{pytest_options} {pytest_arg}'
-        args = shlex.split(command)
-        pipcl.log(f'{PYODIDE_ROOT=} so calling pytest.main(args).')
-        pipcl.log(f'{command=}')
-        pipcl.log(f'args are ({len(args)}):')
-        for arg in args:
-            pipcl.log(f'    {arg!r}')
-        import pytest
-        e = pytest.main(args)
-        assert e == 0, f'pytest.main() failed: {e=}'
-        return
-    
-    if venv >= 2:
-        pipcl.run(f'pip install --upgrade {gh_release.test_packages}')
-    else:
-        pipcl.log(f'{venv=}: Not installing test packages: {gh_release.test_packages}')
-    run_compound_args = ''
-    
-    if implementations:
-        run_compound_args += f' -i {implementations}'
-    
-    if test_timeout:
-        run_compound_args += f' -t {test_timeout}'
-
-    if pytest_prefix in ('valgrind', 'helgrind'):
-        if system_packages:
-            pipcl.log('Installing valgrind.')
-            pipcl.run(f'sudo apt update')
-            pipcl.run(f'sudo apt install --upgrade valgrind')
-        pipcl.run(f'valgrind --version')
-
-    command = f'{python} {pymupdf_dir_rel}/tests/run_compound.py{run_compound_args}'
-    
-    if pytest_prefix is None:
-        pass
-    elif pytest_prefix == 'gdb':
-        command += ' gdb --args'
-    elif pytest_prefix == 'valgrind':
-        env_extra['PYMUPDF_RUNNING_ON_VALGRIND'] = '1'
-        env_extra['PYTHONMALLOC'] = 'malloc'
-        command += (
-                    f' valgrind'
-                    f' --suppressions={pymupdf_dir_abs}/valgrind.supp'
-                    f' --trace-children=no'
-                    f' --num-callers=20'
-                    f' --error-exitcode=100'
-                    f' --errors-for-leak-kinds=none'
-                    f' --fullpath-after='
-                    )
-    elif pytest_prefix == 'helgrind':
-        env_extra['PYMUPDF_RUNNING_ON_VALGRIND'] = '1'
-        env_extra['PYTHONMALLOC'] = 'malloc'
-        command = (
-                f' valgrind'
-                f' --tool=helgrind'
-                f' --trace-children=no'
-                f' --num-callers=20'
-                f' --error-exitcode=100'
-                f' --fullpath-after='
-                )
-    else:
-        assert 0, f'Unrecognised {pytest_prefix=}'
-
-    if platform.system() == 'Windows':
-        # `python -m pytest` doesn't seem to work.
-        command += ' pytest'
-    else:
-        # On OpenBSD `pip install pytest` doesn't seem to install the pytest
-        # command, so we use `python -m pytest ...`.
-        command += f' {python} -m pytest'
-
-    command += f' {pytest_options} {pytest_arg}'
-
-    # Always start by removing any test_*_fitz.py files.
-    for p in glob.glob(f'{pymupdf_dir_rel}/tests/test_*_fitz.py'):
-        pipcl.log(f'Removing {p=}')
-        os.remove(p)
-    if test_fitz:
-        # Create copies of each test file, modified to use `pymupdf`
-        # instead of `fitz`.
-        for p in glob.glob(f'{pymupdf_dir_rel}/tests/test_*.py'):
-            if os.path.basename(p).startswith('test_fitz_'):
-                # Don't recursively generate test_fitz_fitz_foo.py,
-                # test_fitz_fitz_fitz_foo.py, ... etc.
-                continue
-            branch, leaf = os.path.split(p)
-            p2 = f'{branch}/{leaf[:5]}fitz_{leaf[5:]}'
-            pipcl.log(f'Converting {p=} to {p2=}.')
-            with open(p, encoding='utf8') as f:
-                text = f.read()
-            text2 = re.sub("([^\'])\\bpymupdf\\b", '\\1fitz', text)
-            if p.replace(os.sep, '/') == f'{pymupdf_dir_rel}/tests/test_docs_samples.py'.replace(os.sep, '/'):
-                assert text2 == text
-            else:
-                assert text2 != text, f'Unexpectedly unchanged when creating {p!r} => {p2!r}'
-            with open(p2, 'w', encoding='utf8') as f:
-                f.write(text2)
-    try:
-        pipcl.log(f'Running tests with tests/run_compound.py and pytest.')
-        pipcl.run(command, env_extra=env_extra, timeout=test_timeout)
-        
-    except subprocess.TimeoutExpired as e:
-         pipcl.log(f'Timeout when running tests.')
-         raise
-    finally:
-        pipcl.log(f'\n'
-                f'[As of 2024-10-10 we get warnings from pytest/Python such as:\n'
-                f'    DeprecationWarning: builtin type SwigPyPacked has no __module__ attribute\n'
-                f'This seems to be due to Swig\'s handling of Py_LIMITED_API.\n'
-                f'For details see https://github.com/swig/swig/issues/2881.\n'
-                f']'
-                )
-        pipcl.log('\n' + venv_info(pytest_args=f'{pytest_options} {pytest_arg}'))
+            pipcl.fs_remove(path)
 
 
 def github_workflow_unimportant():
@@ -2077,30 +1580,12 @@ def venv_run(args, path, recreate=True, clean=False):
     return e
 
 
-def fs_remove(path):
-    '''
-    Removes file or directory, without raising exception if it doesn't exist.
-
-    path:
-        The path to remove.
-
-    We assert-fail if the path still exists when we return, in case of
-    permission problems etc.
-    '''
-    try:
-        os.remove( path)
-    except Exception:
-        pass
-    shutil.rmtree( path, ignore_errors=1)
-    assert not os.path.exists( path)
-
-
 def fs_write_key(path, data):
     '''
     Writes <data> to <path>, ensuring that <path> is created with appropriate
     permissions.
     '''
-    fs_remove(path)
+    pipcl.fs_remove(path)
     if platform.system() == 'Windows':
         # For unknown reasons, the code below for non-Windows does not work
         # on Windows.
