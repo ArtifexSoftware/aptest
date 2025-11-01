@@ -40,6 +40,7 @@ import io
 import os
 import platform
 import re
+import selectors
 import shlex
 import shutil
 import site
@@ -2368,6 +2369,10 @@ def run(
         prefix=None,
         encoding=None,  # System default.
         errors='backslashreplace',
+        ticker=0,
+        out=None,
+        tee=None,
+        log=None,
         ):
     '''
     Runs a command using `subprocess.run()`.
@@ -2406,6 +2411,27 @@ def run(
               stderr=subprocess.STDOUT, repetaedly reading the command's output
               and writing it to stdout with <prefix>.
             * We do not support <timeout>, which must be None.
+        encoding:
+        errors:
+            Encoding of child process output.
+        ticker:
+            If non-zero, we show a rotating bar when waiting for child process
+            output, with `ticker` seconds between each rotation.
+        out:
+            Where to write output. Single item or list/tuple of items. Each item
+            can be a callable or an object with .write() and .flush() members.
+        tee:
+            Name of file to also write to. We refuse to overwrite existing file.
+        log:
+            If true we write to pipcl.log() instead of sys.stdout.
+    
+    On Windows:
+        <ticker> is not supported and ignored.
+        <prefix> and <timeout> both being true is not supported, and will raise
+        an exception.
+        These restrictions are because the Python module `selectors` does not
+        handle pipes.
+    
     Returns:
         check capture   Return
         --------------------------
@@ -2433,64 +2459,176 @@ def run(
     sep = ' ' if windows() else ' \\\n'
     command2 = sep.join( lines)
     
-    if prefix:
-        assert not timeout, f'Timeout not supported with prefix.'
-        child = subprocess.Popen(
-                command2,
-                shell=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                encoding=encoding,
-                errors=errors,
-                env=env,
-                )
-        if capture:
-            capture_text = ''
-        decoder = codecs.getincrementaldecoder(child.stdout.encoding)(errors)
-        line_start = True
-        
-        while 1:
-            raw = os.read( child.stdout.fileno(), 10000)
-            text = decoder.decode(raw, final=not raw)
-            if capture:
-                capture_text += text
-            lines = text.split('\n')
-            for i, line in enumerate(lines):
-                if line_start:
-                    sys.stdout.write(prefix)
-                    line_start = False
-                sys.stdout.write(line)
-                if i < len(lines) - 1:
-                    sys.stdout.write('\n')
-                    line_start = True
-            sys.stdout.flush()
-            if not raw:
-                break
-        if not line_start:
-            sys.stdout.write('\n')
-        e = child.wait()
-        if check and e:
-            raise subprocess.CalledProcessError(e, command2, capture_text if capture else None)
-        if check:
-            return capture_text if capture else None
+    if platform.system() == 'Windows':
+        # The `selectors` module does not support pipes.
+        ticker = False
+    
+    cleanup = list()
+    
+    if out:
+        if isinstance(out, tuple):
+            out = list(out)
+        elif not isinstance(out, list):
+            out = [out]
         else:
-            return (e, capture_text) if capture else e
+            out = out.copy()
     else:
-        cp = subprocess.run(
-                command2,
-                shell=True,
-                stdout=subprocess.PIPE if capture else None,
-                stderr=subprocess.STDOUT if capture else None,
-                check=check,
-                encoding=encoding,
-                errors=errors,
-                env=env,
-                timeout=timeout,
-                )
-    if check:
-        return cp.stdout if capture else None
-    else:
-        return (cp.returncode, cp.stdout) if capture else cp.returncode
+        out = list()
+    if log:
+        out.append('log')
+    if not out:
+        out = [sys.stdout]
+    
+    if tee:
+        assert not os.path.exists(tee), f'Tee file already exists: {tee}'
+        tee_f = open(tee, 'w')
+        cleanup.append(tee_f.close)
+        out.append(tee_f)
+    
+    # Convert `out` into list of (write, flush) callables.
+    for i, o in enumerate(out):
+        if callable(o):
+            out[i] = (o, lambda: None)
+        elif o == 'log':
+            write2 = lambda text: _log(text, level=0, caller=caller+3, raw=True)
+            out[i] = (write2, None)
+            def log_cleanup():
+                if not _log_text_line_start:
+                    write2('\n')
+            cleanup.append(log_cleanup)
+        else:
+            out[i] = (o.write, o.flush)
+    
+    def write(text):
+        for write2, flush2 in out:
+            write2(text)
+    def flush():
+        for write2, flush2 in out:
+            if flush2:
+                flush2()
+    
+    try:
+        if prefix or ticker or out!=[sys.stdout]:
+            # Use explicit read loop from child process.
+            if platform.system() == 'Windows':
+                # The `selectors` module does not support pipes.
+                assert not timeout, 'timeout with (prefix or out) not supported on Windows'
+            child = subprocess.Popen(
+                    command2,
+                    shell=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    encoding=encoding,
+                    errors=errors,
+                    env=env,
+                    )
+
+            class TickerState:
+                def __init__(self):
+                    self.count = 0
+                def increment(self):
+                    c = '-\\|/'[self.count % 4]
+                    if self.count:
+                        sys.stdout.write(f'\b{c}')
+                    else:
+                        sys.stdout.write(c)
+                    sys.stdout.flush()
+                    self.count += 1
+                def cancel(self):
+                    if self.count:
+                        sys.stdout.write('\b \b')
+                        self.count = 0
+            ticker_state = TickerState()
+            cleanup.append(ticker_state.cancel)
+
+            if timeout or ticker:
+                selector = selectors.DefaultSelector()
+                selector.register(child.stdout.fileno(), selectors.EVENT_READ)
+            if capture:
+                capture_text = ''
+            decoder = codecs.getincrementaldecoder(child.stdout.encoding)(errors)
+            line_start = True
+            timed_out = False
+            if timeout or ticker:
+                t = time.time()
+                if timeout:
+                    endtime = t + timeout
+            
+            while 1:
+                if timeout or ticker:
+                    # We need to use a timeout.
+                    if ticker:
+                        endtime_ticker = t + ticker
+                    if ticker and timeout:
+                        endtime2 = min(endtime, endtime_ticker)
+                    elif ticker:
+                        endtime2 = endtime_ticker
+                    else:
+                        endtime2 = endtime
+                    events = selector.select(endtime2 - t)
+                    if not events:
+                        # timeout
+                        t2 = time.time()
+                        if timeout and t2 >= endtime:
+                            child.terminate()
+                            timed_out = True
+                            break
+                        if ticker and t2 >= endtime_ticker:
+                            ticker_state.increment()
+                        t = t2
+                        continue
+
+                raw = os.read( child.stdout.fileno(), 10000)
+                text = decoder.decode(raw, final=not raw)
+                if capture:
+                    capture_text += text
+                if text:
+                    ticker_state.cancel()
+                lines = text.split('\n')
+                for i, line in enumerate(lines):
+                    if line_start:
+                        if prefix:
+                            write(prefix)
+                        line_start = False
+                    write(line)
+                    if i < len(lines) - 1:
+                        write('\n')
+                        line_start = True
+                flush()
+                if not raw:
+                    break
+            ticker_state.cancel()
+            if not line_start:
+                write('\n')
+            e = child.wait()
+            if timed_out and check:
+                raise subprocess.TimeoutExpired(e, command2, capture_text if capture else None)
+            if check and e:
+                raise subprocess.CalledProcessError(e, command2, capture_text if capture else None)
+            if check:
+                return capture_text if capture else None
+            else:
+                return (e, capture_text) if capture else e
+        else:
+            # Simple case - we can simply call subprocess.run().
+            cp = subprocess.run(
+                    command2,
+                    shell=True,
+                    stdout=subprocess.PIPE if capture else None,
+                    stderr=subprocess.STDOUT if capture else None,
+                    check=check,
+                    encoding=encoding,
+                    errors=errors,
+                    env=env,
+                    timeout=timeout,
+                    )
+        if check:
+            return cp.stdout if capture else None
+        else:
+            return (cp.returncode, cp.stdout) if capture else cp.returncode
+    finally:
+        for fn in cleanup:
+            fn()
 
 
 def darwin():
@@ -3046,8 +3184,6 @@ def verbose(level=None):
         g_verbose = level
     return g_verbose
 
-g_log_line_numbers = True
-
 def log_line_numbers(yes):
     '''
     Sets whether to include line numbers; helps with doctest.
@@ -3067,18 +3203,115 @@ def log1(text='', caller=1):
 def log2(text='', caller=1):
     _log(text, 2, caller+1)
 
-def _log(text, level, caller):
+
+def _duration(s):
+    '''
+    Return representation of elapsed time +[[[DAYSd]HOURSh]MINSm]Ss, for
+    example 1h03m45.3s.
+    '''
+    m, s = divmod(s, 60)
+    h, m = divmod(m, 60)
+    d, h = divmod(h, 24)
+    m = int(m)
+    h = int(h)
+    d = int(d)
+    if d:
+        return f'{d}d{h:02}h{m:02}m{s:04.1f}s'
+    elif h:
+        return f'{h:}h{m:02}m{s:04.1f}s'
+    elif m:
+        return f'{m}m{s:04.1f}s'
+    else:
+        return f'{s:.1f}s'
+
+
+# Log prefix pattern.
+# %d - elapsed time +[[[DAYSd]HOURSh]MINSm]Ss, for example 1h03m45.3s.
+# %f - function name
+# %l - line number
+# %p - path.
+# %t - current time YYYY-MM-DD-HH-MM-SS
+g_log_format = '[+%d] %p:%l: %f(): '
+g_log_t0 = time.time()
+
+def _log_prefix(format_, caller):
+    ret = ''
+    
+    _get_frame_cache = [None]
+    def get_frame():
+        if _get_frame_cache[0] is None:
+            frame = inspect.stack(context=0)[caller+1]
+            path = relpath(frame.filename)
+            _get_frame_cache[0] = frame, path
+        return _get_frame_cache[0]
+    
+    pos = 0
+    while pos < len(format_):
+        pos0 = pos
+        if 0:
+            pass
+        elif format_[pos:].startswith('%d'):
+            # Elapsed time.
+            pos += 2
+            s = time.time() - g_log_t0
+            ret += _duration(s)
+        elif format_[pos:].startswith('%f'):
+            # Function name.
+            pos += 2
+            frame, path = get_frame()
+            ret += frame.function
+        elif format_[pos:].startswith('%l'):
+            # Line number.
+            pos += 2
+            frame, path = get_frame()
+            ret += str(frame.lineno)
+        elif format_[pos:].startswith('%p'):
+            # Path.
+            pos += 2
+            frame, path = get_frame()
+            ret += path
+        elif format_[pos:].startswith('%t'):
+            # Current date and time.
+            pos += 2
+            ret += time.strftime(f'%F-%T')
+        else:
+            ret += format_[pos]
+            pos += 1
+        assert pos > pos0
+    return ret
+
+_log_text_line_start = True
+
+
+def _log(text, level, caller, raw=False, nl=True):
     '''
     Logs lines with prefix, if <level> is lower or equal to <g_verbose>.
     '''
-    if level <= g_verbose:
-        fr = inspect.stack(context=0)[caller]
-        filename = relpath(fr.filename)
-        for line in text.split('\n'):
-            if g_log_line_numbers:
-                print(f'{filename}:{fr.lineno}:{fr.function}(): {line}', file=sys.stdout, flush=1)
-            else:
-                print(f'{filename}:{fr.function}(): {line}', file=sys.stdout, flush=1)
+    
+    if level > g_verbose:
+        return
+    prefix = None
+    global _log_text_line_start
+    text2 = ''
+    pos = 0
+    while 1:
+        if pos == len(text):
+            break
+        if not raw or _log_text_line_start:
+            if prefix is None:
+                prefix = _log_prefix(g_log_format, caller+1)
+            sys.stdout.write(prefix)
+        nlp = text.find('\n', pos)
+        if nlp == -1:
+            sys.stdout.write(text[pos:])
+            if not raw and nl:
+                sys.stdout.write('\n')
+            pos = len(text)
+        else:
+            sys.stdout.write(text[pos:nlp+1])
+            pos = nlp+1
+        if raw:
+            _log_text_line_start = (nlp >= 0)
 
 
 def relpath(path, start=None, allow_up=True):
@@ -3513,7 +3746,10 @@ if __name__ == '__main__':
     # graal_legacy_python_config is true.
     #
     includes, ldflags = sysconfig_python_flags()
-    if sys.argv[1] == '--doctest':
+    if len(sys.argv) == 1:
+        run('sleep 4', ticker=0.5, timeout=0)
+        run('sleep 3', ticker=0.25, timeout=0)
+    elif sys.argv[1] == '--doctest':
         import doctest
         if sys.argv[2:]:
             for f in sys.argv[2:]:
