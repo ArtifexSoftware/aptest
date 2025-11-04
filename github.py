@@ -558,6 +558,7 @@ def gh_workflow_download_multiple(url_base, yml, ids, download=True, extra_wheel
     ids0 = ids.copy()
     local_dir = f'gh_workflow-{time.strftime("%Y-%m-%d")}-{"-".join(ids)}'
     local_dir_union = f'{local_dir}-union'
+    local_dir_pypi = f'{local_dir}-pypi'
     pipcl.log(f'{ids=} {local_dir=}')
     directorys = [None] * len(ids)
     pipcl.log(f'Waiting for workflows to finish: {ids=}')
@@ -644,13 +645,24 @@ def gh_workflow_download_multiple(url_base, yml, ids, download=True, extra_wheel
     _check_identical_wheels(leaf_to_paths)
     
     pyodide_wheels = _create_download_union(leaf_to_paths, extra_wheels, local_dir_union)
+    pipcl.log(f'Have coped {len(pyodide_wheels)} wheels into {local_dir_union}.')
     
     if errors:
         raise Exception(f'One or more workflows failed: {errors}')
 
+    # Create pypi-style directory.
+    make_piprepo(local_dir_union, local_dir_pypi)
+    pipcl.log(f'Have created {local_dir_pypi=}.')
+    
     if upload:
         _upload(local_dir_union, pyodide_wheels, upload)
-    
+
+
+def make_piprepo(wheel_dir, pypi_dir):    
+    pipcl.run(f'pip install --upgrade piprepo setuptools', prefix=f'pip install piprepo setuptools: ')
+    os.makedirs(pypi_dir, exist_ok=1)
+    pipcl.run(f'piprepo build {pypi_dir}')
+    pipcl.run(f'piprepo sync {wheel_dir} {pypi_dir}')
 
 
 def _check_identical_wheels(leaf_to_paths):
@@ -905,3 +917,22 @@ def upload_pypi(paths, pypi_test: bool=False):
             input('Press <enter> to retry... ? ')
         else:
             break
+
+
+def main():
+    args = iter(sys.argv[1:])
+    while 1:
+        try:
+            arg = next(args)
+        except StopIteration:
+            break
+        if arg == 'make-pypi':
+            wheel_dir = next(args)
+            pypi_dir = next(args)
+            make_piprepo(wheel_dir, pypi_dir)
+        else:
+            assert 0, f'Unrecognised {arg=}.'
+
+
+if __name__ == '__main__':
+    sys.exit(main())
