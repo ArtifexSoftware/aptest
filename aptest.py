@@ -602,8 +602,8 @@ def main(argv):
             names = [
                 'mupdf',
                 'pymupdf',
+                'layout',
                 'pro',
-                'layout'
                 ]
             keyfn = lambda name: names.index(name)
             state.packages_build.sort(key=keyfn)
@@ -1384,6 +1384,19 @@ def main(argv):
                             env_extra['PYMUPDFPRO_SETUP_SOT_KEY_PATH'] = f'{prefix}{os.path.abspath(PYMUPDFPRO_SETUP_SOT_KEY_PATH)}'
                     else:
                         prefix = ''
+                    
+                    if platform.system() == 'Linux' and package == 'pro':
+                        # Build will run inside a CentOS-7 container; we
+                        # need to install fontconfig-devel so `#include
+                        # <fontconfig/fonctconfig.h>` works. And for SO build
+                        # we need ssh to allow its git submodule commands.
+                        #
+                        env_extra['CIBW_BEFORE_BUILD_LINUX'] = (
+                                'echo "installing fontconfig-devel and ssh"'
+                                ' && yum -y install fontconfig-devel'
+                                ' && yum groupinstall -y fonts'
+                                ' && yum install -y openssh-clients'
+                                )
                     
                     # Ensure that when cibuildwheel runs pip to install
                     # prerequisite packages, it also looks in cibw_pypi. PIP_EXTRA_INDEX_URL
