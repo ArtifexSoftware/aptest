@@ -29,19 +29,28 @@ Examples:
           and pymupdf_layout.
         * Build/install/test each package.
     
-    ./aptest/aptest.py -r @github -p git: -P git -l git: cibw
-        Build, install and test pymupdf, pymupdfpro and pymupdf_layout using
-        central git repositories.
+    ./aptest/aptest.py -r @github -p git: -P git: -l git: --sdists 1 --github-upload 1 cibw
+        Make a release.
         
-        * Runs on Github.
-        * Downloads the logs and wheels from Github to local machine.
-    
-    ./aptest/aptest.py -p git: -P git -l git: cibw upload
+        * Note that this omits windows-x32 and linux-aarch64.
+        * Will attempt to pip install piprepo after download of wheels, so
+          should be run inside a venv.
+          * Need to modify the code so that we enter a local venv even though
+            `-r` is specified.
+        
         * Runs cibuildwheel on Github to build wheels and test pymupdf,
           pymupdfpro and pymupdf-layout wheels, using latest code in default git
           repositories.
         * Downloads wheels from Github artifacts to local machine.
         * Uploads wheels to pypi.org (after asking for confirmation).
+    
+    ./aptest/aptest.py -r @github -p 'git:-t <version>' -P 'git:-t <version>' -l 'git:-t <version>' -u 1 cibw -o linux -e CIBW_ARCHS_LINUX=aarch64
+    ./aptest/aptest.py -r @github -p 'git:-t 1.26.6' -P 'git:-t 1.26.6' -l 'git:-t 1.26.6' -u 1 cibw -o linux -e CIBW_ARCHS_LINUX=aarch64
+        Make a release 2. pymupdf pro layout for linux-aarch64.
+    
+    ./aptest/aptest.py -r @github -p 'git:-t <version>' -u 1 cibw -o windows -e CIBW_ARCHS_WINDOWS=x86 --cibw-skip-add-defaults 0
+    ./aptest/aptest.py -r @github -p 'git:-t 1.26.6' -u 1 cibw -o windows -e CIBW_ARCHS_WINDOWS=x86 --cibw-skip-add-defaults 0
+        Make a release 2. pymupdf for windows-x32.
 
     ./aptest/aptest.py -r @github -p pip: -P PyMuPDFPlus -l git: cibw
         This demontrates getting packages from different locations.
@@ -168,7 +177,7 @@ Args:
         -o <os_names>
             Control which OS's we run on. If current OS is not in
             (comma-separated) list, we do nothing. <os_names> is case
-            insensitive.
+            insensitive. Should match linux, windows or darwin.
         
         -p <location>
         --pymupdf <location>
@@ -230,6 +239,10 @@ Args:
                 -t -mupdf,-layout
                     Removes mupdf and layout from list of packages to test.
 
+        -u 0|1
+            If 1, if `-r @github` is used then on success we ask the user to
+            confirm and then upload wheels to pypi.org.
+            
         -v <venv>
             0 - do not use a venv.
             1 - Use venv. If it already exists, we assume the existing
@@ -304,11 +317,7 @@ Args:
         --ticker <delay>
             Use ticker with specified delay. Disabled if delay==0. Default is
             0.5.
-        
-        --github-upload 0|1
-            If 1, if `-r @github` is used then on success we ask the user to
-            confirm and then upload wheels to pypi.org.
-        
+            
     Commands:
     
         build
@@ -329,11 +338,6 @@ Args:
 
         test
             Runs pytest tests.
-
-        upload
-            Only works with `-r @github` and intended for use with `cibw` only.
-
-            Uploads wheels to pypi.org. Asks for confirmation before uploading.
             
 
 Other:
@@ -747,6 +751,9 @@ def main(argv):
         
         elif arg == '-o':
             state.os_names += next(args).lower().split(',')
+            names = ('linux', 'windows', 'darwin')
+            for os_name in state.os_names:
+                assert os_name in names, f'OS names should be from {names!r} but {os_name=}.'
         
         elif arg in ('-p', '--pymupdf'):
             add_package('pymupdf', next(args), args.pos - 1)
@@ -814,7 +821,7 @@ def main(argv):
         elif arg == '--ticker':
             ticker = float(next(args))
         
-        elif arg == '--github-upload':
+        elif arg == '-u':
             state.github_upload = int(next(args))
         
         elif arg == '-v':
@@ -913,7 +920,7 @@ def main(argv):
                     'test.yml',
                     workflow_id,
                     #extra_wheels=upload_extra_wheels,
-                    upload=state.github_upload,
+                    upload='pypi' if state.github_upload else None,
                     )
         
         else:
@@ -1126,6 +1133,20 @@ def main(argv):
                     f'cd {directory} && python setup.py -d {g_root_abs}/wheelhouse sdist',
                     prefix='sdist {package}: ',
                     )
+    
+    if (1
+            and os.environ.get('GITHUB_ACTIONS') == 'true'
+            and pipcl.darwin()
+            and platform.machine()=='x86_64'
+            ):
+        # We need to set MACOSX_DEPLOYMENT_TARGET here to avoid build errors
+        # with mupdf's tesseract code.
+        #
+        MACOSX_DEPLOYMENT_TARGET = os.environ.get('MACOSX_DEPLOYMENT_TARGET')
+        pipcl.log(f' {MACOSX_DEPLOYMENT_TARGET=}.')
+        MACOSX_DEPLOYMENT_TARGET = '10.15'
+        pipcl.log(f' {MACOSX_DEPLOYMENT_TARGET=}.')
+        state.env_extra['MACOSX_DEPLOYMENT_TARGET'] = MACOSX_DEPLOYMENT_TARGET
     
     try:
         # Handle commands.
