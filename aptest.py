@@ -30,7 +30,7 @@ Examples:
         * Build/install/test each package.
     
     ./aptest/aptest.py -r @github -p git: -P git: -l git: --sdists 1 --github-upload 1 cibw
-        Make a release.
+        Make a release 1
         
         * Note that this omits windows-x32 and linux-aarch64.
         * Will attempt to pip install piprepo after download of wheels, so
@@ -44,25 +44,25 @@ Examples:
         * Downloads wheels from Github artifacts to local machine.
         * Uploads wheels to pypi.org (after asking for confirmation).
     
-    ./aptest/aptest.py -r @github -p 'git:-t <version>' -P 'git:-t <version>' -l 'git:-t <version>' -u 1 cibw -o linux -e CIBW_ARCHS_LINUX=aarch64
-    ./aptest/aptest.py -r @github -p 'git:-t 1.26.6' -P 'git:-t 1.26.6' -l 'git:-t 1.26.6' -u 1 cibw -o linux -e CIBW_ARCHS_LINUX=aarch64
-        Make a release 2. pymupdf pro layout for linux-aarch64.
-    
     ./aptest/aptest.py -r @github -p 'git:-t <version>' -u 1 cibw -o windows -e CIBW_ARCHS_WINDOWS=x86 --cibw-skip-add-defaults 0
     ./aptest/aptest.py -r @github -p 'git:-t 1.26.6' -u 1 cibw -o windows -e CIBW_ARCHS_WINDOWS=x86 --cibw-skip-add-defaults 0
         Make a release 2. pymupdf for windows-x32.
 
+    ./aptest/aptest.py -r @github -p 'git:-t <version>' -P 'git:-t <version>' -l 'git:-t <version>' -u 1 cibw -o linux -e CIBW_ARCHS_LINUX=aarch64 -e 'CIBW_BUILD=cp310*'
+    ./aptest/aptest.py -r @github -p 'git:-t 1.26.6' -P 'git:-t 1.26.6' -l 'git:-t 1.26.6' -u 1 cibw -o linux -e CIBW_ARCHS_LINUX=aarch64 -e 'CIBW_BUILD=cp310*'
+        Make a release 3. pymupdf pymupdfpro layout for linux-aarch64.
+    
     ./aptest/aptest.py -r @github -p pip: -P PyMuPDFPlus -l git: cibw
         This demontrates getting packages from different locations.
         
         Build/test pymupdf, pymupdfpro and pymupdf-layout using cibuildwheel.
         
-        * Installs pymupdf from pypi.org. (We will not run pymupdf tests.)
+        * Installs pymupdf from pypi.org. (We will not run pymupdf tests
+          because no checkout.)
         * For pymupdfpro we use local checkout.
         * Gets pymupdf_layout from central git.
         
-        (We will fail if pypi.org's pymupdf is a different version from
-        pymupdfpro / pymupdf-layout.)
+        (We will fail if any of the packages have incompatible version numbers.)
 
 Args:
 
@@ -79,25 +79,9 @@ Args:
             the specified comma-separated packages instead of all packages
             specified by `-i`.
         
-        --build-pyodide 0|1
-            Modifies 'build' command to build pyodide wheels.
-
-            We clone `emsdk.git`, set it up, and run `pyodide
-            build`. This runs our setup.py with CC etc set up to
-            create Pyodide binaries in a wheel called, for example,
-            `PyMuPDF-1.23.2-cp311-none-emscripten_3_1_32_wasm32.whl`.
-
-            It seems that sys.version must match the Python version inside
-            emsdk; as of 2025-02-14 this is 3.12. Otherwise we get build errors
-            such as: [wasm-validator error in function 723] unexpected false:
-            all used features should be allowed, on ...
-        
         --build-wheels 0|1
             Makes `build` command build wheel(s) in wheelhouse/ and install
             them, instead of direct build and install.
-        
-        ? -c <packages>
-            The 'cibw' command runs only on the specified packages.
         
         --cibw-name <cibw_name>
             Name to use when installing cibuildwheel, e.g.:
@@ -106,16 +90,12 @@ Args:
             Default is `cibuildwheel`, i.e. the current release.
 
         --cibw-pyodide 0|1
-             Experimental, make `cibw` command build a pyodide wheel.
-             2025-05-27: this fails when building mupdf C API - `ld -r -b
-             binary ...` fails with:
-                emcc: error: binary: No such file or directory ("binary"
-                was expected to be an input file, based on the commandline
-                arguments provided)
+             Make `cibw` command build a pyodide wheel, runs `cibuildwheel
+             --platform pyodide` etc.
 
         --cibw-pyodide-version <cibw_pyodide_version>
-            Override default Pyodide version to use with `cibuildwheel`
-            command. If empty string we use cibuildwheel's default.
+            Override default Pyodide version to use with `cibuildwheel` command
+            by setting CIBW_PYODIDE_VERSION.
 
         --cibw-skip-add-defaults 0|1
             If 1 (the default) we add defaults to CIBW_SKIP such as `pp*` (to
@@ -149,7 +129,7 @@ Args:
         -i <package-name> <location>
             Add an input package.
             package-name:
-                One of: mupdf pymupdf pro layout
+                One of: mupdf pymupdf pymupdfpro layout
                 If empty string will be ignored except that `-r` will sync to
                 remote.
             location:
@@ -184,8 +164,8 @@ Args:
             Alias for `-i pymupdf <location>
         
         -P <location>
-        --pro <location>
-            Alias for `-i pro <location>
+        --pymupdfpro <location>
+            Alias for `-i pymupdfpro <location>
         
         -r <remote>
         
@@ -233,10 +213,14 @@ Args:
             In addition if the first item does not start with '+' or '-' we
             first remove all packages from the list.
             
+            We allow single-letter aliases for package names.
+            
             For example:
-                -t -,pro
-                    Tests only pro.
-                -t -mupdf,-layout
+                -t -,P
+                -t -,pymudfpro
+                    Tests only pymupdfpro.
+                -t -m,-l
+                -t -mupdf,-pymupdf_layout
                     Removes mupdf and layout from list of packages to test.
 
         -u 0|1
@@ -253,12 +237,12 @@ Args:
             
             The default is 2.
         
-        --pyodide-build-version <version>
-            Version of Python package pyodide-build to use with `pyodide`
-            command.
-
-            If None (the default) `pyodide` uses the latest available version.
-            2025-02-13: pyodide_build_version='0.29.3' works.
+        #--pyodide-build-version <version>
+        #    Version of Python package pyodide-build to use with `pyodide`
+        #    command.
+        #
+        #    If None (the default) `pyodide` uses the latest available version.
+        #    2025-02-13: pyodide_build_version='0.29.3' works.
     
         --pytest <pytest-flags>
             Specify pytest flags, for example `--pytest '-k test_123'`.
@@ -508,25 +492,35 @@ def sync(remote, remote_dir, path, ssh_command, verbose):
     return ret
 
 
+def unalias(name):
+    if name == 'm':
+        name = 'mupdf'
+    elif name == 'p':
+        name = 'pymupdf'
+    elif name == 'P':
+        name = 'pymupdfpro'
+    elif name == 'l':
+        name = 'pymupdf_layout'
+    names = ('mupdf', 'pymupdf', 'pymupdfpro', 'pymupdf_layout')
+    assert name in names, f'Unrecognised {name=}, should be one of {names!r}.'
+    return name
+    
+
 def name_info(name):
     class NameInfo:
         pass
     ret = NameInfo()
     ret.submodules = True
     if name == 'mupdf':
-        ret.name_full = 'mupdf'
         ret.git_remote = 'git@github.com:ArtifexSoftware/mupdf.git'
         ret.git_branch = 'master'
     elif name == 'pymupdf':
-        ret.name_full = 'pymupdf'
         ret.git_remote = 'git@github.com:pymupdf/PyMuPDF.git'
         ret.git_branch = 'main'
-    elif name == 'pro':
-        ret.name_full = 'pymupdfpro'
+    elif name == 'pymupdfpro':
         ret.git_remote = 'git@github.com:ArtifexSoftware/PyMuPDFPro.git'
         ret.git_branch = 'main'
-    elif name == 'layout':
-        ret.name_full = 'pymupdf_layout'
+    elif name == 'pymupdf_layout':
         ret.git_remote = 'git@github.com:ArtifexSoftware/sce.git'
         ret.git_branch = 'master'
         # Have seen problems with clong after we've pushed local checkout to
@@ -587,7 +581,7 @@ def main(argv):
     state.packages_build = list() # Sorted list of names.
     state.packages_test = list()  # Sorted list of names.
     state.pybind = False
-    state.pyodide_build_version = None
+    #state.pyodide_build_version = None
     state.pytest_options = ''
     state.pytest_wrap = None
     state.sdists = False
@@ -606,8 +600,8 @@ def main(argv):
             names = [
                 'mupdf',
                 'pymupdf',
-                'layout',
-                'pro',
+                'pymupdf_layout',
+                'pymupdfpro',
                 ]
             keyfn = lambda name: names.index(name)
             state.packages_build.sort(key=keyfn)
@@ -729,43 +723,23 @@ def main(argv):
             _location = next(args)
             add_package(_name, _location, args.pos - 1)
         
-        elif arg in ('-l', '--layout'):
-            add_package('layout', next(args), args.pos - 1)
+        elif arg in ('-l', '--pymupdf_layout'):
+            add_package('pymupdf_layout', next(args), args.pos - 1)
         
         elif arg in ('-m', '--mupdf'):
             add_package('mupdf', next(args), args.pos - 1)
-        
-            #_mupdf = next(args)
-            #if _mupdf == '-':
-            #    _mupdf = None
-            #elif _mupdf.startswith(':'):
-            #    _branch = _mupdf[1:]
-            #    _mupdf = f'git:--branch {_branch} https://github.com/ArtifexSoftware/mupdf.git'
-            #    env_extra['PYMUPDF_SETUP_MUPDF_BUILD'] = _mupdf
-            #elif _mupdf.startswith('git:') or '://' in _mupdf:
-            #    env_extra['PYMUPDF_SETUP_MUPDF_BUILD'] = _mupdf
-            #else:
-            #    assert os.path.isdir(_mupdf), f'Not a directory: {_mupdf=}'
-            #    env_extra['PYMUPDF_SETUP_MUPDF_BUILD'] = os.path.abspath(_mupdf)
-            #    mupdf_sync = _mupdf
         
         elif arg == '-o':
             state.os_names += next(args).lower().split(',')
             names = ('linux', 'windows', 'darwin')
             for os_name in state.os_names:
-                assert os_name in names, f'OS names should be from {names!r} but {os_name=}.'
+                assert os_name in names, f'OS names should be from {names!r} but {names=}.'
         
         elif arg in ('-p', '--pymupdf'):
             add_package('pymupdf', next(args), args.pos - 1)
         
-        elif arg in ('-P', '--pro'):
-            add_package('pro', next(args), args.pos - 1)
-        
-        elif arg == '-p':
-            state.pytest_options += f' {next(args)}'
-        
-        elif arg == '-P':
-            state.system_packages = int(next(args))
+        elif arg in ('-P', '--pymupdfpro'):
+            add_package('pymupdfpro', next(args), args.pos - 1)
         
         elif arg == '-r':
             remote_arg = args.pos
@@ -778,8 +752,8 @@ def main(argv):
         elif arg == '--pybind':
             state.pybind = int(next(args))
         
-        elif arg == '--pyodide-build-version':
-            state.pyodide_build_version = next(args)
+        #elif arg == '--pyodide-build-version':
+        #    state.pyodide_build_version = next(args)
         
         elif arg == '--pytest':
             state.pytest_options = next(args)
@@ -893,14 +867,8 @@ def main(argv):
                         info = name_info(package_name)
                         pipcl.log(f'{package_name=}.')
                         pipcl.log(f'{info.git_remote=}.')
-                        if 0 and package_name == 'mupdf':
-                            # We can't non-fast-forward push to ghostscript.com:/home/git/mupdf.git.
-                            git_remote = 'git@github.com:ArtifexSoftware/mupdf.git'
-                            git_push(package_location, git_remote, branch)
-                            argv[args_pos] = f'git:-b {branch} {git_remote}'
-                        else:
-                            git_push(package_location, info.git_remote, branch)
-                            argv[args_pos] = f'git:-b {branch} {info.git_remote}'
+                        git_push(package_location, info.git_remote, branch)
+                        argv[args_pos] = f'git:-b {branch} {info.git_remote}'
 
                 # Run ourselves on Github, passing argv.
                 data = dict(
@@ -1008,9 +976,8 @@ def main(argv):
                 # Copy remote wheels back to local machine.
                 filters = list()
                 for package in state.packages_build:
-                    info = name_info(package)
-                    filters.append(f'--include={info.name_full}-*.whl')
-                    filters.append(f'--include={info.name_full}-*.tar.gz')
+                    filters.append(f'--include={package}-*.whl')
+                    filters.append(f'--include={package}-*.tar.gz')
                 filters.append('--exclude=*')
                 sync_reverse(
                         remote, remote_dir,
@@ -1082,11 +1049,7 @@ def main(argv):
     # Set environment variables to give access to required git repositories.
     #
     paths_to_delete = list()
-    if (1   # we need this even for mupdf because we use git@github.com/... when cloning, not https.
-            or 'pro' in state.packages_build
-            or 'layout' in state.packages_build
-            or 'layout' in state.packages_test
-            ):
+    if 1:
         # Allow access to private github.com/ArtifexSoftware/* repositories.
         
         # On Github ARTIFEX_SOFTWARE_SSH_KEY is set from repository secret.
@@ -1100,7 +1063,7 @@ def main(argv):
         elif os.path.isfile(artifex_software_ssh_key):
             state.ssh_key_path_abs = os.path.abspath(artifex_software_ssh_key)
         else:
-            pipcl.log('## May not be able to clone/update/test pro/layout because ARTIFEX_SOFTWARE_SSH_KEY unset and file {artifex_software_ssh_key!r} does not exist')
+            pipcl.log('## May not be able to clone/update/test pymupdfpro/layout because ARTIFEX_SOFTWARE_SSH_KEY unset and file {artifex_software_ssh_key!r} does not exist')
             state.ssh_key_path_abs = None
         if state.ssh_key_path_abs:
             # We need to use forward slashes on Windows.
@@ -1111,7 +1074,7 @@ def main(argv):
             #APTEST_SSH_KEY = os.path.abspath(key_path)
             #state.env_extra['APTEST_SSH_KEY'] = APTEST_SSH_KEY
 
-    if 'pro' in state.packages_build:
+    if 'pymupdfpro' in state.packages_build:
         # The SmartOffice build requires remote git access.
         
         # On Github PYMUPDFPRO_SETUP_SOT_KEY is set from repository secret.
@@ -1125,7 +1088,7 @@ def main(argv):
                 state.env_extra['PYMUPDFPRO_SETUP_SOT_KEY_PATH'] = PYMUPDFPRO_SETUP_SOT_KEY_PATH
                 pipcl.log(f'Using {PYMUPDFPRO_SETUP_SOT_KEY_PATH=}.')
             else:
-                pipcl.log('## May not be able to build pro because PYMUPDFPRO_SETUP_SOT_KEY unset and file {PYMUPDFPRO_SETUP_SOT_KEY_PATH!r} does not exist')
+                pipcl.log('## May not be able to build pymupdfpro because PYMUPDFPRO_SETUP_SOT_KEY unset and file {PYMUPDFPRO_SETUP_SOT_KEY_PATH!r} does not exist')
     
     def build_sdist(package, directory):
         if package == 'pymupdf':
@@ -1171,17 +1134,17 @@ def main(argv):
                     location, args_pos = state.packages[package]
                     if not location:
                         continue
-                    info = name_info(package)
                     if location.startswith('pip:'):
-                        assert info.name_full != 'mupdf', f'Not a package on pypi.org: {info.full_name}'
+                        assert package != 'mupdf', f'Not a package on pypi.org: {package}'
                         command = f'pip install -v'
-                        command += f' {info.name_full}{location[4:]}'
+                        command += f' {package}{location[4:]}'
                         pipcl.run(command)
                     else:
                         if location.startswith('git:'):
+                            info = name_info(package)
                             temp_key_path = None
                             directory = pipcl.git_get(
-                                    local=f'git-{info.name_full}',
+                                    local=f'aptest-git-{package}',
                                     remote=info.git_remote,
                                     branch=info.git_branch,
                                     text=location,
@@ -1199,7 +1162,7 @@ def main(argv):
                             state.env_extra['PYMUPDF_SETUP_MUPDF_BUILD'] = directory_abs
                             # fixme: be able to set to '' for system install?
                         else:
-                            pipcl.run(f'pip uninstall -y {info.name_full}')
+                            pipcl.run(f'pip uninstall -y {package}')
                             
                             if state.sdists:
                                 build_sdist(package, directory)
@@ -1207,20 +1170,21 @@ def main(argv):
                             if (package == 'pymupdf'
                                     and state.graal
                                     and (
-                                        'pro' in state.packages_build
+                                        'pymupdfpro' in state.packages_build
                                         or 'layout' in state.packages_build
                                         )
                                     ):
-                                # As of 2025-08-07, pipcl does graal builds by running a
-                                # non-graal build with graal python's include and library
-                                # paths.
+                                # As of 2025-08-07, pipcl does graal builds by
+                                # running a non-graal build with graal python's
+                                # include and library paths.
                                 #
-                                # In the non-graal build, out setup.py will still want
-                                # to do `import pymupdf`, so we prepare a non-graal venv
-                                # containing its own build of the specified pymupdf,
-                                # and tell pipcl to use it when it does the non-graal
-                                # build. Thus pro's setup.py will be able to do `import pymupdf`
-                                # etc.
+                                # In the non-graal build, out setup.py will
+                                # still want to do `import pymupdf`, so we
+                                # prepare a non-graal venv containing its own
+                                # build of the specified pymupdf, and tell
+                                # pipcl to use it when it does the non-graal
+                                # build. Thus pymupdfpro's setup.py will be
+                                # able to do `import pymupdf` etc.
                                 #
                                 native_python = os.environ['PIPCL_GRAAL_PYTHON']
                                 assert native_python
@@ -1232,10 +1196,10 @@ def main(argv):
                                         prefix='PyMuPDFPro/scripts/test.py install PyMuPDF graal native python: ',
                                         )
                                 # Tell pipcl to use <venv_native> when it
-                                # builds pro/layout later on.
+                                # builds pymupdfpro/layout later on.
                                 state.env_extra['PIPCL_GRAAL_NATIVE_VENV'] = os.path.abspath(venv_native)
 
-                            new_files = pipcl.NewFiles(f'{wheelhouse_local}/{info.name_full}*.whl')
+                            new_files = pipcl.NewFiles(f'{wheelhouse_local}/{package}*.whl')
                             pipcl.run(
                                     f'pip wheel -v --extra-index-url file://{pypi_local}/simple --no-cache-dir -w {wheelhouse_local} {directory_abs}',
                                     env_extra=state.env_extra,
@@ -1340,13 +1304,13 @@ def main(argv):
                     location, args_pos = state.packages[package]
                     if not location:
                         continue
-                    info = name_info(package)
                     if location.startswith('pip:'):
                         # cibuildwheel will download from pypi as required.
                         continue
                     elif location.startswith('git:'):
+                        info = name_info(package)
                         directory = pipcl.git_get(
-                                local=f'git-aptest-{info.name_full}',
+                                local=f'aptest-git-{package}',
                                 remote=info.git_remote,
                                 branch=info.git_branch,
                                 text=location,
@@ -1361,9 +1325,9 @@ def main(argv):
                         directory = location
                     directory_abs = os.path.abspath(directory)
                     if package == 'mupdf':
-                        if platform.system() == 'Linux':
+                        if platform.system() == 'Linux' and not state.cibw_pyodide:
                             # Need /host/ prefix so accessible from within manylinux docker.
-                            state.env_extra['PYMUPDF_SETUP_MUPDF_BUILD'] = f'/host/{directory_abs}'
+                            state.env_extra['PYMUPDF_SETUP_MUPDF_BUILD'] = f'/host{directory_abs}'
                         else:
                             state.env_extra['PYMUPDF_SETUP_MUPDF_BUILD'] = directory_abs
                         # fixme: be able to set to '' for system install?
@@ -1374,7 +1338,18 @@ def main(argv):
 
                     # Tell cibuildwheel how to test <package>.
                     if package in state.packages_test:
-                        state.env_extra['CIBW_TEST_COMMAND'] = f'python {{project}}/scripts/test.py test'
+                        CIBW_TEST_COMMAND = f'python {{project}}/scripts/test.py test'
+                        if state.pytest_options:
+                            if package == 'pymupdf':
+                                CIBW_TEST_COMMAND += f' -p {shlex.quote(state.pytest_options)}'
+                            elif package == 'pymupdfpro':
+                                CIBW_TEST_COMMAND += f' -t {shlex.quote(state.pytest_options)}'
+                            elif package == 'pymupdf_layout':
+                                CIBW_TEST_COMMAND += f' -t {shlex.quote(state.pytest_options)}'
+                            else:
+                                pipcl.log(f'Unable to add {state.pytest_options=} to CIBW_TEST_COMMAND.')
+                        state.env_extra['CIBW_TEST_COMMAND'] = CIBW_TEST_COMMAND
+                                
                     else:
                         pipcl.log(f'Not testing because not in state.packages_test: {package=}')
                     # fixme: prefer to just run pytest directly. Needs
@@ -1406,7 +1381,7 @@ def main(argv):
                     else:
                         prefix = ''
                     
-                    if platform.system() == 'Linux' and package == 'pro':
+                    if platform.system() == 'Linux' and package == 'pymupdfpro':
                         # Build will run inside a CentOS-7 container; we
                         # need to install fontconfig-devel so `#include
                         # <fontconfig/fonctconfig.h>` works. And for SO build
@@ -1476,15 +1451,15 @@ def main(argv):
                     location, _ = state.packages[package]
                     if not location:
                         continue
-                    info = name_info(package)
-                    if info.name_full == 'mupdf':
+                    if package == 'mupdf':
                         pass
                     elif location.startswith('pip:'):
                         pass
                     else:
                         if location.startswith('git:'):
+                            info = name_info(package)
                             directory = pipcl.git_get(
-                                    local='git-{info.name_full}',
+                                    local='aptest-git-{package}',
                                     remote=info.git_remote,
                                     branch=info.git_branch,
                                     text=location,
@@ -1496,6 +1471,7 @@ def main(argv):
                             if not state.pytest_options:
                                 command += ' -sv'
                         if state.pytest_wrap:
+                            command = f'python -m {command}'
                             if state.pytest_wrap == 'gdb':
                                 command = f'gdb --args {command}'
                             elif state.pytest_wrap == 'valgrind':
@@ -1539,8 +1515,8 @@ def main(argv):
                             pipcl.log(f'    {package}')
                         raise Exception(f'Packages failed tests: {failed_packages}')
 
-            elif command == 'pyodide':
-                build_pyodide_wheel(pyodide_build_version=pyodide_build_version)
+            #elif command == 'pyodide':
+            #    build_pyodide_wheel(pyodide_build_version=pyodide_build_version)
 
             else:
                 assert 0, f'{command=}'
