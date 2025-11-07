@@ -38,12 +38,14 @@ import hashlib
 import inspect
 import io
 import os
+import pickle
 import platform
 import re
 import selectors
 import shlex
 import shutil
 import site
+import stat
 import subprocess
 import sys
 import sysconfig
@@ -2324,7 +2326,7 @@ def git_get(
         # No existing git checkout, so do a fresh clone.
         #_fs_remove(local)
         log0(f'{os.getcwd()=}')
-        log0(f'Cloning to: {local}')
+        log0(f'Cloning to: {os.path.abspath(local)}')
         command = f'git clone --config core.longpaths=true{depth_arg}'
         if submodules:
             command += f' --recursive --shallow-submodules'
@@ -2584,17 +2586,19 @@ def run(
                     capture_text += text
                 if text:
                     ticker_state.cancel()
-                lines = text.split('\n')
-                for i, line in enumerate(lines):
-                    if line_start:
-                        if prefix:
-                            write(prefix)
-                        line_start = False
-                    write(line)
-                    if i < len(lines) - 1:
-                        write('\n')
-                        line_start = True
-                flush()
+                # Unhelpfully, ''.split('\n') is [''], not [].
+                if text:
+                    lines = text.split('\n')
+                    for i, line in enumerate(lines):
+                        if line_start:
+                            if prefix:
+                                write(prefix)
+                            line_start = False
+                        write(line)
+                        if i < len(lines) - 1:
+                            write('\n')
+                            line_start = True
+                    flush()
                 if not raw:
                     break
             ticker_state.cancel()
@@ -2928,15 +2932,17 @@ def run_if( command, out, *prerequisites, caller=1):
 
     Args:
         command:
-            The command to run. We write this into a file <out>.cmd so that we
-            know to run a command if the command itself has changed.
+            The command to run. We write this and a hash of argv[0] into a file
+            <out>.cmd so that we know to run a command if the command itself
+            has changed.
         out:
             Path of the output file.
 
         prerequisites:
             List of prerequisite paths or true/false/None items. If an item
             is None it is ignored, otherwise if an item is not a string we
-            immediately return it cast to a bool.
+            immediately return it cast to a bool. We recurse into directories,
+            effectively using the newest file in the directory.
 
     Returns:
         True if we ran the command, otherwise None.
@@ -2944,14 +2950,10 @@ def run_if( command, out, *prerequisites, caller=1):
 
     If the output file does not exist, the command is run:
 
-        >>> verbose(1)
-        1
-        >>> log_line_numbers(0)
+        >>> log_prefix('%p:%f(): ')
         >>> out = 'run_if_test_out'
-        >>> if os.path.exists( out):
-        ...     os.remove( out)
-        >>> if os.path.exists( f'{out}.cmd'):
-        ...     os.remove( f'{out}.cmd')
+        >>> fs_remove(out)
+        >>> fs_remove( f'{out}.cmd')
         >>> run_if( f'touch {out}', out, caller=0)
         pipcl.py:run_if(): Running command because: File does not exist: 'run_if_test_out'
         pipcl.py:run_if(): Running: touch run_if_test_out
@@ -2970,7 +2972,6 @@ def run_if( command, out, *prerequisites, caller=1):
         pipcl.py:run_if():      touch
         pipcl.py:run_if():     -run_if_test_out
         pipcl.py:run_if():     +run_if_test_out;
-        pipcl.py:run_if(): 
         pipcl.py:run_if(): Running: touch run_if_test_out;
         True
 
@@ -2986,7 +2987,6 @@ def run_if( command, out, *prerequisites, caller=1):
         pipcl.py:run_if():      touch
         pipcl.py:run_if():     -run_if_test_out;
         pipcl.py:run_if():     +run_if_test_out
-        pipcl.py:run_if(): 
         pipcl.py:run_if(): Running: touch  run_if_test_out
         True
 
@@ -2995,25 +2995,76 @@ def run_if( command, out, *prerequisites, caller=1):
 
         >>> run_if( f'touch  {out}', out, prerequisite, caller=0)
         pipcl.py:run_if(): Not running command because up to date: 'run_if_test_out'
+    
+    We detect changes to the contents of argv[0]:
+    
+    Create a shell script and run it:
+    
+    >>> for path in glob.glob('run_if_test_argv0.*'):
+    ...     fs_remove(path)
+    >>> with open('run_if_test_argv0.sh', 'w') as f:
+    ...     print('#! /bin/sh', file=f)
+    ...     print('echo hello world > run_if_test_argv0.out', file=f)
+    >>> os.chmod('run_if_test_argv0.sh', os.stat('run_if_test_argv0.sh').st_mode | stat.S_IEXEC)
+    
+    >>> run_if( f'./run_if_test_argv0.sh', f'run_if_test_argv0.out', caller=0)
+    pipcl.py:run_if(): Running command because: File does not exist: 'run_if_test_argv0.out'
+    pipcl.py:run_if(): Running: ./run_if_test_argv0.sh
+    True
+    
+    Running it a second time does nothing:
+    
+    >>> run_if( f'./run_if_test_argv0.sh', f'run_if_test_argv0.out', caller=0)
+    pipcl.py:run_if(): Not running command because up to date: 'run_if_test_argv0.out'
+    
+    Modify the script.
+    
+    >>> with open('run_if_test_argv0.sh', 'a') as f:
+    ...     print('\\necho hello >> run_if_test_argv0.out', file=f)
+    
+    And now it is run because the hash of argv[0] has changed:
+    
+    >>> run_if( f'./run_if_test_argv0.sh', f'run_if_test_argv0.out', caller=0)
+    pipcl.py:run_if(): Running command because: arg0 hash has changed.
+    pipcl.py:run_if(): Running: ./run_if_test_argv0.sh
+    True
     '''
     doit = False
+    
+    # Path of file containig pickle data for command and hash of command's first arg.
     cmd_path = f'{out}.cmd'
+    
+    def hash_get(path):
+        try:
+            with open(path, 'rb') as f:
+                return hashlib.md5(f.read()).hexdigest()
+        except Exception as e:
+            #log(f'Failed to get hash of {path=}: {e}')
+            return None
+    
+    command_args = shlex.split(command or '')
+    command_arg0_path = fs_find_in_paths(command_args[0])
+    command_arg0_hash = hash_get(command_arg0_path)
+    
+    cmd_args, cmd_arg0_hash = (None, None)
+    if os.path.isfile(cmd_path):
+        with open(cmd_path, 'rb') as f:
+            try:
+                cmd_args, cmd_arg0_hash = pickle.load(f)
+            except Exception as e:
+                #log(f'pickle.load() failed with {cmd_path=}: {e}')
+                pass
 
     if not doit:
+        # Set doit if outfile does not exist.
         out_mtime = _fs_mtime( out)
         if out_mtime == 0:
             doit = f'File does not exist: {out!r}'
 
     if not doit:
-        if os.path.isfile( cmd_path):
-            with open( cmd_path) as f:
-                cmd = f.read()
-        else:
-            cmd = None
-        cmd_args = shlex.split(cmd or '')
-        command_args = shlex.split(command or '')
+        # Set doit if command has changed.
         if command_args != cmd_args:
-            if cmd is None:
+            if cmd_args is None:
                 doit = 'No previous command stored'
             else:
                 doit = f'Command has changed'
@@ -3029,8 +3080,8 @@ def run_if( command, out, *prerequisites, caller=1):
                     # shlex.split().
                     doit += ':\n'
                     lines = difflib.unified_diff(
-                            cmd.split(),
-                            command.split(),
+                            cmd_args,
+                            command_args,
                             lineterm='',
                             )
                     # Skip initial lines.
@@ -3039,6 +3090,13 @@ def run_if( command, out, *prerequisites, caller=1):
                     for line in lines:
                         doit += f'    {line}\n'
 
+    if not doit:
+        # Set doit if argv[0] hash has changed.
+        #print(f'{cmd_arg0_hash=} {command_arg0_hash=}', file=sys.stderr)
+        if command_arg0_hash != cmd_arg0_hash:
+            doit = f'arg0 hash has changed.'
+            #doit = f'arg0 hash has changed from {cmd_arg0_hash=} to {command_arg0_hash=}..'
+    
     if not doit:
         # See whether any prerequisites are newer than target.
         def _make_prerequisites(p):
@@ -3074,17 +3132,15 @@ def run_if( command, out, *prerequisites, caller=1):
         # Remove `cmd_path` before we run the command, so any failure
         # will force rerun next time.
         #
-        try:
-            os.remove( cmd_path)
-        except Exception:
-            pass
+        fs_remove(cmd_path)
         log1( f'Running command because: {doit}', caller=caller+1)
 
         run( command, caller=caller+1)
 
         # Write the command we ran, into `cmd_path`.
-        with open( cmd_path, 'w') as f:
-            f.write( command)
+        
+        with open(cmd_path, 'wb') as f:
+            pickle.dump((command_args, command_arg0_hash), f)
         return True
     else:
         log1( f'Not running command because up to date: {out!r}', caller=caller+1)
@@ -3093,6 +3149,35 @@ def run_if( command, out, *prerequisites, caller=1):
         log2( f'out_mtime={time.ctime(out_mtime)} pre_mtime={time.ctime(pre_mtime)}.'
                 f' pre_path={pre_path!r}: returning {ret!r}.'
                 )
+
+
+def fs_find_in_paths( name, paths=None, verbose=False):
+    '''
+    Looks for `name` in paths and returns complete path. `paths` is list/tuple
+    or `os.pathsep`-separated string; if `None` we use `$PATH`. If `name`
+    contains `/`, we return `name` itself if it is a file or None, regardless
+    of <paths>.
+    '''
+    if '/' in name:
+        return name if os.path.isfile( name) else None
+    if paths is None:
+        paths = os.environ.get( 'PATH', '')
+        if verbose:
+            log('From os.environ["PATH"]: {paths=}')
+    if isinstance( paths, str):
+        paths = paths.split( os.pathsep)
+        if verbose:
+            log('After split: {paths=}')
+    for path in paths:
+        p = os.path.join( path, name)
+        if verbose:
+            log('Checking {p=}')
+        if os.path.isfile( p):
+            if verbose:
+                log('Returning because is file: {p!r}')
+            return p
+    if verbose:
+        log('Returning None because not found: {name!r}')
 
 
 def _get_prerequisites(path):
@@ -3184,13 +3269,6 @@ def verbose(level=None):
         g_verbose = level
     return g_verbose
 
-def log_line_numbers(yes):
-    '''
-    Sets whether to include line numbers; helps with doctest.
-    '''
-    global g_log_line_numbers
-    g_log_line_numbers = bool(yes)
-
 def log(text='', caller=1):
     _log(text, 0, caller+1)
 
@@ -3234,7 +3312,18 @@ def _duration(s):
 g_log_format = '[+%d] %p:%l: %f(): '
 g_log_t0 = time.time()
 
+def log_prefix(pattern):
+    '''
+    Sets log prefix pattern.
+    '''
+    global g_log_format
+    g_log_format = pattern
+
+
 def _log_prefix(format_, caller):
+    '''
+    Evaluates log format for <caller>.
+    '''
     ret = ''
     
     _get_frame_cache = [None]
@@ -3312,6 +3401,7 @@ def _log(text, level, caller, raw=False, nl=True):
             pos = nlp+1
         if raw:
             _log_text_line_start = (nlp >= 0)
+    sys.stdout.flush()
 
 
 def relpath(path, start=None, allow_up=True):
