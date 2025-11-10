@@ -278,6 +278,10 @@ Args:
             If 0 we don't sync to remote and we don't run any commands on
             remote. But we do sync remote wheels to local.
         
+        --run <package> <command>
+            Make `run` command run specified command within checkout of
+            <package>.
+        
         --sdists 0|1
             If 1, the 'build' and 'cibw' commands will also build sdists.
         
@@ -330,6 +334,9 @@ Args:
             If CIBW_ARCHS is unset we set $CIBW_ARCHS_WINDOWS, $CIBW_ARCHS_MACOS
             and $CIBW_ARCHS_LINUX to auto64 if they are unset.
 
+        run
+            Runs commands specified by `--run` within checkouts.
+        
         test
             Runs pytest tests.
             
@@ -522,7 +529,7 @@ def name_info(name):
     ret = NameInfo()
     ret.submodules = True
     if name == 'mupdf':
-        ret.git_remote = 'git@github.com:ArtifexSoftware/mupdf.git'
+        ret.github_name = 'pymupdf/mupdf'
         ret.git_branch = 'master'
     elif name == 'pymupdf':
         ret.github_name = 'pymupdf/PyMuPDF'
@@ -597,6 +604,7 @@ def main(argv):
     state.pytest_wrap = None
     state.remote_github_yml = None
     state.remote_github_yml_inputs = None
+    state.run_commands = list()
     state.sdists = False
     state.swig = None
     state.swig_quick = None
@@ -758,6 +766,11 @@ def main(argv):
             remote_arg = args.pos
             remote = next(args)
         
+        elif arg == '--run':
+            package = next(args)
+            command = next(args)
+            state.run_commands.append((package, command))
+        
         elif arg == '-t':
             _names = next(args).split(',')
             apply_deltas(state.packages_test, _names)
@@ -827,7 +840,7 @@ def main(argv):
         elif arg.startswith('-'):
             assert 0, f'Unrecognised option: {arg=}.'
             
-        elif arg in ('build', 'cibw', 'test'):
+        elif arg in ('build', 'cibw', 'run', 'test'):
             state.commands.append(arg)
         
         else:
@@ -1079,7 +1092,10 @@ def main(argv):
                 sys.exit(e)
     
     elif not remote_github_workflow_id:
-        pipcl.log(f'Warning, no commands specified so nothing to do.')
+        pipcl.log(f'##Warning, no commands specified so nothing to do.')
+    
+    if state.run_commands and 'run' not in state.commands:
+        pipcl.log(f'## Warning, --run was specified but no `run` command.')
     
     # Clone/update/build swig if specified.
     swig_binary = pipcl.swig_get(state.swig, state.swig_quick)
@@ -1185,22 +1201,7 @@ def main(argv):
                         command += f' {package}{location[4:]}'
                         pipcl.run(command)
                     else:
-                        if location.startswith('git:'):
-                            info = name_info(package)
-                            temp_key_path = None
-                            directory = pipcl.git_get(
-                                    local=f'aptest-git-{package}',
-                                    remote=info.git_remote,
-                                    branch=info.git_branch,
-                                    text=location,
-                                    env_extra=state.env_extra,
-                                    )
-                            # Update information to contain local directory. This
-                            # allows 'test' command to work without repeating the
-                            # call of pip.git_get().
-                            state.packages[package] = directory, args_pos
-                        else:
-                            directory = location
+                        directory = _get_local(package, state)
                         directory_abs = os.path.abspath(directory)
                         pipcl.log(f'{package=}')
                         if package == 'mupdf':
@@ -1346,28 +1347,11 @@ def main(argv):
                 packages = list()
                 for package in state.packages_build:
                     pipcl.log(f'{package=}')
-                    location, args_pos = state.packages[package]
-                    if not location:
-                        continue
-                    if location.startswith('pip:'):
+                    directory = _get_local(package, state)
+                    if not directory:
+                        # location is pip.
                         # cibuildwheel will download from pypi as required.
                         continue
-                    elif location.startswith('git:'):
-                        info = name_info(package)
-                        directory = pipcl.git_get(
-                                local=f'aptest-git-{package}',
-                                remote=info.git_remote,
-                                branch=info.git_branch,
-                                text=location,
-                                env_extra=state.env_extra,
-                                submodules=info.submodules,
-                                )
-                        # Update information to contain local directory. This
-                        # allows 'test' command to work without repeating the
-                        # call of pip.git_get().
-                        state.packages[package] = directory, args_pos
-                    else:
-                        directory = location
                     directory_abs = os.path.abspath(directory)
                     if package == 'mupdf':
                         if platform.system() == 'Linux' and not state.cibw_pyodide:
@@ -1477,6 +1461,11 @@ def main(argv):
                             st = os.stat(path_dir)
                             pipcl.log(f'{st=}: {path_dir=}')
 
+            elif command == 'run':
+                for package, command in state.run_commands:
+                    directory = _get_local(package, state)
+                    pipcl.run(f'cd {directory} && {command}')
+
             elif command == 'test':
                 if state.pytest_wrap in ('valgrind', 'helgrind'):
                     if state.system_packages:
@@ -1501,16 +1490,7 @@ def main(argv):
                     elif location.startswith('pip:'):
                         pass
                     else:
-                        if location.startswith('git:'):
-                            info = name_info(package)
-                            directory = pipcl.git_get(
-                                    local='aptest-git-{package}',
-                                    remote=info.git_remote,
-                                    branch=info.git_branch,
-                                    text=location,
-                                    )
-                        else:
-                            directory = location
+                        directory = _get_local(package, state)
                         command = f'pytest {directory}/tests {state.pytest_options}'
                         if state.pytest_wrap in ('valgrind', 'helgrind'):
                             if not state.pytest_options:
@@ -1560,15 +1540,37 @@ def main(argv):
                             pipcl.log(f'    {package}')
                         raise Exception(f'Packages failed tests: {failed_packages}')
 
-            #elif command == 'pyodide':
-            #    build_pyodide_wheel(pyodide_build_version=pyodide_build_version)
-
             else:
                 assert 0, f'{command=}'
     finally:
         for path in paths_to_delete:
             pipcl.fs_remove(path)
 
+
+def _get_local(package, state):
+    '''
+    Returns local directory containing <package> checkout. Returns None if
+    location is pip:.
+    '''
+    location, args_pos = state.packages[package]
+    info = name_info(package)
+    if location.startswith('pip:'):
+        # Todo: Lookup version of pypi package and checkout the corresponding
+        # tag in default git.
+        return
+    elif location.startswith('git:'):
+        directory = pipcl.git_get(
+                local=f'aptest-git-{package}',
+                remote=info.git_remote,
+                branch=info.git_branch,
+                text=location,
+                env_extra=state.env_extra,
+                submodules=info.submodules,
+                )
+    else:
+        directory = location
+    return directory
+    
 
 def github_workflow_unimportant():
     '''
