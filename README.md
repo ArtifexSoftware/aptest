@@ -1,14 +1,14 @@
 ## Artifex Packages build/test.
 
-The `aptest.py` scripts can Build, test and release (to pypi.org) multiple
+The `aptest.py` scripts can build, test and release (to pypi.org) multiple
 Python packages together.
 
 
 ### Supported packages:
 
-* MuPDF
-* PyMuPDF
-* PyMuPDFPro
+* mupdf
+* pymupdf
+* pymupdfpro
 * pymupdf-layout
 
 
@@ -25,9 +25,9 @@ See `-i` option, or aliases `-m`, `-p`, `-P` and `-l`.
 
 * Local machine
 * Remote machine via ssh/rsync.
-* Github runner.
+* Github runner via push to unique(ish) branch.
 
-See the `-r`option.
+See the `-r` option.
 
 
 ### Build/install
@@ -46,6 +46,9 @@ See the `-r`option.
 ### Test
 
 * We run tests in the current venv for each package, using pytest.
+* Packages on pypi.org do not contain test suites, but one can test with
+  a separate package location, for example a local checkout or remote git
+  repository.
 
 
 ### Build/test with cibuildwheel
@@ -58,7 +61,7 @@ See the `-r`option.
   prerequisite wheels will be installed as required.
 
 
-### Running on Github
+### Running on Github with `-r @github`.
 
 * If a package is specified as a local checkout:
   * We push the local checkout to a branch in the equivalent Github repository.
@@ -100,5 +103,5 @@ Use of keys with remote runs:
 
 ### More information
 
-Please run `aptest.py -h`. This simply prints out the doc-comment at the start
+Please run `aptest.py -h` or read the same text in the doc-comment at the start
 of aptest.py.
