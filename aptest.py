@@ -64,6 +64,9 @@ Examples:
         
         (We will fail if any of the packages have incompatible version numbers.)
 
+    ./aptest/aptest.py -r @github --remote-github-yml test_multiple.yml -P PyMuPDFPlus --remote-github-yml-inputs 'args=-o windows'
+        Runs specific Github workflow PyMuPDFPlus/.github/workflows/test_multiple.yml.
+
 Args:
 
     Options:
@@ -259,6 +262,13 @@ Args:
             instead continue from previous `-r @github` invocation by waiting
             for <workflow_id> to finish and then downloadings logs and wheels
             etc. Note that you still need to include `-r @github cibw`.
+        
+        --remote-github-yml <yml>
+            With @github, run .yml file instead of running aptest.py.
+            
+        --remote-github-yml-inputs <inputs>
+            Specify inputs used with --github-yml. <inputs> is comma-separated
+            list of name=value pairs.
         
         --remote-prefix <remote_prefix>
             Run remote using specified Python command. Ignored by `-r @github`.
@@ -515,19 +525,20 @@ def name_info(name):
         ret.git_remote = 'git@github.com:ArtifexSoftware/mupdf.git'
         ret.git_branch = 'master'
     elif name == 'pymupdf':
-        ret.git_remote = 'git@github.com:pymupdf/PyMuPDF.git'
+        ret.github_name = 'pymupdf/PyMuPDF'
         ret.git_branch = 'main'
     elif name == 'pymupdfpro':
-        ret.git_remote = 'git@github.com:ArtifexSoftware/PyMuPDFPro.git'
+        ret.github_name = 'ArtifexSoftware/PyMuPDFPro'
         ret.git_branch = 'main'
     elif name == 'pymupdf_layout':
-        ret.git_remote = 'git@github.com:ArtifexSoftware/sce.git'
+        ret.github_name = 'ArtifexSoftware'
         ret.git_branch = 'master'
         # Have seen problems with clong after we've pushed local checkout to
         # branch but submodule `mupdf` not present.
         ret.submodules = False
     else:
         assert 0, f'{name=}'
+    ret.git_remote = f'git@github.com:{ret.github_name}.git'
     return ret
 
 
@@ -584,6 +595,8 @@ def main(argv):
     #state.pyodide_build_version = None
     state.pytest_options = ''
     state.pytest_wrap = None
+    state.remote_github_yml = None
+    state.remote_github_yml_inputs = None
     state.sdists = False
     state.swig = None
     state.swig_quick = None
@@ -771,6 +784,15 @@ def main(argv):
         elif arg == '--remote-github-workflow':
             remote_github_workflow_id = next(args)
         
+        elif arg == '--remote-github-yml':
+            state.remote_github_yml = next(args)
+            assert state.remote_github_yml.endswith('.yml'), (
+                    f'Should end with `.yml`: {state.remote_github_yml=}'
+                    )
+            
+        elif arg == '--remote-github-yml-inputs':
+            state.remote_github_yml_inputs = next(args)
+            
         elif arg == '--remote-prefix':
             remote_prefix = next(args)
         
@@ -852,13 +874,14 @@ def main(argv):
             branch = f'aptest-{os.environ["USER"]}'    #-{time.strftime("%F-%T")}'
             pipcl.log(f'{branch=}.')
 
+            github_name = 'ArtifexSoftware/aptest'
             if remote_github_workflow_id:
                 workflow_id = remote_github_workflow_id
             else:
                 # Push ourselves to Git.
                 git_push(g_root, 'git@github.com:ArtifexSoftware/aptest.git', branch)
 
-                # Push specified local package repositorie to Github and update args to
+                # Push specified local package repository to Github and update args to
                 # point to new location.
                 for package_name, (package_location, args_pos) in state.packages.items():
                     if not package_location.startswith(('git:', 'pip:')):
@@ -870,21 +893,43 @@ def main(argv):
                         git_push(package_location, info.git_remote, branch)
                         argv[args_pos] = f'git:-b {branch} {info.git_remote}'
 
-                # Run ourselves on Github, passing argv.
-                data = dict(
-                        ref = branch,
-                        inputs = dict(args=shlex.join(argv)),
-                        )
-                workflow_id = github.gh_run_workflow(
-                        'https://api.github.com/repos/ArtifexSoftware/aptest',
-                        'test.yml',
-                        data,
-                        )
+                if state.remote_github_yml:
+                    # Run .yml directly.
+                    pipcl.log(f'Running .yml instead of aptest.py: {state.remote_github_yml}')
+                    assert len(state.packages) == 1
+                    for package_name, (package_location, args_pos) in state.packages.items():
+                        pass
+                    info = name_info(package_name)
+                    github_name = info.github_name
+                    data = dict()
+                    data['ref'] = branch
+                    if state.remote_github_yml_inputs:
+                        inputs = dict()
+                        for nv in state.remote_github_yml_inputs.split(','):
+                            n, v = nv.split('=', 1)
+                            inputs[n] = v
+                        data['inputs'] = inputs
+                    workflow_id = github.gh_run_workflow(
+                            f'https://api.github.com/repos/{github_name}',
+                            state.remote_github_yml,
+                            data,
+                            )
+                else:
+                    # Run ourselves on Github, passing argv.
+                    data = dict(
+                            ref = branch,
+                            inputs = dict(args=shlex.join(argv)),
+                            )
+                    workflow_id = github.gh_run_workflow(
+                            'https://api.github.com/repos/ArtifexSoftware/aptest',
+                            'test.yml',
+                            data,
+                            )
             
             assert isinstance(workflow_id, str)
             github.gh_workflow_download_multiple(
                     #rest_url_base,
-                    'https://api.github.com/repos/ArtifexSoftware/aptest',
+                    f'https://api.github.com/repos/{github_name}',
                     'test.yml',
                     workflow_id,
                     #extra_wheels=upload_extra_wheels,
