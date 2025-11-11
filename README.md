@@ -4,7 +4,7 @@ The `aptest.py` scripts can build, test and release (to pypi.org) multiple
 Python packages together.
 
 
-### Supported packages:
+### Supported packages/projects:
 
 * mupdf
 * pymupdf
@@ -14,9 +14,9 @@ Python packages together.
 
 ### Package locations
 
-* Built from local checkout.
-* Built from specific branch or tag on remote git repository.
-* Installed directly from pypi.org.
+* Build from local checkout.
+* Build from specific branch or tag on remote git repository.
+* Install directly from pypi.org.
 
 See `-i` option, or aliases `-m`, `-p`, `-P` and `-l`.
 
@@ -24,23 +24,22 @@ See `-i` option, or aliases `-m`, `-p`, `-P` and `-l`.
 ### Run in different places
 
 * Local machine
-* Remote machine via ssh/rsync.
-* Github runner via push to unique(ish) branch.
+* Remote machine (uses ssh/rsync).
+* Github runner (pushes to unique(ish) branches and runs a workflow).
 
 See the `-r` option.
 
 
 ### Build/install
 
-* We have hard-coded knowledge about package dependencie, for example we
-  know that pymupdf_layout requires pymupdf.
-* For each package:
-  * The package is built as a wheel using `pip wheel`.
-  * The wheel is installed into the current venv.
-  * The wheel is added to a pypip-style PEP-503 internal package repository.
-  * We use pip's `--extra-index-url` option to refer to our internal package
-    repository.
-  * Thus pip will use previously built wheels as prerequisites, as required.
+For each package:
+* The package is built as a wheel using `pip wheel`. This will typically
+  take place in an internal pip venv.
+* The wheel is installed into the current venv.
+* The wheel is added to a pypip-style PEP-503 internal package repository.
+* We use pip's `--extra-index-url` option to refer to our internal package
+  repository.
+* Thus pip will use previously built wheels as prerequisites, as required.
 
 
 ### Test
@@ -69,8 +68,8 @@ See the `-r` option.
   * For example we would change `-p PyMuPDF` to
     `-p 'git:-b <branch> git@github.com:pymupdf/PyMuPDF.git`.
 * We use branch name `aptest-$USER`.
-  * This allows multiple developers to run on Github simultaneously.
-  * We don't create too many temporary branches.
+  * This allows multiple developers to run on Github simultaneously, without
+    creating an unbounded number of temporary branches.
 
 
 ### Ssh keys
@@ -85,8 +84,8 @@ git@github.com:PyMuPDF/PyMuPDF and repositories within git@github.com:Artifex/.
   .ssh/known_hosts.
 
 We also allow specification of a custom ssh private key that allows access to
-the SmartOffice repository; this is required when building PyMuPDFPro because
-of how the SmartOffice build system works.
+the SmartOffice repository; this is required when PyMuPDFPro builds SmartOffice
+because of how the SmartOffice build system works.
   
 * If required, this key should be provided in file `thirdparty-so-key` in the
   current directory.
