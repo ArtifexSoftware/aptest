@@ -29,40 +29,29 @@ Examples:
           and pymupdf_layout.
         * Build/install/test each package.
     
-    ./aptest/aptest.py -r @github -p git: -P git: -l git: --sdists 1 --github-upload 1 cibw
-        Make a release 1
+    ./aptest/aptest.py --release-1
+    ./aptest/aptest.py --release-2
+    ./aptest/aptest.py --release-3
+        Make release, building/testing on Github, downloading to local machine,
+        and uploading to pypi.org.
         
-        * Note that this omits windows-x32 and linux-aarch64.
-        * Will attempt to pip install piprepo after download of wheels, so
-          should be run inside a venv.
-          * Need to modify the code so that we enter a local venv even though
-            `-r` is specified.
-        
-        * Runs cibuildwheel on Github to build wheels and test pymupdf,
-          pymupdfpro and pymupdf-layout wheels, using latest code in default git
-          repositories.
-        * Downloads wheels from Github artifacts to local machine.
-        * Uploads wheels to pypi.org (after asking for confirmation).
-    
-    ./aptest/aptest.py -r @github -p 'git:-t <version>' -u 1 cibw -o windows -e CIBW_ARCHS_WINDOWS=x86 --cibw-skip-add-defaults 0
-    ./aptest/aptest.py -r @github -p 'git:-t 1.26.6' -u 1 cibw -o windows -e CIBW_ARCHS_WINDOWS=x86 --cibw-skip-add-defaults 0
-        Make a release 2. pymupdf for windows-x32.
-
-    ./aptest/aptest.py -r @github -p 'git:-t <version>' -P 'git:-t <version>' -l 'git:-t <version>' -u 1 cibw -o linux -e CIBW_ARCHS_LINUX=aarch64 -e 'CIBW_BUILD=cp310*'
-    ./aptest/aptest.py -r @github -p 'git:-t 1.26.6' -P 'git:-t 1.26.6' -l 'git:-t 1.26.6' -u 1 cibw -o linux -e CIBW_ARCHS_LINUX=aarch64 -e 'CIBW_BUILD=cp310*'
-        Make a release 3. pymupdf pymupdfpro layout for linux-aarch64.
-    
     ./aptest/aptest.py -r @github -p pip: -P PyMuPDFPlus -l git: cibw
-        This demontrates getting packages from different locations.
-        
-        Build/test pymupdf, pymupdfpro and pymupdf-layout using cibuildwheel.
+        Build/test pymupdf, pymupdfpro and pymupdf-layout using cibuildwheel,
+        getting packages from different locations.
         
         * Installs pymupdf from pypi.org. (We will not run pymupdf tests
           because no checkout.)
         * For pymupdfpro we use local checkout.
         * Gets pymupdf_layout from central git.
         
-        (We will fail if any of the packages have incompatible version numbers.)
+        (Builds may fail if any of the packages have incompatible version
+        numbers.)
+    
+    ./aptest/aptest.py -r macmini -p pip: -p git: build test
+        Test current pymupdf release with latest test suite in central git.
+
+    ./aptest/aptest.py -r macmini -p pip: -p PyMuPDF build test
+        Test current pymupdf release with test suite in local checkout.
 
     ./aptest/aptest.py -r @github --remote-github-yml test_multiple.yml -P PyMuPDFPlus --remote-github-yml-inputs 'args=-o windows'
         Runs specific Github workflow PyMuPDFPlus/.github/workflows/test_multiple.yml.
@@ -81,10 +70,6 @@ Args:
             Modifies behaviour of 'build' command to only build/install only
             the specified comma-separated packages instead of all packages
             specified by `-i`.
-        
-        --build-wheels 0|1
-            Makes `build` command build wheel(s) in wheelhouse/ and install
-            them, instead of direct build and install.
         
         --cibw-name <cibw_name>
             Name to use when installing cibuildwheel, e.g.:
@@ -133,8 +118,6 @@ Args:
             Add an input package.
             package-name:
                 One of: mupdf pymupdf pymupdfpro layout
-                If empty string will be ignored except that `-r` will sync to
-                remote.
             location:
                 `pip:`
                     Install from pypi.org using pip.
@@ -148,6 +131,17 @@ Args:
                     `git-<package-name>`.
                 <local-dir>
                     Local directory, typically a git checkout.
+            
+            If a package is specified twice, the first location will be used
+            for building, and the second location used for testing. This allows
+            packages on pypi.org to be tested with a git checkout's test suite,
+            for example:
+            
+                -i pymupdf pip: -i pymupdf PyMuPDF build test
+                    Test current pymupdf release with testsuite in PyMuPDF/tests.
+
+                -i pymupdf pip: -i pymupdf git: build test
+                    Test current pymupdf release with testsuite in current git.
 
         -l <location>
         --layout <location>
@@ -201,6 +195,19 @@ Args:
 
                 * On success wheels are copied back into local directory
                   aptest-wheelhouse/.
+        
+        --release-1
+        --release-2
+        --release-3
+            Preset args for making releases. Only one may be specified, and it
+            must be the only arg.
+            
+            aptest/aptest.py --release-1
+                Build wheels for everything except linux-aarch64 and win32.
+            aptest/aptest.py --release-2
+                Build wheels for linux-aarch64.
+            aptest/aptest.py --release-3
+                Build wheels for win32 (pymupdf only).
         
         -t <packages>
             Comma-separated ordered list of modifications to the list of
@@ -529,7 +536,7 @@ def name_info(name):
     ret = NameInfo()
     ret.submodules = True
     if name == 'mupdf':
-        ret.github_name = 'pymupdf/mupdf'
+        ret.github_name = 'ArtifexSoftware/mupdf'
         ret.git_branch = 'master'
     elif name == 'pymupdf':
         ret.github_name = 'pymupdf/PyMuPDF'
@@ -538,7 +545,7 @@ def name_info(name):
         ret.github_name = 'ArtifexSoftware/PyMuPDFPro'
         ret.git_branch = 'main'
     elif name == 'pymupdf_layout':
-        ret.github_name = 'ArtifexSoftware'
+        ret.github_name = 'ArtifexSoftware/sce'
         ret.git_branch = 'master'
         # Have seen problems with clong after we've pushed local checkout to
         # branch but submodule `mupdf` not present.
@@ -583,7 +590,6 @@ def main(argv):
         pass
     state = State()
     state.build_isolation = None
-    state.build_wheels = None
     state.cibw_name = 'cibuildwheel'
     state.cibw_pyodide = None
     state.cibw_pyodide_version = None
@@ -596,10 +602,10 @@ def main(argv):
     state.graal = False
     state.os_names = list()
     state.packages = dict()   # map from name to location.
+    state.packages2 = dict()   # map from name to location.
     state.packages_build = list() # Sorted list of names.
     state.packages_test = list()  # Sorted list of names.
     state.pybind = False
-    #state.pyodide_build_version = None
     state.pytest_options = ''
     state.pytest_wrap = None
     state.remote_github_yml = None
@@ -613,22 +619,23 @@ def main(argv):
     state.valgrind = False
     
     def add_package(name, location, args_pos):
-        if name:
-            state.packages[name] = (location, args_pos)
-            state.packages_build.append(name)
-            state.packages_test.append(name)
+        if name in state.packages:
+            pipcl.log(f'Adding secone location for {name=} testing only: {location=}')
+            state.packages2[name] = (location, args_pos)
+            return
+        state.packages[name] = (location, args_pos)
+        state.packages_build.append(name)
+        state.packages_test.append(name)
 
-            names = [
-                'mupdf',
-                'pymupdf',
-                'pymupdf_layout',
-                'pymupdfpro',
-                ]
-            keyfn = lambda name: names.index(name)
-            state.packages_build.sort(key=keyfn)
-            state.packages_test.sort(key=keyfn)
-        else:
-            state.packages.append(os.path.dirname(location), location)
+        names = [
+            'mupdf',
+            'pymupdf',
+            'pymupdf_layout',
+            'pymupdfpro',
+            ]
+        keyfn = lambda name: names.index(name)
+        state.packages_build.sort(key=keyfn)
+        state.packages_test.sort(key=keyfn)
     
     def apply_deltas(items, deltas, check=1):
         if deltas and not deltas[0].startswith(('+', '-')):
@@ -666,13 +673,11 @@ def main(argv):
             pass
         
         elif arg == '-a':
-            pos1 = args.pos
+            pos1 = args.pos - 1
             _name = next(args)
             _value = os.environ.get(_name, '')
             pos2 = args.pos
             new_args = shlex.split(_value)
-            #args_list = shlex.split(_value) + list(args)
-            #args = iter(args_list)
             args.argv[pos1:pos2] = new_args
             args.pos = pos1
         
@@ -682,29 +687,6 @@ def main(argv):
         elif arg == '--build-isolation':
             state.build_isolation = int(next(args))
         
-        elif arg == '--build-wheels':
-            state.build_wheels = int(next(args))
-        
-        #elif arg == '--cibw-release-1':
-        #    cibw_sdist = True
-        #    env_extra['CIBW_ARCHS_LINUX'] = 'auto64'
-        #    env_extra['CIBW_ARCHS_MACOS'] = 'auto64'
-        #    env_extra['CIBW_ARCHS_WINDOWS'] = 'auto'    # win32 and win64.
-        #    env_extra['CIBW_SKIP'] = '*i686 *musllinux*aarch64* cp3??t-*'
-        #    cibw_skip_add_defaults = 0
-        #
-        #elif arg == '--cibw-release-2':
-        #    # Testing only first and last python versions because otherwise
-        #    # Github times out after 6h.
-        #    env_extra['CIBW_BUILD'] = cibw_cp(python_versions_minor[0], python_versions_minor[-1])
-        #    env_extra['CIBW_ARCHS_LINUX'] = 'aarch64'
-        #    env_extra['CIBW_SKIP'] = '*i686 *musllinux*aarch64* cp3??t-*'
-        #    cibw_skip_add_defaults = 0
-        #    os_names = ['linux']
-        #
-        #elif arg == '--cibw-archs-linux':
-        #    env_extra['CIBW_ARCHS_LINUX'] = next(args)
-        #    
         elif arg == '--cibw-name':
             state.cibw_name = next(args)
         
@@ -717,16 +699,6 @@ def main(argv):
         elif arg == '--cibw-skip-add-defaults':
             state.cibw_skip_add_defaults = int(next(args))
         
-        #elif arg == '--cibw-test-project':
-        #    cibw_test_project = int(next(args))
-        #
-        #elif arg == '--cibw-test-project-setjmp':
-        #    cibw_test_project_setjmp = int(next(args))
-        #
-        #elif arg == '--dummy':
-        #    env_extra['PYMUPDF_SETUP_DUMMY'] = '1'
-        #    env_extra['CIBW_TEST_COMMAND'] = ''
-        #
         elif arg == '-e':
             _nv = next(args)
             assert '=' in _nv, f'-e <name>=<value> does not contain "=": {_nv!r}'
@@ -778,9 +750,6 @@ def main(argv):
         elif arg == '--pybind':
             state.pybind = int(next(args))
         
-        #elif arg == '--pyodide-build-version':
-        #    state.pyodide_build_version = next(args)
-        
         elif arg == '--pytest':
             state.pytest_options = next(args)
         
@@ -790,6 +759,23 @@ def main(argv):
         elif arg == '--python':
             python_args_pos = args.pos
             python = next(args)
+        
+        elif arg.startswith('--release-'):
+            pos = args.pos - 1
+            assert args.pos == 1 and len(args.argv) == 1, f'args `--release-*` must be only arg.'
+            if arg == '--release-1':
+                new_args = '-r @github -u 1 -p git: -P git: -l git: cibw --sdists 1'
+            elif arg == '--release-2':
+                new_args = '-r @github -u 1 -p git: -P git: -l git: cibw -o linux -e CIBW_ARCHS_LINUX=aarch64 -e "CIBW_BUILD=cp310*"'
+            elif arg == '--release-3':
+                new_args = '-r @github -u 1 -p git: cibw -o windows -e CIBW_ARCHS_WINDOWS=x86 --cibw-skip-add-defaults 0'
+            else:
+                assert 0, f'Unrecognised {arg=}, should be one of --release-1, --release-2, --release-3.'
+            new_args = shlex.split(new_args)
+            args.argv[pos:] = new_args
+            args.pos = pos
+            pipcl.log(f'{args.pos=}: {args.argv=}')
+            sys.exit(0)
         
         elif arg == '--remote-do':
             remote_do = int(next(args))
@@ -880,10 +866,57 @@ def main(argv):
     pymupdfpro_key_path_leaf = 'thirdparty-so-key'
     artifex_software_ssh_key = 'artifex-software-ssh-key'
     
+    if state.commands or remote == '@github':
+        if venv:
+            # Rerun ourselves inside a venv if not already in a venv.
+            if venv_in():
+                pipcl.log(f'Already in venv')
+            else:
+            
+                if state.graal:
+                    if 'cibw' in state.commands:
+                        # We don't create graal/pyenv so wheel/build commands
+                        # will not work.
+                        assert 'build' not in state.commands
+                if state.graal and 'cibw' not in state.commands:
+                    # Re-run outselves in a pyenv/Graal venv.
+                    # 2025-07-24: We need the latest pyenv.
+                    graalpy = 'graalpy-24.2.1'
+                    venv_name = f'venv-aptest-{graalpy}'
+                    pyenv_dir = f'{g_root_abs}/pyenv-git'
+                    os.environ['PYENV_ROOT'] = pyenv_dir
+                    os.environ['PATH'] = f'{pyenv_dir}/bin:{os.environ["PATH"]}'
+                    os.environ['PIPCL_GRAAL_PYTHON'] = sys.executable
+                    
+                    if venv >= 3:
+                        shutil.rmtree(venv_name, ignore_errors=1)
+                    if venv == 1 and os.path.exists(pyenv_dir) and os.path.exists(venv_name):
+                        pipcl.log(f'{venv=} and {venv_name=} already exists so not building pyenv or creating venv.')
+                    else:
+                        pipcl.git_get(pyenv_dir, remote='https://github.com/pyenv/pyenv.git', branch='master')
+                        pipcl.run(f'cd {pyenv_dir} && src/configure && make -C src')
+                        pipcl.run(f'which pyenv')
+                        pipcl.run(f'pyenv install -v -s {graalpy}')
+                        pipcl.run(f'{pyenv_dir}/versions/{graalpy}/bin/graalpy -m venv {venv_name}')
+                    e = pipcl.run(f'. {venv_name}/bin/activate && python {shlex.join(sys.argv)}',
+                            check=False,
+                            )
+                else:
+                    # Re-run outselves in a Python venv.
+                    venv_name = f'venv-aptest-{platform.python_version()}-{int.bit_length(sys.maxsize+1)}'
+                    e = venv_run(
+                            sys.argv,
+                            venv_name,
+                            recreate=(venv>=2),
+                            clean=(venv>=3),
+                            )
+                sys.exit(e)
+    
     if remote:
         argv = args.argv[:]
         argv[remote_arg] = ''   # Change `-r github` to `-r ''`.
         if remote == '@github':
+            pipcl.run('pip install requests')
             branch = f'aptest-{os.environ["USER"]}'    #-{time.strftime("%F-%T")}'
             pipcl.log(f'{branch=}.')
 
@@ -896,7 +929,7 @@ def main(argv):
 
                 # Push specified local package repository to Github and update args to
                 # point to new location.
-                for package_name, (package_location, args_pos) in state.packages.items():
+                for package_name, (package_location, args_pos) in list(state.packages.items()) + list(state.packages2.items()):
                     if not package_location.startswith(('git:', 'pip:')):
                         # Push to a Github branch and update argv[] to refer to this
                         # Github branch.
@@ -909,7 +942,7 @@ def main(argv):
                 if state.remote_github_yml:
                     # Run .yml directly.
                     pipcl.log(f'Running .yml instead of aptest.py: {state.remote_github_yml}')
-                    assert len(state.packages) == 1
+                    assert len(state.packages) == 1, f'Running yml directly requires exactly one package, but {len(state.packages)=}.'
                     for package_name, (package_location, args_pos) in state.packages.items():
                         pass
                     info = name_info(package_name)
@@ -977,7 +1010,7 @@ def main(argv):
 
             if remote_do:
                 git_paths = list()
-                for package_name, (package_location, args_pos) in state.packages.items():
+                for package_name, (package_location, args_pos) in list(state.packages.items()) + list(state.packages2.items()):
                     if not package_location.startswith(('git:', 'pip:')):
                         if sync(remote, remote_dir, package_location, ssh_command=ssh_command, verbose=verbose):
                             git_paths.append(package_location)
@@ -1047,51 +1080,7 @@ def main(argv):
 
         return
         
-    if state.commands:
-        if venv:
-            # Rerun ourselves inside a venv if not already in a venv.
-            if not venv_in():
-            
-                if state.graal:
-                    if 'cibw' in state.commands:
-                        # We don't create graal/pyenv so wheel/build commands
-                        # will not work.
-                        assert 'build' not in state.commands
-                if state.graal and 'cibw' not in state.commands:
-                    # Re-run outselves in a pyenv/Graal venv.
-                    # 2025-07-24: We need the latest pyenv.
-                    graalpy = 'graalpy-24.2.1'
-                    venv_name = f'venv-aptest-{graalpy}'
-                    pyenv_dir = f'{g_root_abs}/pyenv-git'
-                    os.environ['PYENV_ROOT'] = pyenv_dir
-                    os.environ['PATH'] = f'{pyenv_dir}/bin:{os.environ["PATH"]}'
-                    os.environ['PIPCL_GRAAL_PYTHON'] = sys.executable
-                    
-                    if venv >= 3:
-                        shutil.rmtree(venv_name, ignore_errors=1)
-                    if venv == 1 and os.path.exists(pyenv_dir) and os.path.exists(venv_name):
-                        pipcl.log(f'{venv=} and {venv_name=} already exists so not building pyenv or creating venv.')
-                    else:
-                        pipcl.git_get(pyenv_dir, remote='https://github.com/pyenv/pyenv.git', branch='master')
-                        pipcl.run(f'cd {pyenv_dir} && src/configure && make -C src')
-                        pipcl.run(f'which pyenv')
-                        pipcl.run(f'pyenv install -v -s {graalpy}')
-                        pipcl.run(f'{pyenv_dir}/versions/{graalpy}/bin/graalpy -m venv {venv_name}')
-                    e = pipcl.run(f'. {venv_name}/bin/activate && python {shlex.join(sys.argv)}',
-                            check=False,
-                            )
-                else:
-                    # Re-run outselves in a Python venv.
-                    venv_name = f'venv-aptest-{platform.python_version()}-{int.bit_length(sys.maxsize+1)}'
-                    e = venv_run(
-                            sys.argv,
-                            venv_name,
-                            recreate=(venv>=2),
-                            clean=(venv>=3),
-                            )
-                sys.exit(e)
-    
-    elif not remote_github_workflow_id:
+    if not state.commands and not remote_github_workflow_id:
         pipcl.log(f'##Warning, no commands specified so nothing to do.')
     
     if state.run_commands and 'run' not in state.commands:
@@ -1247,13 +1236,15 @@ def main(argv):
 
                             new_files = pipcl.NewFiles(f'{wheelhouse_local}/{package}*.whl')
                             pipcl.run(
-                                    f'pip wheel -v --extra-index-url file://{pypi_local}/simple --no-cache-dir -w {wheelhouse_local} {directory_abs}',
+                                    #f'pip wheel -v --extra-index-url file://{pypi_local}/simple --no-cache-dir -w {wheelhouse_local} {directory_abs}',
+                                    f'pip wheel -v --extra-index-url file://{pypi_local}/simple -w {wheelhouse_local} {directory_abs}',
                                     env_extra=state.env_extra,
                                     prefix=f'build {package}: ',
                                     )
                             wheel = new_files.get_one()
                             pipcl.run(
-                                    f'pip install -v --extra-index-url file://{pypi_local}/simple --no-cache-dir {wheel}',
+                                    #f'pip install -v --extra-index-url file://{pypi_local}/simple --no-cache-dir {wheel}',
+                                    f'pip install -v --extra-index-url file://{pypi_local}/simple {wheel}',
                                     env_extra=state.env_extra,
                                     prefix=f'install {package}: ',
                                     )
@@ -1486,54 +1477,53 @@ def main(argv):
                     if not location:
                         continue
                     if package == 'mupdf':
-                        pass
-                    elif location.startswith('pip:'):
-                        pass
-                    else:
-                        directory = _get_local(package, state)
-                        command = f'pytest {directory}/tests {state.pytest_options}'
-                        if state.pytest_wrap in ('valgrind', 'helgrind'):
-                            if not state.pytest_options:
-                                command += ' -sv'
-                        if state.pytest_wrap:
-                            command = f'python -m {command}'
-                            if state.pytest_wrap == 'gdb':
-                                command = f'gdb --args {command}'
-                            elif state.pytest_wrap == 'valgrind':
-                                state.env_extra['PYMUPDF_RUNNING_ON_VALGRIND'] = '1'
-                                state.env_extra['PYTHONMALLOC'] = 'malloc'
-                                command = (
-                                        f' valgrind'
-                                        f' --suppressions={g_root_abs}/valgrind.supp'
-                                        f' --trace-children=no'
-                                        f' --num-callers=20'
-                                        f' --error-exitcode=100'
-                                        f' --errors-for-leak-kinds=none'
-                                        f' --fullpath-after='
-                                        f' {command}'
-                                        )
-                            elif state.pytest_wrap == 'helgrind':
-                                state.env_extra['PYMUPDF_RUNNING_ON_VALGRIND'] = '1'
-                                state.env_extra['PYTHONMALLOC'] = 'malloc'
-                                command = (
-                                        f' valgrind'
-                                        f' --tool=helgrind'
-                                        f' --trace-children=no'
-                                        f' --num-callers=20'
-                                        f' --error-exitcode=100'
-                                        f' --fullpath-after='
-                                        f' {command}'
-                                        )
-                            else:
-                                assert 0, f'Unrecognised {state.pytest_wrap=}.'
-                        e = pipcl.run(
-                                command,
-                                env_extra=state.env_extra,
-                                prefix=f'pytest {package}: ',
-                                check=0,
-                                )
-                        if e:
-                            failed_packages.append(package)
+                        continue
+                    directory = _get_local(package, state, test=1)
+                    if not directory:
+                        continue
+                    command = f'pytest {directory}/tests {state.pytest_options}'
+                    if state.pytest_wrap in ('valgrind', 'helgrind'):
+                        if not state.pytest_options:
+                            command += ' -sv'
+                    if state.pytest_wrap:
+                        command = f'python -m {command}'
+                        if state.pytest_wrap == 'gdb':
+                            command = f'gdb --args {command}'
+                        elif state.pytest_wrap == 'valgrind':
+                            state.env_extra['PYMUPDF_RUNNING_ON_VALGRIND'] = '1'
+                            state.env_extra['PYTHONMALLOC'] = 'malloc'
+                            command = (
+                                    f' valgrind'
+                                    f' --suppressions={g_root_abs}/valgrind.supp'
+                                    f' --trace-children=no'
+                                    f' --num-callers=20'
+                                    f' --error-exitcode=100'
+                                    f' --errors-for-leak-kinds=none'
+                                    f' --fullpath-after='
+                                    f' {command}'
+                                    )
+                        elif state.pytest_wrap == 'helgrind':
+                            state.env_extra['PYMUPDF_RUNNING_ON_VALGRIND'] = '1'
+                            state.env_extra['PYTHONMALLOC'] = 'malloc'
+                            command = (
+                                    f' valgrind'
+                                    f' --tool=helgrind'
+                                    f' --trace-children=no'
+                                    f' --num-callers=20'
+                                    f' --error-exitcode=100'
+                                    f' --fullpath-after='
+                                    f' {command}'
+                                    )
+                        else:
+                            assert 0, f'Unrecognised {state.pytest_wrap=}.'
+                    e = pipcl.run(
+                            command,
+                            env_extra=state.env_extra,
+                            prefix=f'pytest {package}: ',
+                            check=0,
+                            )
+                    if e:
+                        failed_packages.append(package)
                     if failed_packages:
                         pipcl.log(f'Tests failed for these packages:')
                         for package in failed_packages:
@@ -1547,18 +1537,20 @@ def main(argv):
             pipcl.fs_remove(path)
 
 
-def _get_local(package, state):
+def _get_local(package, state, test=False):
     '''
     Returns local directory containing <package> checkout. Returns None if
     location is pip:.
     '''
     location, args_pos = state.packages[package]
     info = name_info(package)
-    if location.startswith('pip:'):
-        # Todo: Lookup version of pypi package and checkout the corresponding
-        # tag in default git.
-        return
-    elif location.startswith('git:'):
+    if location.startswith('pip:') and test:
+        # Use second location of <package> if specified.
+        location, args_pos = state.packages2.get(package, (None, None))
+        if location is None:
+            return
+        pipcl.log(f'Using second specified location for {package=}: {location}')
+    if location.startswith('git:'):
         directory = pipcl.git_get(
                 local=f'aptest-git-{package}',
                 remote=info.git_remote,
