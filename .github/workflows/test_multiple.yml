@@ -1,0 +1,65 @@
+# Run aptest.py on Github. Instead of
+# specifying individual inputs, we support a single string input which is used
+# for the command line directly.
+#
+# This ensures we behave exactly like scripts/test.py, without confusion caused
+# by having to translate between differing APIs.
+
+name: Tests
+
+on:
+  schedule:
+    - cron: '47 2 * * *'
+  workflow_dispatch:
+    inputs:
+      args:
+        type: string
+        default: ''
+        description: 'Arguments to pass to scripts/test.py'
+
+jobs:
+
+  test:
+    name: Test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [
+                ubuntu-latest,
+                windows-2022,
+                macos-14
+                macos-15-intel,
+                ]
+        
+        args: [
+            -m 'git:-b 1.26.x' -p git: -P git: -l git:
+            -m git:            -p git: -P git: -l git:
+            ]
+
+      # Avoid cancelling of all runs after a single failure.
+      fail-fast: false
+
+    steps:
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: test
+        env:
+          APTEST_args: ${{inputs.args}}
+          ARTIFEX_SOFTWARE_SSH_KEY: ${{secrets.ARTIFEX_SOFTWARE_SSH_KEY}}
+          PYMUPDFPRO_SETUP_SOT_KEY: ${{secrets.PYMUPDFPRO_SETUP_SOT_KEY}}
+        run:
+          python aptest.py ${{matrix.args}} build test -a APTEST_args ${{matrix.args}}
+      
+      # Upload generated wheels, to be accessible from github Actions page.
+      #
+      - uses: actions/upload-artifact@v4
+        with:
+          path: |
+              wheelhouse/*.whl
+              wheelhouse/*.tar.gz
+          name: artifact-${{ matrix.os }}
