@@ -2,17 +2,6 @@
 
 '''Developer build/test script for Artifex packages.
 
-Args:
-
-* Command line arguments are called parameters if they start with `-`,
-  otherwise they are called commands.
-* Parameters are evaluated first in the order that they were specified.
-* Then commands are run in the order in which they were specified.
-* Usually command `test` would be specified after commands such as `build`.
-* Parameters and commands can be interleaved but it may be clearer to separate
-  them on the command line.
-
-
 Examples:
 
     ./aptest/aptest.py -p PyMuPDF -P PyMuPDFPro -m mupdf -l sce build test
@@ -58,7 +47,15 @@ Examples:
 
 Args:
 
-    Options:
+    * Command line arguments are called parameters if they start with `-`,
+      otherwise they are called commands.
+    * Parameters are evaluated first in the order that they were specified.
+    * Then commands are run in the order in which they were specified.
+    * Usually command `test` would be specified after commands such as `build`.
+    * Parameters and commands can be interleaved but it may be clearer to separate
+      them on the command line.
+
+    Parameters:
     
         -a <env_name>
             Read next space-separated argument(s) from environmental variable
@@ -67,7 +64,7 @@ Args:
             * Useful when running via Github action.
     
         -b <packages>
-            Modifies behaviour of 'build' command to only build/install only
+            Modifies behaviour of 'build' command to build/install only
             the specified comma-separated packages instead of all packages
             specified by `-i`.
         
@@ -123,46 +120,47 @@ Args:
                     Install from pypi.org using pip.
                 `pip:==<version>`
                     Install specified version from pypi.org.
+                    Doesn't really work because if another project needs a
+                    newer version, pip will install again from pypi.prg.
                 `'git:[-b <branch>] [-t <tag>] [<remote>]'`
-                    Clone/update from git remote, optionally overriding default
+                    Clone/update from git remote into local checkout
+                    `aptest-git-<package-name>`, optionally overriding default
                     branch/tag/remote.
-
-                    The local git repository will be called
-                    `git-<package-name>`.
                 <local-dir>
                     Local directory, typically a git checkout.
             
             If a package is specified twice, the first location will be used
             for building, and the second location used for testing. This allows
-            packages on pypi.org to be tested with a git checkout's test suite,
-            for example:
+            packages on pypi.org to be tested, for example:
             
-                -i pymupdf pip: -i pymupdf PyMuPDF build test
+                aptest.py -i pymupdf pip: -i pymupdf PyMuPDF build test
                     Test current pymupdf release with testsuite in PyMuPDF/tests.
 
-                -i pymupdf pip: -i pymupdf git: build test
+                aptest.py -i pymupdf pip: -i pymupdf git: build test
                     Test current pymupdf release with testsuite in current git.
 
-        -l <location>
+        --pymupdf_layout <location>
         --layout <location>
-            Alias for `-i layout <location>
+        -l <location>
+            Aliases for `-i pymupdf_layout <location>
         
-        -m <location>
         --mupdf <location>
-            Alias for `-i mupdf <location>
+        -m <location>
+            Aliases for `-i mupdf <location>
         
         -o <os_names>
             Control which OS's we run on. If current OS is not in
             (comma-separated) list, we do nothing. <os_names> is case
             insensitive. Should match linux, windows or darwin.
         
-        -p <location>
         --pymupdf <location>
-            Alias for `-i pymupdf <location>
+        -p <location>
+            Aliases for `-i pymupdf <location>
         
-        -P <location>
         --pymupdfpro <location>
-            Alias for `-i pymupdfpro <location>
+        --pro <location>
+        -P <location>
+            Aliases for `-i pymupdfpro <location>
         
         -r <remote>
         
@@ -716,10 +714,10 @@ def main(argv):
             _location = next(args)
             add_package(_name, _location, args.pos - 1)
         
-        elif arg in ('-l', '--pymupdf_layout'):
+        elif arg in ('--pymupdf_layout', '--layout', '-l'):
             add_package('pymupdf_layout', next(args), args.pos - 1)
         
-        elif arg in ('-m', '--mupdf'):
+        elif arg in ('--mupdf', '-m'):
             add_package('mupdf', next(args), args.pos - 1)
         
         elif arg == '-o':
@@ -728,10 +726,10 @@ def main(argv):
             for os_name in state.os_names:
                 assert os_name in names, f'OS names should be from {names!r} but {names=}.'
         
-        elif arg in ('-p', '--pymupdf'):
+        elif arg in ('--pymupdf', '-p'):
             add_package('pymupdf', next(args), args.pos - 1)
         
-        elif arg in ('-P', '--pymupdfpro'):
+        elif arg in ('--pymupdfpro', '--pro', '-P'):
             add_package('pymupdfpro', next(args), args.pos - 1)
         
         elif arg == '-r':
