@@ -414,7 +414,6 @@ def _cpu_name():
     return f'x{32 if sys.maxsize == 2**31 - 1 else 64}'
 
 
-
 def _log(text='', caller=1):
     '''
     Logs lines with prefix.

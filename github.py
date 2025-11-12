@@ -123,7 +123,7 @@ def ghlogs_links(root, logs):
     '''
     pipcl.log(f'### Logfile links in {logs}:')
     pipcl.log(f'{root=} {logs=}')
-    assert(root), f'{root=}'
+    assert root, f'{root=}'
     for p in glob.glob(f'{logs}/*.txt'):
         st = os.stat(p)
         dst = f'{root}/{os.path.basename(p)}'
@@ -669,7 +669,7 @@ def gh_workflow_download_multiple(url_base, ids, download=True, extra_wheels=Non
         _upload(local_dir_union, pyodide_wheels, upload)
 
 
-def make_piprepo(wheel_dir):    
+def make_piprepo(wheel_dir):
     pipcl.run(f'pip install --upgrade piprepo setuptools', prefix=f'pip install piprepo setuptools: ')
     pipcl.run(f'piprepo build {wheel_dir}')
 
@@ -815,7 +815,7 @@ def _create_download_union(leaf_to_paths, extra_wheels, local_dir_union):
     for leaf, paths in leaf_to_paths.items():
         if 'emscripten' in leaf:
             pipcl.log(f'Pyodide wheel: {leaf=} {paths=}')
-            pyodide_wheels.append((leaf, paths) )
+            pyodide_wheels.append((leaf, paths))
             continue
         path = paths[0]
         pipcl.run(f'rsync -ai {path} {local_dir_union}/')

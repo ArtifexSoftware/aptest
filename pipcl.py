@@ -621,7 +621,7 @@ class Package:
         self.home_page = home_page
         self.download_url = download_url
         self.author = author
-        self.author_email  = author_email
+        self.author_email = author_email
         self.maintainer = maintainer
         self.maintainer_email = maintainer_email
         self.license = license
@@ -649,7 +649,6 @@ class Package:
         # a command that will print includes/libs from graal_py's sysconfig.
         #
         self.graal_legacy_python_config = True
-
 
     def build_wheel(self,
             wheel_directory,
@@ -796,7 +795,6 @@ class Package:
                     log2(f'    {zi.file_size: 10,d} {zi.filename}')
 
         return os.path.basename(path)
-
 
     def build_sdist(self,
             sdist_directory,
@@ -1045,7 +1043,6 @@ class Package:
         
         return ret
 
-
     def _argv_clean(self, all_):
         '''
         Called by `handle_argv()`.
@@ -1064,7 +1061,6 @@ class Package:
                         f'path={path!r} does not start with root={self.root+os.sep!r}'
                 log2(f'Removing: {path}')
                 shutil.rmtree(path, ignore_errors=True)
-
 
     def install(self, record_path=None, root=None):
         '''
@@ -1133,7 +1129,6 @@ class Package:
 
         log2(f'Finished.')
 
-
     def _argv_dist_info(self, root):
         '''
         Called by `handle_argv()`. There doesn't seem to be any documentation
@@ -1147,7 +1142,6 @@ class Package:
             with open( f'{root}/COPYING', 'w') as f:
                 f.write( self.license)
 
-
     def _argv_egg_info(self, egg_base):
         '''
         Called by `handle_argv()`.
@@ -1155,7 +1149,6 @@ class Package:
         if egg_base is None:
             egg_base = '.'
         self._write_info(f'{egg_base}/.egg-info')
-
 
     def _write_info(self, dirpath=None):
         '''
@@ -1179,7 +1172,6 @@ class Package:
         #    f.write(f'{self.name}\n')
         #with open(os.path.join(dirpath, 'METADATA', 'w') as f:
         #    f.write(self._metainfo())
-
 
     def handle_argv(self, argv):
         '''
@@ -1298,7 +1290,7 @@ class Package:
             elif arg == '--dist-dir' or arg == '-d':            opt_dist_dir = args.next()
             elif arg == '--egg-base':                           opt_egg_base = args.next()
             elif arg == '--formats':                            opt_formats = args.next()
-            elif arg == '--install-headers':                    opt_install_headers = args.next()
+            elif arg == '--install-headers':                    opt_install_headers = args.next()   # noqa: F841
             elif arg == '--python-tag':                         pass
             elif arg == '--record':                             opt_record = args.next()
             elif arg == '--root':                               opt_root = args.next()
@@ -1394,7 +1386,6 @@ class Package:
             assert 0, f'Unrecognised command: {command}'
 
         log2(f'Finished handling command: {command}')
-
 
     def __str__(self):
         return ('{'
@@ -3558,6 +3549,7 @@ class NewFiles:
         # Find current matches of <glob_pattern>.
         self.glob_pattern = glob_pattern
         self.items0 = self._items()
+    
     def get(self):
         '''
         Returns list of new matches of <glob_pattern> - paths of files that
@@ -3571,6 +3563,7 @@ class NewFiles:
             if id0 != id_:
                 ret.append(path)
         return ret
+    
     def get_n(self, n):
         '''
         Returns new files matching <glob_pattern>, asserting that there are
@@ -3580,12 +3573,14 @@ class NewFiles:
         sep = '\n    '
         assert len(ret) == n, f'{len(ret)=} != {n=}:{sep}{sep.join(ret)}'
         return ret
+    
     def get_one(self):
         '''
         Returns new match of <glob_pattern>, asserting that there is exactly
         one.
         '''
         return self.get_n(1)[0]
+    
     def _file_id(self, path):
         mtime = os.stat(path).st_mtime
         with open(path, 'rb') as f:
@@ -3594,6 +3589,7 @@ class NewFiles:
             # With python >= 3.11 we can do:
             #hash_ = hashlib.file_digest(f, hashlib.md5).digest()
         return mtime, hash_
+    
     def _items(self):
         ret = dict()
         for path in glob.glob(self.glob_pattern):
@@ -3649,7 +3645,7 @@ def swig_get(swig, quick, swig_local='pipcl-swig-git'):
                 # > bison is keg-only, which means it was not symlinked into /opt/homebrew,
                 # > because macOS already provides this software and installing another version in
                 # > parallel can cause all kinds of trouble.
-                # > 
+                # >
                 # > If you need to have bison first in your PATH, run:
                 # >   echo 'export PATH="/opt/homebrew/opt/bison/bin:$PATH"' >> ~/.zshrc
                 #

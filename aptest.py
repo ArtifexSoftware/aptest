@@ -390,6 +390,7 @@ g_root = pipcl.relpath(g_root_abs)
 # With cibw we build and test Python 3.x for x in this range.
 python_versions_minor = range(10, 13+1)
 
+
 def cibw_cp(*version_minors):
     '''
     Returns <version_tuples> in 'cp39*' format, e.g. suitable for CIBW_BUILD.
@@ -561,6 +562,7 @@ class ArgsIterator:
         self.pos += 1
         return ret
 
+
 def main(argv):
     pipcl.show_system()
     
@@ -650,7 +652,7 @@ def main(argv):
     # venv, partly so we can return errors immediately.
     #
     options = os.environ.get('APTEST_options', '')
-    options = shlex.split(options)    
+    options = shlex.split(options)
     args_list = options + argv[1:]
     args = ArgsIterator(args_list)
     i = 0
@@ -854,7 +856,6 @@ def main(argv):
             e = pipcl.run(f'{python} {shlex.join(argv)}', check=0)
             sys.exit(e)
             
-    
     # Hard-coded ssh/git key paths.
     pymupdfpro_key_path_leaf = 'thirdparty-so-key'
     artifex_software_ssh_key = 'artifex-software-ssh-key'
@@ -910,7 +911,7 @@ def main(argv):
         argv[remote_arg] = ''   # Change `-r github` to `-r ''`. # pylint: disable=used-before-assignment.
         if remote == '@github':
             pipcl.run('pip install requests')
-            branch = f'aptest-{os.environ["USER"]}'    #-{time.strftime("%F-%T")}'
+            branch = f'aptest-{os.environ["USER"]}'    # -{time.strftime("%F-%T")}'
             pipcl.log(f'{branch=}.')
 
             github_name = 'ArtifexSoftware/aptest'
