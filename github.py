@@ -506,8 +506,8 @@ def gh_assert_remote_branch_identical(url, branch, local_dir, check_clean_tree=T
             Git URL.
         check_clean_tree:
             If true we require that current tree is identical to remote tree
-            after push. Otherwise we require that current commited tree is
-            identical to remote tree after push, i.e. we allow uncommited
+            after push. Otherwise we require that current committed tree is
+            identical to remote tree after push, i.e. we allow uncommitted
             changes.
     '''
     assert url.startswith('https://api.github.com/repos/')
@@ -572,7 +572,7 @@ def gh_workflow_download_multiple(url_base, ids, download=True, extra_wheels=Non
     local_dir = f'gh_workflow-{time.strftime("%Y-%m-%d")}-{"-".join(ids)}'
     local_dir_union = f'{local_dir}-union'
     pipcl.log(f'{ids=} {local_dir=}')
-    directorys = [None] * len(ids)
+    directories = [None] * len(ids)
     pipcl.log(f'Waiting for workflows to finish: {ids=}')
     pipcl.log(f'Repeat with: {sys.argv[0]} gh_release_wait_upload --upload={upload} --download={download} {",".join(ids)}')
     t0 = time.time()
@@ -604,7 +604,7 @@ def gh_workflow_download_multiple(url_base, ids, download=True, extra_wheels=Non
                     workflow = None
                 if directory or directory == '':    # Finished or skipped.
                     pipcl.log(f'{workflow.get("html_url")}: Workflow run has finished: {id_=} {directory=}')
-                    directorys[i] = directory + '_artifact' if directory else ''
+                    directories[i] = directory + '_artifact' if directory else ''
                 if e or directory or directory == '':
                     # Finished/skipped or (network) error getting workflow info.
                     ids[i] = None
@@ -643,8 +643,8 @@ def gh_workflow_download_multiple(url_base, ids, download=True, extra_wheels=Non
     # Show contents of download directory.
     #
     leaf_to_paths = dict()
-    pipcl.log(f'{directorys=}')
-    for directory in directorys:
+    pipcl.log(f'{directories=}')
+    for directory in directories:
         if not directory:
             continue
         pipcl.log(f'    {directory}*')
@@ -726,7 +726,7 @@ def _check_identical_wheels(leaf_to_paths):
                             t3 = '\n'.join(t2)
                             assert len(t3) == len(t)
                             pipcl.fs_write(p, t3)
-            nd = 0
+            numdiffs0 = 0
             for i in range(len(extracted_paths)-1):
                 excludes = list()
                 excludes_text = ''
@@ -749,7 +749,7 @@ def _check_identical_wheels(leaf_to_paths):
                         #out='log',
                         )
                 if e:
-                    nd += 1
+                    numdiffs0 += 1
                 if excludes:
                     e = 0
                     for dirpath, _dirnames, filenames in os.walk(extracted_paths[i]):
@@ -774,9 +774,9 @@ def _check_identical_wheels(leaf_to_paths):
                                     pipcl.log(f'    {p2_size: 10}: {p2}')
                                     e = 1
                     if e:
-                        nd += 1
-            if nd:
-                num_diffs += nd
+                        numdiffs0 += 1
+            if numdiffs0:
+                num_diffs += numdiffs0
             else:
                 for extracted_path in extracted_paths:
                     assert extracted_path.startswith('pymupdf-temp-')

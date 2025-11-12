@@ -3031,7 +3031,8 @@ def run_if( command, out, *prerequisites, caller=1):
     '''
     doit = False
     
-    # Path of file containig pickle data for command and hash of command's first arg.
+    # Path of file containibg pickle data for command and hash of command's
+    # first arg.
     cmd_path = f'{out}.cmd'
     
     def hash_get(path):

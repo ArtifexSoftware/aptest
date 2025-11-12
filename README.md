@@ -96,7 +96,7 @@ Use of keys with remote runs:
   copied to the remote machine. This obviously has security implications.
 
 * If the `-r` option is used to defer to a Github runner, we rely on the
-  ArtifexSoftware/aptest repostory having secrets that allow the required
+  ArtifexSoftware/aptest repository having secrets that allow the required
   access.
 
 

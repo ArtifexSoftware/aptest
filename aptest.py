@@ -178,7 +178,7 @@ Args:
 
                 * We rerun the aptest.py command on Github machines, changing
                   -i, -m etc args to use git: to refer to the above
-                  repostories.
+                  repositories.
 
                 * On success we copy Github logs and artifacts
                   and extracted wheels etc to local directory
@@ -404,7 +404,7 @@ def git_push(path, repository, remote_branch, tmpcommit=True, doit=True):
     '''
     Pushes <path> to <repository> (or 'origin' if None).
     
-    If <tmpcommit> is true, we do a temporary commit of any uncommited changes
+    If <tmpcommit> is true, we do a temporary commit of any uncommitted changes
     before pushing, then restore. Note that this will forget about newly added
     files.
     '''
@@ -872,7 +872,7 @@ def main(argv):
                         # will not work.
                         assert 'build' not in state.commands
                 if state.graal and 'cibw' not in state.commands:
-                    # Re-run outselves in a pyenv/Graal venv.
+                    # Re-run ourselves in a pyenv/Graal venv.
                     # 2025-07-24: We need the latest pyenv.
                     graalpy = 'graalpy-24.2.1'
                     venv_name = f'venv-aptest-{graalpy}'
@@ -895,7 +895,7 @@ def main(argv):
                             check=False,
                             )
                 else:
-                    # Re-run outselves in a Python venv.
+                    # Re-run ourselves in a Python venv.
                     venv_name = f'venv-aptest-{platform.python_version()}-{int.bit_length(sys.maxsize+1)}'
                     e = venv_run(
                             sys.argv,
@@ -1374,8 +1374,8 @@ def main(argv):
                     else:
                         pipcl.log(f'Not testing because not in state.packages_test: {package=}')
                     # fixme: prefer to just run pytest directly. Needs
-                    # test/conftest.py to alway `pip install` packages required for
-                    # testing.
+                    # test/conftest.py to always `pip install` packages
+                    # required for testing.
                     #state.env_extra['CIBW_TEST_COMMAND'] = f'pytest {{project}}/tests'
 
                     # Use a copy of state.env_extra because we modify it if
