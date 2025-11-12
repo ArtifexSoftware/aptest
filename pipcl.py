@@ -2294,7 +2294,7 @@ def git_get(
                     prefix='git fetch: ',
                     )
             run(
-                    f'cd {local} && git checkout {tag}',
+                    f'cd {local} && git checkout -f {tag}',
                     env_extra=env_extra,
                     prefix='git checkout: ',
                     )
@@ -2306,7 +2306,7 @@ def git_get(
                     prefix='git fetch: ',
                     )
             run(
-                    f'cd {local} && git checkout {branch}',
+                    f'cd {local} && git checkout -f {branch}',
                     env_extra=env_extra,
                     prefix='git checkout: ',
                     )
