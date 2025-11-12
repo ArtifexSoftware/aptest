@@ -1,5 +1,7 @@
 import os
 import re
+import platform
+import shlex
 import subprocess
 import sys
 import textwrap
@@ -58,15 +60,60 @@ def test_pylint():
         ignores_list.append(m.group(1))
     ignores = ','.join(ignores_list)
     
-    command = f'pylint -d {ignores}'
     root = os.path.normpath(f'{__file__}/../..')
     sys.path.insert(0, root)
-    import pipcl
-    del sys.path[0]
+    try:
+        import pipcl
+    finally:
+        del sys.path[0]
+        
     directory = root
     leafs = pipcl.git_items(directory)
+    command = f'pylint -d {ignores}'
     for leaf in leafs:
         if leaf.endswith('.py'):
             command += f' {directory}/{leaf}'
     print(f'Running: {command}')
     subprocess.run(command, shell=1, check=1)
+
+
+def test_codespell():
+    '''
+    Check rebased Python code with codespell.
+    '''
+    root = os.path.abspath(f'{__file__}/../..')
+    
+    # For now we ignore files that we would ideally still look at, because it
+    # is difficult to exclude some text sections.
+    skips = textwrap.dedent('''
+            ''')
+    skips = skips.strip().replace('\n', ',')
+    
+    command = textwrap.dedent(f'''
+            cd {root} && codespell
+                --skip {shlex.quote(skips)}
+                --ignore-multiline-regex 'codespell:ignore-begin.*codespell:ignore-end'
+            ''')
+    
+    sys.path.insert(0, root)
+    try:
+        import pipcl
+    finally:
+        del sys.path[0]
+    
+    git_files = pipcl.git_items(root)
+    for p in git_files:
+        _, ext = os.path.splitext(p)
+        if ext in []:
+            pass
+        else:
+            command += f'    {p}\n'
+    
+    if platform.system() != 'Windows':
+        command = command.replace('\n', ' \\\n')
+    # Don't print entire command because very long, and will be displayed
+    # anyway if there is an error.
+    #print(f'test_codespell(): Running: {command}')
+    print(f'Running codespell.')
+    subprocess.run(command, shell=1, check=1)
+    print('test_codespell(): codespell succeeded.')
