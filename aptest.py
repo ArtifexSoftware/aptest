@@ -363,15 +363,12 @@ Environment:
         Is prepended to command line args.
 '''
 
-import glob
 import os
 import platform
-import re
 import shlex
 import shutil
 import subprocess
 import sys
-import textwrap
 import time
 
 
@@ -417,7 +414,7 @@ def git_push(path, repository, remote_branch, tmpcommit=True, doit=True):
             try:
                 pipcl.run(f'cd {path} && git commit -m "ghtest.py temporary commit" -a')
             except Exception:
-                log(f'Temporary commit failed. {diff=}.')
+                pipcl.log(f'Temporary commit failed. {diff=}.')
                 raise
     try:
         #pipcl.run(f'cd {path} && GIT_SSH_COMMAND="ssh -i ~/.ssh/id_rsa2" git push -fv {repository} HEAD:{remote_branch}')
@@ -431,7 +428,16 @@ def git_push(path, repository, remote_branch, tmpcommit=True, doit=True):
     return branch
 
 
-def sync_reverse(remote, remote_dir, path_remote, path_local, ssh_command, filters=None, verbose=1):
+def sync_reverse(
+        remote,
+        remote_dir,
+        path_remote,
+        path_local,
+        ssh_command,
+        *,
+        filters=None,
+        verbose=1,
+        ):
     '''
     Uses rsync to copy from remote machine to local.
 
@@ -493,7 +499,7 @@ def sync(remote, remote_dir, path, ssh_command, verbose):
             pipcl.log(f'syncing git directory: {path}')
             filenames = pipcl.git_items(path, submodules=1)
             filenames_path = f'remote-sync-paths-{os.getpid()}-{time.time()}'
-            with open(filenames_path, 'w') as f:
+            with open(filenames_path, 'w') as f:    # pylint: disable=unspecified-encoding
                 for filename in filenames:
                     filename_path = f'{path}/{filename.strip()}'
                     if os.path.isfile(filename_path):
@@ -514,44 +520,30 @@ def sync(remote, remote_dir, path, ssh_command, verbose):
     return ret
 
 
-def unalias(name):
-    if name == 'm':
-        name = 'mupdf'
-    elif name == 'p':
-        name = 'pymupdf'
-    elif name == 'P':
-        name = 'pymupdfpro'
-    elif name == 'l':
-        name = 'pymupdf_layout'
-    names = ('mupdf', 'pymupdf', 'pymupdfpro', 'pymupdf_layout')
-    assert name in names, f'Unrecognised {name=}, should be one of {names!r}.'
-    return name
-    
-
-def name_info(name):
-    class NameInfo:
-        pass
-    ret = NameInfo()
-    ret.submodules = True
-    if name == 'mupdf':
-        ret.github_name = 'ArtifexSoftware/mupdf'
-        ret.git_branch = 'master'
-    elif name == 'pymupdf':
-        ret.github_name = 'pymupdf/PyMuPDF'
-        ret.git_branch = 'main'
-    elif name == 'pymupdfpro':
-        ret.github_name = 'ArtifexSoftware/PyMuPDFPro'
-        ret.git_branch = 'main'
-    elif name == 'pymupdf_layout':
-        ret.github_name = 'ArtifexSoftware/sce'
-        ret.git_branch = 'master'
-        # Have seen problems with clong after we've pushed local checkout to
-        # branch but submodule `mupdf` not present.
-        ret.submodules = False
-    else:
-        assert 0, f'{name=}'
-    ret.git_remote = f'git@github.com:{ret.github_name}.git'
-    return ret
+class NameInfo:
+    '''
+    Hard-coded info about package.
+    '''
+    def __init__(self, name):
+        self.submodules = True
+        if name == 'mupdf':
+            self.github_name = 'ArtifexSoftware/mupdf'
+            self.git_branch = 'master'
+        elif name == 'pymupdf':
+            self.github_name = 'pymupdf/PyMuPDF'
+            self.git_branch = 'main'
+        elif name == 'pymupdfpro':
+            self.github_name = 'ArtifexSoftware/PyMuPDFPro'
+            self.git_branch = 'main'
+        elif name == 'pymupdf_layout':
+            self.github_name = 'ArtifexSoftware/sce'
+            self.git_branch = 'master'
+            # Have seen problems with clong after we've pushed local checkout to
+            # branch but submodule `mupdf` not present.
+            self.submodules = False
+        else:
+            assert 0, f'{name=}'
+        self.git_remote = f'git@github.com:{self.github_name}.git'
 
 
 class ArgsIterator:
@@ -567,7 +559,6 @@ class ArgsIterator:
         return ret
 
 def main(argv):
-
     pipcl.show_system()
     
     if github_workflow_unimportant():
@@ -587,7 +578,6 @@ def main(argv):
     class State:
         pass
     state = State()
-    state.build_isolation = None
     state.cibw_name = 'cibuildwheel'
     state.cibw_pyodide = None
     state.cibw_pyodide_version = None
@@ -612,7 +602,7 @@ def main(argv):
     state.sdists = False
     state.swig = None
     state.swig_quick = None
-    state.system_packages = True if os.environ.get('GITHUB_ACTIONS') == 'true' else False
+    state.system_packages = True if os.environ.get('GITHUB_ACTIONS') == 'true' else False   # pylint: disable=simplifiable-if-expression
     state.system_site_packages = False
     state.valgrind = False
     
@@ -681,9 +671,6 @@ def main(argv):
         
         elif arg == '-b':
             state.packages_build = next(args).split(',')
-        
-        elif arg == '--build-isolation':
-            state.build_isolation = int(next(args))
         
         elif arg == '--cibw-name':
             state.cibw_name = next(args)
@@ -855,7 +842,7 @@ def main(argv):
         else:
             pipcl.log(f'{python=}: rerunning because {platform.python_version_tuple()[:2]=} != {python_version_tuple[:2]=}')
             argv = args.argv[:]
-            argv[python_args_pos] = ''
+            argv[python_args_pos] = ''  # pylint: disable=used-before-assignment
             e = pipcl.run(f'{python} {shlex.join(argv)}', check=0)
             sys.exit(e)
             
@@ -910,9 +897,9 @@ def main(argv):
                             )
                 sys.exit(e)
     
-    if remote:
+    if remote:  # pylint: disable=too-many-nested-blocks
         argv = args.argv[:]
-        argv[remote_arg] = ''   # Change `-r github` to `-r ''`.
+        argv[remote_arg] = ''   # Change `-r github` to `-r ''`. # pylint: disable=used-before-assignment.
         if remote == '@github':
             pipcl.run('pip install requests')
             branch = f'aptest-{os.environ["USER"]}'    #-{time.strftime("%F-%T")}'
@@ -931,7 +918,7 @@ def main(argv):
                     if not package_location.startswith(('git:', 'pip:')):
                         # Push to a Github branch and update argv[] to refer to this
                         # Github branch.
-                        info = name_info(package_name)
+                        info = NameInfo(package_name)
                         pipcl.log(f'{package_name=}.')
                         pipcl.log(f'{info.git_remote=}.')
                         git_push(package_location, info.git_remote, branch)
@@ -943,7 +930,7 @@ def main(argv):
                     assert len(state.packages) == 1, f'Running yml directly requires exactly one package, but {len(state.packages)=}.'
                     for package_name, (package_location, args_pos) in state.packages.items():
                         pass
-                    info = name_info(package_name)
+                    info = NameInfo(package_name)
                     github_name = info.github_name
                     data = dict()
                     data['ref'] = branch
@@ -996,6 +983,7 @@ def main(argv):
                 for j in jumps:
                     ssh_command += f' -J {j}'
                 ssh_command += f' {remote}'
+                label = remote
                 remote = None
             elif remote_ssh:
                 ssh_command = remote
@@ -1159,10 +1147,9 @@ def main(argv):
         pipcl.log(f' {MACOSX_DEPLOYMENT_TARGET=}.')
         state.env_extra['MACOSX_DEPLOYMENT_TARGET'] = MACOSX_DEPLOYMENT_TARGET
     
-    try:
+    try:    # pylint: disable=too-many-nested-blocks.
         # Handle commands.
         #
-        have_installed = False
         for command in state.commands:
             pipcl.log(f'### {command=}.')
             if 0:
@@ -1330,7 +1317,7 @@ def main(argv):
                 if state.cibw_pyodide_version:
                     # 2025-07-21: there is no --pyodide-version option so we set
                     # CIBW_PYODIDE_VERSION.
-                    state.env_extra['CIBW_PYODIDE_VERSION'] = cibw_pyodide_version
+                    state.env_extra['CIBW_PYODIDE_VERSION'] = state.cibw_pyodide_version
                     state.env_extra['CIBW_ENABLE'] = 'pyodide-prerelease'
 
                 packages = list()
@@ -1540,13 +1527,13 @@ def _get_local(package, state, test=False):
     Returns local directory containing <package> checkout. Returns None if
     location is pip:.
     '''
-    location, args_pos = state.packages[package]
-    info = name_info(package)
+    location, _ = state.packages[package]
+    info = NameInfo(package)
     if location.startswith('pip:') and test:
         # Use second location of <package> if specified.
-        location, args_pos = state.packages2.get(package, (None, None))
+        location, _ = state.packages2.get(package, (None, None))
         if location is None:
-            return
+            return None
         pipcl.log(f'Using second specified location for {package=}: {location}')
     if location.startswith('git:'):
         directory = pipcl.git_get(
@@ -1571,13 +1558,14 @@ def github_workflow_unimportant():
     GITHUB_EVENT_NAME = os.environ.get('GITHUB_EVENT_NAME')
     GITHUB_REPOSITORY = os.environ.get('GITHUB_REPOSITORY')
     if GITHUB_EVENT_NAME == 'schedule':
-        sha, comment, diff, branch = pipcl.git_info(g_root)
+        _sha, _comment, _diff, branch = pipcl.git_info(g_root)
         if branch != 'main':
-            log(f'## This is an unimportant Github workflow on non-main branch.')
-            log(f'## {GITHUB_EVENT_NAME=}.')
-            log(f'## {GITHUB_REPOSITORY=}.')
-            log(f'## {branch=}.')
+            pipcl.log(f'## This is an unimportant Github workflow on non-main branch.')
+            pipcl.log(f'## {GITHUB_EVENT_NAME=}.')
+            pipcl.log(f'## {GITHUB_REPOSITORY=}.')
+            pipcl.log(f'## {branch=}.')
             return True
+    return False
 
 
 def venv_in(path=None):
