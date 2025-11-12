@@ -32,8 +32,8 @@ jobs:
                 ]
         
         args: [
-            -m 'git:-b 1.26.x' -p git: -P git: -l git:
-            -m git:            -p git: -P git: -l git:
+            '-m "git:-b 1.26.x" -p git: -P git: -l git:',
+            '-m git:            -p git: -P git: -l git:',
             ]
 
       # Avoid cancelling of all runs after a single failure.
