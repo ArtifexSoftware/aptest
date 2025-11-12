@@ -1,7 +1,13 @@
 #! /usr/bin/env python3
 
+'''
+Abstractions for Github ReST API.
+'''
+
 import pipcl
 
+import fnmatch
+import getpass
 import glob
 import hashlib
 import io
@@ -105,8 +111,8 @@ def _unzip(path_zip, path_out_directory):
     pipcl.log(f'    to: {path_out_directory}')
     path_out_directory_ = f'{path_out_directory}_'
     pipcl.fs_ensure_empty_dir(path_out_directory_)
-    z = zipfile.ZipFile(path_zip)
-    z.extractall(path_out_directory_)
+    with zipfile.ZipFile(path_zip) as z:
+        z.extractall(path_out_directory_)
     os.rename(path_out_directory_, path_out_directory)
 
 
@@ -175,10 +181,10 @@ def _gh_get(url, *, raise_for_status=True, stream=False, params=None, headers=No
         auth:
             None or (username, password).
     '''
-    import requests
+    import requests # pylint: disable=import-outside-toplevel
     url = _url_expand(url)
     assert url.startswith(f'https://')
-    r = requests.get(
+    r = requests.get(   # pylint: disable=missing-timeout
             url,
             headers=_gh_headers(headers),
             params=params,
@@ -190,7 +196,7 @@ def _gh_get(url, *, raise_for_status=True, stream=False, params=None, headers=No
     return r
 
 
-def _gh_post(url, json, raise_for_status=True):
+def _gh_post(url, json, raise_for_status=True): # pylint: disable=redefined-outer-name
     '''
     Calls requests.post() for github URL `url`.
     Args:
@@ -201,12 +207,12 @@ def _gh_post(url, json, raise_for_status=True):
         json:
             Dict to pass as requests.post()'s `json` arg.
     '''
-    import requests
+    import requests # pylint: disable=import-outside-toplevel
     pipcl.log(f'{url=}')
     url = _url_expand(url)
     pipcl.log(f'{url=}')
     pipcl.log(f'{_gh_headers()=}')
-    r = requests.post(url, headers=_gh_headers(), json=json)
+    r = requests.post(url, headers=_gh_headers(), json=json)    # pylint: disable=missing-timeout
     if raise_for_status:
         _raise(r)
     return r
@@ -286,7 +292,7 @@ def gh_run_workflow(
     run0_id = _gh_runs_newest(url_base)
     pipcl.log(f'{data=}')
     url = f'{url_base}/actions/workflows/{yml}/dispatches'
-    r = _gh_post(url, json=data)
+    _gh_post(url, json=data)
     pipcl.log(f'Have started new workflow run: {url=}')
 
     # Unfortunately `r` does not contain any information about the id of
@@ -310,7 +316,13 @@ def gh_run_workflow(
     return run_id
 
         
-def gh_workflow_download(url_base, yml, id_='newest', verbose: int=0, block=True, local_dir=None, loglinks=True):
+def gh_workflow_download(
+        url_base,
+        *,
+        id_='newest',
+        block=True,
+        local_dir=None,
+        ):
     '''
     Waits for workflow to finish if it is in progress, then downloads the
     workflow's logs and artifacts.
@@ -502,7 +514,7 @@ def gh_assert_remote_branch_identical(url, branch, local_dir, check_clean_tree=T
     pipcl.log(f'{url=}')
     remote_sha = _gh_get(f'{url}/branches/{branch}').json()['commit']['sha']
     pipcl.log(f'{url=} => {remote_sha=}.')
-    e, text = pipcl.system(
+    e, text = pipcl.run(
             f'cd {local_dir} && git diff {"" if check_clean_tree else "--cached"} {remote_sha}',
             check=0,
             #out=[('log', 'git diff: '), (str, '')],
@@ -525,7 +537,7 @@ def gh_community(url, verbose=True):
     return ret
 
 
-def gh_workflow_download_multiple(url_base, yml, ids, download=True, extra_wheels=None, upload=''):
+def gh_workflow_download_multiple(url_base, ids, download=True, extra_wheels=None, upload=''):
     '''
     Wait for workflows to finish, downloads to local machine, uploads to
     pypi.
@@ -580,12 +592,12 @@ def gh_workflow_download_multiple(url_base, yml, ids, download=True, extra_wheel
             directory = None
             if download:
                 try:
-                    workflow, directory = gh_workflow_download(url_base, yml, id_=id_, block=False, local_dir=local_dir)
+                    workflow, directory = gh_workflow_download(url_base, id_=id_, block=False, local_dir=local_dir)
                 except Exception as ee:
                     e = ee
                     text = io.StringIO()
-                    ee_detailed = traceback.print_exc(file=text)
-                    text = text.getvalue()
+                    traceback.print_exc(file=text)
+                    ee_detailed = text.getvalue()
                     #ee_detailed = jlib.exception_info(file=str)
                     pipcl.log(f'Workflow failed: {id_=} {ee}:\n{ee_detailed}')
                     errors.append(e)
@@ -604,22 +616,21 @@ def gh_workflow_download_multiple(url_base, yml, ids, download=True, extra_wheel
                     if num_workflows_finished == len(ids):
                         break
             else:
-                run, completed, e = gh_workflow_wait(id_=id_, block=False)
-                if completed:
-                    if e:
-                        errors.append(e)
-                    ids[i] = None
-                    num_workflows_finished += 1
-                    pipcl.log(f'{run.get("html_url")}: {len(ids)=} {num_workflows_finished=}')
-                    if num_workflows_finished == len(ids):
-                        break
+                run, e = gh_workflow_wait(url_base, id_=id_, block=False)
+                if e:
+                    errors.append(e)
+                ids[i] = None
+                num_workflows_finished += 1
+                pipcl.log(f'{run.get("html_url")}: {len(ids)=} {num_workflows_finished=}')
+                if num_workflows_finished == len(ids):
+                    break
         if num_workflows_finished == len(ids):
             break
 
     if not download:
         pipcl.log('All workflow(s) have finished. Not downloading.')
         for id_ in ids0:
-            run = _gh_workflow(id_=id_)
+            run = _gh_workflow(url_base, id_=id_)
             #pipcl.log(f'Info for {id_=}:\n{json.dumps(run, indent=4)}')
             pipcl.log(f'URL for {id_=}: {run.get("html_url")}')
         
@@ -640,7 +651,7 @@ def gh_workflow_download_multiple(url_base, yml, ids, download=True, extra_wheel
         for path in glob.glob(f'{directory}*/*'):
             pipcl.log(f'        {path}')
             leaf = os.path.basename(path)
-            paths = leaf_to_paths.setdefault(leaf, []).append(path)
+            leaf_to_paths.setdefault(leaf, []).append(path)
 
     _check_identical_wheels(leaf_to_paths)
     
@@ -673,9 +684,10 @@ def _check_identical_wheels(leaf_to_paths):
     # different datestamps, so we extract each one and compare with
     # command-line diff -r.)
     #
+    
     pipcl.log('Checking duplicate sdist/wheels')
     num_diffs = 0
-    for leaf in sorted(leaf_to_paths.keys()):
+    for leaf in sorted(leaf_to_paths.keys()):   # pylint: disable=too-many-nested-blocks
         paths = leaf_to_paths[ leaf]
         pipcl.log(f'{leaf}:')
         try:
@@ -692,18 +704,18 @@ def _check_identical_wheels(leaf_to_paths):
                 pipcl.fs_ensure_empty_dir(extracted_path)
                 #pipcl.log(f'Extracting to temporary: {path} -> {path_extracted}')
                 if path.endswith('.whl'):
-                    z = zipfile.ZipFile(path)
-                    z.extractall(extracted_path)
+                    with zipfile.ZipFile(path) as z:
+                        z.extractall(extracted_path)
                 elif path.endswith('.tar.gz'):
-                    z = tarfile.open(path)
-                    z.extractall(extracted_path)
+                    with tarfile.open(path) as z:
+                        z.extractall(extracted_path)
                 else:
                     assert 0, f'Unrecognised suffix: {path=}'
                 extracted_paths.append(extracted_path)
             # Looks like cibuildwheel or auditwheel on Linux might be
             # reordering the items in RECORD files, so we sort them here.
             for path in extracted_paths:
-                for dirpath, dirnames, filenames in os.walk(path):
+                for dirpath, _dirnames, filenames in os.walk(path):
                     for filename in filenames:
                         if filename == 'RECORD':
                             p = os.path.join(dirpath, filename)
@@ -740,11 +752,10 @@ def _check_identical_wheels(leaf_to_paths):
                     nd += 1
                 if excludes:
                     e = 0
-                    for dirpath, dirnames, filenames in os.walk(extracted_paths[i]):
+                    for dirpath, _dirnames, filenames in os.walk(extracted_paths[i]):
                         for filename in filenames:
                             match = 0
                             for exclude in excludes:
-                                import fnmatch
                                 if fnmatch.fnmatch(filename, exclude):
                                     match = 1
                                     break
@@ -817,7 +828,7 @@ def _upload(local_dir_union, pyodide_wheels, upload):
     if isinstance(upload, str) and ':' in upload:
         command = f'rsync -ai {local_dir_union}/ {upload}/'
         pipcl.log(f'Will upload to {upload}/:')
-        pipcl.runf(f'ls -ld {local_dir_union}/*')
+        pipcl.run(f'ls -ld {local_dir_union}/*')
         while 1:
             pipcl.log(f'{command=}')
             #yes = input(jlib.log_text('Upload with this command? Enter "yes" if you are sure... ? ', nl=0))
@@ -843,7 +854,7 @@ def _upload(local_dir_union, pyodide_wheels, upload):
     
     if pyodide_wheels:
         pipcl.log(f'Pyodide wheel(s):')
-        for leaf, paths in pyodide_wheels:
+        for _leaf, paths in pyodide_wheels:
             for path in paths:
                 pipcl.log(f'    {os.path.relpath(path)}')
     return local_dir_union
@@ -853,8 +864,6 @@ def cpu_bits():
 
 
 def upload_pypi(paths, pypi_test: bool=False):
-    '''
-    '''
     num_tgz = 0
     num_whl = 0
     num_other = 0
@@ -926,8 +935,7 @@ def main():
             break
         if arg == 'make-pypi':
             wheel_dir = next(args)
-            pypi_dir = next(args)
-            make_piprepo(wheel_dir, pypi_dir)
+            make_piprepo(wheel_dir)
         else:
             assert 0, f'Unrecognised {arg=}.'
 
