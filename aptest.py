@@ -68,6 +68,9 @@ Args:
             the specified comma-separated packages instead of all packages
             specified by `-i`.
         
+        --build-type debug|release
+            Set build type.
+        
         --cibw-name <cibw_name>
             Name to use when installing cibuildwheel, e.g.:
                 --cibw-name cibuildwheel==3.0.0b1
@@ -578,6 +581,7 @@ def main(argv):
     class State:
         pass
     state = State()
+    state.build_type = None
     state.cibw_name = 'cibuildwheel'
     state.cibw_pyodide = None
     state.cibw_pyodide_version = None
@@ -671,6 +675,10 @@ def main(argv):
         
         elif arg == '-b':
             state.packages_build = next(args).split(',')
+        
+        elif arg == '--build-type':
+            state.build_type = next(args)
+            assert state.build_type in ('release', 'debug', 'memento')
         
         elif arg == '--cibw-name':
             state.cibw_name = next(args)
@@ -1219,6 +1227,14 @@ def main(argv):
                                 # builds pymupdfpro/layout later on.
                                 state.env_extra['PIPCL_GRAAL_NATIVE_VENV'] = os.path.abspath(venv_native)
 
+                            if state.build_type:
+                                if package == 'pymupdf':
+                                    state.env_extra['PYMUPDF_SETUP_MUPDF_BUILD_TYPE'] = state.build_type
+                                if package == 'pymupdfpro':
+                                    state.env_extra['PYMUPDFPRO_SETUP_BUILD_TYPE'] = state.build_type
+                                if package == 'pymupdf_layout':
+                                    state.env_extra['PYMUPDF_LAYOUT_SETUP_BUILD_TYPE'] = state.build_type
+                                    
                             new_files = pipcl.NewFiles(f'{wheelhouse_local}/{package}*.whl')
                             pipcl.run(
                                     #f'pip wheel -v --extra-index-url file://{pypi_local}/simple --no-cache-dir -w {wheelhouse_local} {directory_abs}',
