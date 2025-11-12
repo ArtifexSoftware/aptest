@@ -11,7 +11,7 @@ import sys
 import sysconfig
 import textwrap
 
-import pipcl
+import pipcl    # pylint: disable=cyclic-import
 
 
 class WindowsVS:
@@ -157,7 +157,7 @@ class WindowsVS:
             # Find csc.exe.
             #
             csc = None
-            for dirpath, dirnames, filenames in os.walk(directory):
+            for dirpath, _dirnames, filenames in os.walk(directory):
                 for filename in filenames:
                     if filename == 'csc.exe':
                         csc = os.path.join(dirpath, filename)
@@ -167,7 +167,7 @@ class WindowsVS:
             # Find MSBuild.exe.
             #
             msbuild = None
-            for dirpath, dirnames, filenames in os.walk(directory):
+            for dirpath, _dirnames, filenames in os.walk(directory):
                 for filename in filenames:
                     if filename == 'MSBuild.exe':
                         msbuild = os.path.join(dirpath, filename)
@@ -345,7 +345,6 @@ class WindowsPython:
                 if m := re.match( '^ *-V:([0-9.]+)(-32)? ([*])? +(.+)$', line):
                     version2 = m.group(1)
                     bits = 32 if m.group(2) else 64
-                    current = m.group(3)
                     path = m.group(4).strip()
                 elif m := re.match( '^ *-([0-9.]+)-((32)|(64)) +(.+)$', line):
                     version2 = m.group(1)
@@ -359,7 +358,6 @@ class WindowsPython:
                     _log( f'{version2=} {bits=} {path=} from {line=}.')
                 if bits != cpu.bits or version2 != version:
                     continue
-                root = os.path.dirname(path)
                 if not os.path.exists(path):
                     # Sometimes it seems that the specified .../python.exe does not exist,
                     # and we have to change it to .../python<version>.exe.
