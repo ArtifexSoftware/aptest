@@ -117,3 +117,62 @@ def test_codespell():
     print(f'Running codespell.')
     subprocess.run(command, shell=1, check=1)
     print('test_codespell(): codespell succeeded.')
+
+
+def test_flake8():
+    ignores = textwrap.dedent('''
+            E123 closing bracket does not match indentation of opening bracket\'s line
+            E124 closing bracket does not match visual indentation
+            E126 continuation line over-indented for hanging indent
+            E127 continuation line over-indented for visual indent
+            E128 continuation line under-indented for visual indent
+            E131 continuation line unaligned for hanging indent
+            E201 whitespace after \'(\'
+            E203 whitespace before \':\'
+            E225 missing whitespace around operator
+            E226 missing whitespace around arithmetic operator
+            E227 missing whitespace around bitwise or shift operator
+            E241 multiple spaces after \':\'
+            E251 unexpected spaces around keyword / parameter equals
+            E252 missing whitespace around parameter equals
+            E261 at least two spaces before inline comment
+            E265 block comment should start with \'# \'
+            E271 multiple spaces after keyword
+            E272 multiple spaces before keyword
+            E302 expected 2 blank lines, found 1
+            E305 expected 2 blank lines after class or function definition, found 1
+            E306 expected 1 blank line before a nested definition, found 0
+            E402 module level import not at top of file
+            E501 line too long
+            E701 multiple statements on one line (colon)
+            E731 do not assign a lambda expression, use a def
+            E741 ambiguous variable name \'l\'
+            F541 f-string is missing placeholders
+            W293 blank line contains whitespace
+            W503 line break before binary operator
+            W504 line break after binary operator
+            ''')
+    ignores = ignores.strip().split('\n')
+    ignores2 = list()
+    for i in ignores:
+        if not i.startswith('#'):
+            ignores2.append(i.split(' ', 1)[0])
+    ignores = ','.join(ignores2)
+    root = os.path.normpath(f'{__file__}/../..')
+    print(f'{root=}')
+    sys.path.insert(0, root)
+    try:
+        import pipcl
+    finally:
+        del sys.path[0]
+    
+    command = f'flake8 --ignore={ignores} --statistics'
+    
+    git_files = pipcl.git_items(root)
+    for p in git_files:
+        if p.endswith('.py'):
+            command += f' {root}/{p}'
+    
+    print(f'test_flake8(): Running: {command}')
+    subprocess.run(command, shell=1, check=1)
+    print(f'test_flake8(): flake8 succeeded.')
