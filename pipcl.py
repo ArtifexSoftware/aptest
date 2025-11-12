@@ -44,8 +44,6 @@ import re
 import selectors
 import shlex
 import shutil
-import site
-import stat
 import subprocess
 import sys
 import sysconfig
@@ -319,7 +317,7 @@ class Package:
             name,
             version,
             *,
-            platform = None,
+            platform = None,    # pylint: disable=redefined-outer-name
             supported_platform = None,
             summary = None,
             description = None,
@@ -331,7 +329,7 @@ class Package:
             author_email = None,
             maintainer = None,
             maintainer_email = None,
-            license = None,
+            license = None, # pylint: disable=redefined-builtin
             classifier = None,
             requires_dist = None,
             requires_python = None,
@@ -759,7 +757,7 @@ class Package:
             # Add the files returned by fn_build().
             #
             for item in items:
-                from_, (to_abs, to_rel) = self._fromto(item)
+                from_, (_to_abs, to_rel) = self._fromto(item)
                 add(from_, to_rel)
 
             # Add <name>-<version>.dist-info/WHEEL.
@@ -859,7 +857,7 @@ class Package:
 
             found_pyproject_toml = False
             for item in items:
-                from_, (to_abs, to_rel) = self._fromto(item)
+                from_, (_to_abs, to_rel) = self._fromto(item)
                 if isinstance(from_, bytes):
                     add(from_, to_rel)
                 else:
@@ -1033,7 +1031,7 @@ class Package:
         # py_limited_api=True, but haven't tested this, and it seems simpler to
         # be strict.)
         for item in ret:
-            from_, (to_abs, to_rel) = self._fromto(item)
+            from_, (_to_abs, _to_rel) = self._fromto(item)
             from_abs = os.path.abspath(from_)
             is_py_limited_api = _extensions_to_py_limited_api.get(from_abs)
             if is_py_limited_api is not None:
@@ -1060,7 +1058,7 @@ class Package:
                 paths = paths,
             for path in paths:
                 if not os.path.isabs(path):
-                    path = ps.path.join(self.root, path)
+                    path = os.path.join(self.root, path)
                 path = os.path.abspath(path)
                 assert path.startswith(self.root+os.sep), \
                         f'path={path!r} does not start with root={self.root+os.sep!r}'
@@ -1143,7 +1141,7 @@ class Package:
         it writes to a slightly different directory.
         '''
         if root is None:
-            root = f'{normalise2(self.name)}-{self.version}.dist-info'
+            root = f'{_normalise2(self.name)}-{self.version}.dist-info'
         self._write_info(f'{root}/METADATA')
         if self.license:
             with open( f'{root}/COPYING', 'w') as f:
@@ -1185,7 +1183,7 @@ class Package:
 
     def handle_argv(self, argv):
         '''
-        Attempt to handles old-style (pre PEP-517) command line passed by
+        Attempt to handle old-style (pre PEP-517) command line passed by
         old releases of pip to a `setup.py` script, and manual running of
         `setup.py`.
 
@@ -1210,9 +1208,9 @@ class Package:
                 '''
                 try:
                     return next( self.items)
-                except StopIteration:
+                except StopIteration as e:
                     if eof is ArgsRaise:
-                        raise Exception('Not enough args')
+                        raise Exception('Not enough args') from e
                     return eof
 
         command = None
@@ -1220,18 +1218,18 @@ class Package:
         opt_dist_dir = 'dist'
         opt_egg_base = None
         opt_formats = None
-        opt_install_headers = None
+        opt_install_headers = None  # pylint: disable=unused-variable
         opt_record = None
         opt_root = None
 
         args = Args(argv[1:])
 
         while 1:
+            # pylint: disable=multiple-statements,consider-using-in
             arg = args.next(None)
             if arg is None:
                 break
-
-            elif arg in ('-h', '--help', '--help-commands'):
+            if arg in ('-h', '--help', '--help-commands'):
                 log0(textwrap.dedent('''
                         Usage:
                             [<options>...] <command> [<options>...]
@@ -1308,11 +1306,12 @@ class Package:
             elif arg == '--verbose' or arg == '-v':             g_verbose += 1
 
             else:
-               raise Exception(f'Unrecognised arg: {arg}')
+                raise Exception(f'Unrecognised arg: {arg}')
 
         assert command, 'No command specified'
 
         log1(f'Handling command={command}')
+        # pylint: disable=multiple-statements
         if 0:   pass
         elif command == 'bdist_wheel':  self.build_wheel(opt_dist_dir)
         elif command == 'clean':        self._argv_clean(opt_all)
@@ -1357,6 +1356,7 @@ class Package:
             vs = wdev.WindowsVS(year=year, grade=grade, version=version)
             print(f'Visual Studio is:\n{vs.description_ml("    ")}')
 
+        # pylint: disable=too-many-nested-blocks
         elif command == 'show-sysconfig':
             show_sysconfig()
             for mod in platform, sys:
@@ -1554,7 +1554,6 @@ class Package:
 
         `to_rel` is derived from the `to_abs` and is relative to self.root`.
         '''
-        ret = None
         if isinstance(p, str):
             p = p, p
         assert isinstance(p, tuple) and len(p) == 2
@@ -1875,6 +1874,7 @@ def build_extension(
                 path_o,
                 path_source,
                 [path_source] + _get_prerequisites(prerequisites_path),
+                prerequisites_compile,
                 )
 
     # Link
@@ -1929,6 +1929,7 @@ def build_extension(
             path_cpp,
             *path_os,
             *_get_prerequisites(f'{path_so}.d'),
+            prerequisites_link,
             )
 
     if link_was_run and darwin():
@@ -2483,7 +2484,7 @@ def run(
     
     if tee:
         assert not os.path.exists(tee), f'Tee file already exists: {tee}'
-        tee_f = open(tee, 'w')
+        tee_f = open(tee, 'w')  # pylint: disable=consider-using-with
         cleanup.append(tee_f.close)
         out.append(tee_f)
     
@@ -2502,10 +2503,10 @@ def run(
             out[i] = (o.write, o.flush)
     
     def write(text):
-        for write2, flush2 in out:
+        for write2, _flush2 in out:
             write2(text)
     def flush():
-        for write2, flush2 in out:
+        for _write2, flush2 in out:
             if flush2:
                 flush2()
     
@@ -2515,7 +2516,7 @@ def run(
             if platform.system() == 'Windows':
                 # The `selectors` module does not support pipes.
                 assert not timeout, 'timeout with (prefix or out) not supported on Windows'
-            child = subprocess.Popen(
+            child = subprocess.Popen(   # pylint: disable=consider-using-with
                     command2,
                     shell=True,
                     stdout=subprocess.PIPE,
@@ -2562,7 +2563,7 @@ def run(
                     if ticker:
                         endtime_ticker = t + ticker
                     if ticker and timeout:
-                        endtime2 = min(endtime, endtime_ticker)
+                        endtime2 = min(endtime, endtime_ticker) # pylint: disable=possibly-used-before-assignment
                     elif ticker:
                         endtime2 = endtime_ticker
                     else:
@@ -2830,7 +2831,6 @@ def macos_patch( library, *sublibraries):
         return
     subprocess.run( f'otool -L {library}', shell=1, check=1)
     command = 'install_name_tool'
-    names = []
     for sublibrary in sublibraries:
         name = subprocess.run(
                 f'otool -D {sublibrary}',
@@ -3038,7 +3038,7 @@ def run_if( command, out, *prerequisites, caller=1):
         try:
             with open(path, 'rb') as f:
                 return hashlib.md5(f.read()).hexdigest()
-        except Exception as e:
+        except Exception:
             #log(f'Failed to get hash of {path=}: {e}')
             return None
     
@@ -3051,8 +3051,7 @@ def run_if( command, out, *prerequisites, caller=1):
         with open(cmd_path, 'rb') as f:
             try:
                 cmd_args, cmd_arg0_hash = pickle.load(f)
-            except Exception as e:
-                #log(f'pickle.load() failed with {cmd_path=}: {e}')
+            except Exception:
                 pass
 
     if not doit:
@@ -3068,27 +3067,19 @@ def run_if( command, out, *prerequisites, caller=1):
                 doit = 'No previous command stored'
             else:
                 doit = f'Command has changed'
-                if 0:
-                    doit += f':\n    {cmd!r}\n    {command!r}'
-                if 0:
-                    doit += f'\nbefore:\n'
-                    doit += textwrap.indent(cmd, '    ')
-                    doit += f'\nafter:\n'
-                    doit += textwrap.indent(command, '    ')
-                if 1:
-                    # Show diff based on commands split into pseudo lines by
-                    # shlex.split().
-                    doit += ':\n'
-                    lines = difflib.unified_diff(
-                            cmd_args,
-                            command_args,
-                            lineterm='',
-                            )
-                    # Skip initial lines.
-                    assert next(lines) == '--- '
-                    assert next(lines) == '+++ '
-                    for line in lines:
-                        doit += f'    {line}\n'
+                # Show diff based on commands split into pseudo lines by
+                # shlex.split().
+                doit += ':\n'
+                lines = difflib.unified_diff(
+                        cmd_args,
+                        command_args,
+                        lineterm='',
+                        )
+                # Skip initial lines.
+                assert next(lines) == '--- '
+                assert next(lines) == '+++ '
+                for line in lines:
+                    doit += f'    {line}\n'
 
     if not doit:
         # Set doit if argv[0] hash has changed.
@@ -3145,11 +3136,6 @@ def run_if( command, out, *prerequisites, caller=1):
     else:
         log1( f'Not running command because up to date: {out!r}', caller=caller+1)
 
-    if 0:
-        log2( f'out_mtime={time.ctime(out_mtime)} pre_mtime={time.ctime(pre_mtime)}.'
-                f' pre_path={pre_path!r}: returning {ret!r}.'
-                )
-
 
 def fs_find_in_paths( name, paths=None, verbose=False):
     '''
@@ -3204,7 +3190,7 @@ def _fs_mtime_newest( path):
     '''
     ret = 0
     if os.path.isdir( path):
-        for dirpath, dirnames, filenames in os.walk( path):
+        for dirpath, _dirnames, filenames in os.walk( path):
             for filename in filenames:
                 path = os.path.join( dirpath, filename)
                 ret = max( ret, _fs_mtime( path))
@@ -3333,7 +3319,7 @@ def _log_prefix(format_, caller):
             path = relpath(frame.filename)
             _get_frame_cache[0] = frame, path
         return _get_frame_cache[0]
-    
+    # pylint: disable=unpacking-non-sequence
     pos = 0
     while pos < len(format_):
         pos0 = pos
@@ -3381,7 +3367,6 @@ def _log(text, level, caller, raw=False, nl=True):
         return
     prefix = None
     global _log_text_line_start
-    text2 = ''
     pos = 0
     while 1:
         if pos == len(text):
@@ -3743,8 +3728,6 @@ def show_sysconfig():
     '''
     Shows contents of sysconfig.get_paths() and sysconfig.get_config_vars() dicts.
     '''
-    import sysconfig
-    paths = sysconfig.get_paths()
     log0(f'show_sysconfig().')
     log0(f'sysconfig.get_paths():\n{_show_dict(sysconfig.get_paths())}')
     log0(f'sysconfig.get_config_vars():\n{_show_dict(sysconfig.get_config_vars())}')
@@ -3835,20 +3818,20 @@ if __name__ == '__main__':
     # Internal-only limited command line support, used if
     # graal_legacy_python_config is true.
     #
-    includes, ldflags = sysconfig_python_flags()
+    includes_, ldflags = sysconfig_python_flags()
     if len(sys.argv) == 1:
         run('sleep 4', ticker=0.5, timeout=0)
         run('sleep 3', ticker=0.25, timeout=0)
     elif sys.argv[1] == '--doctest':
         import doctest
         if sys.argv[2:]:
-            for f in sys.argv[2:]:
-                ff = globals()[f]
-                doctest.run_docstring_examples(ff, globals())
+            for ff in sys.argv[2:]:
+                fff = globals()[ff]
+                doctest.run_docstring_examples(fff, globals())
         else:
             doctest.testmod(None)
     elif sys.argv[1:] == ['--graal-legacy-python-config', '--includes']:
-        print(includes)
+        print(includes_)
     elif sys.argv[1:] == ['--graal-legacy-python-config', '--ldflags']:
         print(ldflags)
     else:
