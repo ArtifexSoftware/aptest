@@ -68,8 +68,8 @@ Args:
             the specified comma-separated packages instead of all packages
             specified by `-i`.
         
-        --build-type debug|release
-            Set build type.
+        --build-type debug|memento|release
+            Set build type. Default is relese.
         
         --cibw-name <cibw_name>
             Name to use when installing cibuildwheel, e.g.:
@@ -165,6 +165,21 @@ Args:
         -P <location>
             Aliases for `-i pymupdfpro <location>
         
+        --pytest <pytest-flags>
+            Specify pytest flags, for example `--pytest '-k test_123'`.
+        
+        --pytest-path <pytest_path>
+            Specify a directory/file/function to test, relative to project root
+            directory. Can be specified multiple times. Default is the project
+            root directory itself.
+
+        --pytest-wrap gdb|valgrind|helgrind
+            Run tests under specified tool
+        
+        --python <python>
+            Set Python to use. If set we re-run ourselves using specified
+            python command.
+        
         -r <remote>
         
             Rerun ourselves on remote machine(s) and on success copy wheels
@@ -175,6 +190,10 @@ Args:
                 * We push specified local checkouts directories (specified
                   by -i, -m, -p etc) to branches called `aptest-$USER`in the
                   equivalent repositories in github.com/ArtifexSoftware/.
+                
+                * Warning: if local checkouts have uncommited changes, they are
+                  pushed as temporary commits; unfortuntaely this will forget
+                  about newly added files.
 
                 * We rerun the aptest.py command on Github machines, changing
                   -i, -m etc args to use git: to refer to the above
@@ -247,23 +266,6 @@ Args:
             3 - Use venv but delete it first if it already exists.
             
             The default is 2.
-        
-        #--pyodide-build-version <version>
-        #    Version of Python package pyodide-build to use with `pyodide`
-        #    command.
-        #
-        #    If None (the default) `pyodide` uses the latest available version.
-        #    2025-02-13: pyodide_build_version='0.29.3' works.
-    
-        --pytest <pytest-flags>
-            Specify pytest flags, for example `--pytest '-k test_123'`.
-
-        --pytest-wrap gdb|valgrind|helgrind
-            Run tests under specified tool
-        
-        --python <python>
-            Set Python to use. If set we re-run ourselves using specified
-            python command.
         
         --remote-github-workflow <workflow_id>
             Changes behaviour of `-r @github`. Don't run anything Github,
@@ -348,7 +350,6 @@ Args:
         test
             Runs pytest tests.
             
-
 Other:
 
 * If we are not already running inside a Python venv, we automatically create a
@@ -601,6 +602,7 @@ def main(argv):
     state.packages_test = list()  # Sorted list of names.
     state.pybind = False
     state.pytest_options = ''
+    state.pytest_paths = list()
     state.pytest_wrap = None
     state.remote_github_yml = None
     state.remote_github_yml_inputs = None
@@ -747,6 +749,9 @@ def main(argv):
         
         elif arg == '--pytest':
             state.pytest_options = next(args)
+        
+        elif arg == '--pytest-path':
+            state.pytest_paths.append(next(args))
         
         elif arg == '--pytest-wrap':
             state.pytest_wrap = next(args)
@@ -1108,7 +1113,7 @@ def main(argv):
         elif os.path.isfile(artifex_software_ssh_key):
             state.ssh_key_path_abs = os.path.abspath(artifex_software_ssh_key)
         else:
-            pipcl.log('## May not be able to clone/update/test pymupdfpro/layout because ARTIFEX_SOFTWARE_SSH_KEY unset and file {artifex_software_ssh_key!r} does not exist')
+            pipcl.log(f'## May not be able to clone/update/test pymupdfpro/layout because ARTIFEX_SOFTWARE_SSH_KEY unset and file {artifex_software_ssh_key!r} does not exist')
             state.ssh_key_path_abs = None
         if state.ssh_key_path_abs:
             # We need to use forward slashes on Windows.
@@ -1133,7 +1138,7 @@ def main(argv):
                 state.env_extra['PYMUPDFPRO_SETUP_SOT_KEY_PATH'] = PYMUPDFPRO_SETUP_SOT_KEY_PATH
                 pipcl.log(f'Using {PYMUPDFPRO_SETUP_SOT_KEY_PATH=}.')
             else:
-                pipcl.log('## May not be able to build pymupdfpro because PYMUPDFPRO_SETUP_SOT_KEY unset and file {PYMUPDFPRO_SETUP_SOT_KEY_PATH!r} does not exist')
+                pipcl.log(f'## May not be able to build pymupdfpro because PYMUPDFPRO_SETUP_SOT_KEY unset and file {PYMUPDFPRO_SETUP_SOT_KEY_PATH!r} does not exist')
     
     def build_sdist(package, directory):
         if package == 'pymupdf':
@@ -1483,7 +1488,14 @@ def main(argv):
                     directory = _get_local(package, state, test=1)
                     if not directory:
                         continue
-                    command = f'pytest {directory}/tests {state.pytest_options}'
+                    command = f'pytest'
+                    if state.pytest_options:
+                        command += f' {state.pytest_options}'
+                    if state.pytest_paths:
+                        for path in state.pytest_paths:
+                            command += f' {directory}/{path}'
+                    else:
+                        command += f' {directory}'
                     if state.pytest_wrap in ('valgrind', 'helgrind'):
                         if not state.pytest_options:
                             command += ' -sv'
