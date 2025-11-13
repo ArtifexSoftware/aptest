@@ -361,6 +361,30 @@ Other:
   builds. For details see:
   https://mupdf.readthedocs.io/en/latest/language-bindings.html#environmental-variables
 
+* Cibuildwheel needs system install of required python version(s).
+  On macos:
+  * Installing python versions with brew does not seem to work - cibuildwheel
+    cannot find it.
+  * To install python3.14t:
+    * wget https://www.python.org/ftp/python/3.14.0/python-3.14.0-macos11.pkg
+    * Create choicechanges.plist:
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <plist version="1.0">
+        <array>
+                <dict>
+                        <key>attributeSetting</key>
+                        <integer>1</integer>
+                        <key>choiceAttribute</key>
+                        <string>selected</string>
+                        <key>choiceIdentifier</key>
+                        <string>org.python.Python.PythonTFramework-3.14</string>
+                </dict>
+        </array>
+        </plist>
+    * sudo installer -pkg python-3.14.0-macos11.pkg -applyChoiceChangesXML choicechanges.plist -target /
+    * See: https://docs.python.org/3/using/mac.html
+
 Environment:
 
     APTEST_options
