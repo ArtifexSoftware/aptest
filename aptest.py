@@ -706,7 +706,7 @@ def main(argv):
             state.graal = int(next(args))
         
         elif arg in ('-h', '--help'):
-            state.show_help = True
+            show_help = True
         
         elif arg == '-i':
             _name = next(args)
