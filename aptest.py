@@ -397,6 +397,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+import sysconfig
 import time
 
 
@@ -542,7 +543,7 @@ def sync(remote, remote_dir, path, ssh_command, verbose):
             # Sync the file or directory directly.
             pipcl.log(f'syncing: {path}')
             command += f'{path} :{remote_dir}/'
-        pipcl.run(command, prefix=f'sync {path}: ')
+        pipcl.run(command, prefix=f'sync {path}: ', out='log')
     finally:
         if filenames_path:
             pipcl.fs_remove(filenames_path)
@@ -926,7 +927,9 @@ def main(argv):
                             )
                 else:
                     # Re-run ourselves in a Python venv.
-                    venv_name = f'venv-aptest-{platform.python_version()}-{int.bit_length(sys.maxsize+1)}'
+                    Py_GIL_DISABLED = sysconfig.get_config_var('Py_GIL_DISABLED')
+                    t = '-t' if Py_GIL_DISABLED else ''
+                    venv_name = f'venv-aptest-{platform.python_version()}{t}-{int.bit_length(sys.maxsize+1)}'
                     e = venv_run(
                             sys.argv,
                             venv_name,
@@ -1373,6 +1376,7 @@ def main(argv):
                     if not directory:
                         # location is pip.
                         # cibuildwheel will download from pypi as required.
+                        pipcl.log(f'Unable to process with cibuildwheel because location is pip: {package=}')
                         continue
                     directory_abs = os.path.abspath(directory)
                     if package == 'mupdf':
@@ -1582,12 +1586,15 @@ def _get_local(package, state, test=False):
     '''
     location, _ = state.packages[package]
     info = NameInfo(package)
-    if location.startswith('pip:') and test:
-        # Use second location of <package> if specified.
-        location, _ = state.packages2.get(package, (None, None))
-        if location is None:
-            return None
-        pipcl.log(f'Using second specified location for {package=}: {location}')
+    if location.startswith('pip:'):
+        if test:
+            # Use second location of <package> if specified.
+            location, _ = state.packages2.get(package, (None, None))
+            if location is None:
+                return None
+            pipcl.log(f'Using second specified location for {package=}: {location}')
+        else:
+            return location[4:]
     if location.startswith('git:'):
         directory = pipcl.git_get(
                 local=f'aptest-git-{package}',
