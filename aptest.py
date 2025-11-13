@@ -169,9 +169,9 @@ Args:
             Specify pytest flags, for example `--pytest '-k test_123'`.
         
         --pytest-path <pytest_path>
-            Specify a directory/file/function to test, relative to project root
-            directory. Can be specified multiple times. Default is the project
-            root directory itself.
+            Specify a directory/file/function to test, relative to each project
+            root directory. Can be specified multiple times. Default is the
+            project root directory itself.
 
         --pytest-wrap gdb|valgrind|helgrind
             Run tests under specified tool
