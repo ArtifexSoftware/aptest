@@ -1523,7 +1523,20 @@ def main(argv):
                         for path in state.pytest_paths:
                             command += f' {directory}/{path}'
                     else:
-                        command += f' {directory}'
+                        # We need to somehow limit things to {package}/tests/
+                        # because otherwise pytest can recurse into other
+                        # directories (e.g. mupdf checkout in pympdf) and get
+                        # hopelessly confused.
+                        #
+                        # Would like to do `pytest {directory}` and let
+                        # pytest.ini identify `tests/` as the directory look
+                        # in for tests. But unfortunately pytest configuration
+                        # doesn't seem to allow this sort of thing, for example
+                        # `testpaths = tests` only effects `cd {package} &&
+                        # pytest` - i.e. running pytest on current directory
+                        # without specifying any location.
+                        #
+                        command += f' {directory}/tests'
                     if state.pytest_wrap in ('valgrind', 'helgrind'):
                         if not state.pytest_options:
                             command += ' -sv'
