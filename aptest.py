@@ -185,7 +185,7 @@ Args:
             Rerun ourselves on remote machine(s) and on success copy wheels
             back to local machines.
         
-            If remote='github', run on Github:
+            If remote='@github', we run on Github:
             
                 * We push specified local checkouts directories (specified
                   by -i, -m, -p etc) to branches called `aptest-$USER`in the
@@ -204,16 +204,30 @@ Args:
                   gh_workflow_YYYY-MM-DD-<workflowid>. Wheels are copied in
                   flat format into gh_workflow_YYYY-MM-DD-<workflowid>-union/.
             
-            Otherwise <remote> should be a ssh-style remote user/machine such
-            as 'macmini' or 'username@macmini'.
+            Otherwise <remote> should specify a remote machine on which to run
+            aptest:
             
-                * Specify a ssh jump host using `::`, for example `-r
-                  <gataeway>::<internal-name>`.
+                * If <remote> contains a space is is interpreted as the ssh
+                  command to use, optionally ending with a colon followed by
+                  the remote directory to use.
+                  
+                  For example:
+                  
+                      -r 'ssh -p 2222 -J barfoo@mygateway foobar@mymachine.com:testdir'
+                  
+                * Otherwise <remote> should be a rsync-style specification such
+                  as 'macmini' or 'username@macmini:testdir'.
+                
+                  Specify a ssh jump host using `::`, for example:
+                  
+                      -r <gateway>::<remote-host>
 
+                In both cases:
+            
                 * Local checkouts specified by `-i` are coped to the remote
                   using rsync, then `git clean -f` is run on the remote.
 
-                * On success wheels are copied back into local directory
+                * On success, wheels are copied back into local directory
                   aptest-wheelhouse/.
         
         --release-1
@@ -601,7 +615,6 @@ def main(argv):
     remote_do = True
     remote_github_workflow_id = None
     remote_prefix = None
-    remote_ssh = None
     show_help = False
     venv = 2
     ticker = 0.5
@@ -641,7 +654,7 @@ def main(argv):
     
     def add_package(name, location, args_pos):
         if name in state.packages:
-            pipcl.log(f'Adding secone location for {name=} testing only: {location=}')
+            pipcl.log(f'Adding second location for {name=} testing only: {location=}')
             state.packages2[name] = (location, args_pos)
             return
         state.packages[name] = (location, args_pos)
@@ -1011,7 +1024,7 @@ def main(argv):
         else:
             verbose = 1
             jumps = None
-            if not remote_ssh:
+            if ' ' not in remote:
                 jumps = remote.split('::')
                 jumps, remote = jumps[:-1], jumps[-1]
             colon = remote.rfind(':')
@@ -1026,7 +1039,7 @@ def main(argv):
                 ssh_command += f' {remote}'
                 label = remote
                 remote = None
-            elif remote_ssh:
+            elif ' ' in remote:
                 ssh_command = remote
                 remote = None
                 label = ssh_command
@@ -1037,16 +1050,19 @@ def main(argv):
 
             if remote_do:
                 git_paths = list()
+                sync_artifex_software_ssh_key = False
                 for package_name, (package_location, args_pos) in list(state.packages.items()) + list(state.packages2.items()):
                     if not package_location.startswith(('git:', 'pip:')):
                         if sync(remote, remote_dir, package_location, ssh_command=ssh_command, verbose=verbose):
                             git_paths.append(package_location)
+                    if package_location.startswith('git:'):
+                        sync_artifex_software_ssh_key = True
 
                 # Sync aptest/ checkout.
                 if sync(remote, remote_dir, g_root, ssh_command=ssh_command, verbose=verbose):
                     git_paths.append(g_root)
 
-                if 'pro' in state.packages_build or 'layout' in state.packages_build:
+                if sync_artifex_software_ssh_key:
                     if os.path.isfile(artifex_software_ssh_key):
                         sync(remote, remote_dir, artifex_software_ssh_key, ssh_command=ssh_command, verbose=verbose)
                     else:
