@@ -343,11 +343,12 @@ Args:
     Commands:
     
         build
-            Builds and installs packages specified by `-i` into venv.
+            Builds and installs packages specified by `-i` into venv. Wheels
+            are placed in `aptest-wheelhouse`, which is initially cleared.
 
         cibw
             Build and test packages using cibuildwheel. Wheels are placed
-            in directory `wheelhouse`.
+            in directory `aptest-wheelhouse`, which is initially cleared.
             * We do not install wheels and it is generally not useful to do
             `cibw test`.
 
@@ -651,6 +652,7 @@ def main(argv):
     state.system_packages = True if os.environ.get('GITHUB_ACTIONS') == 'true' else False   # pylint: disable=simplifiable-if-expression
     state.system_site_packages = False
     state.valgrind = False
+    state.wheelhouse = 'aptest-wheelhouse'
     
     def add_package(name, location, args_pos):
         if name in state.packages:
@@ -950,7 +952,7 @@ def main(argv):
                             clean=(venv>=3),
                             )
                 sys.exit(e)
-    
+        
     if remote:  # pylint: disable=too-many-nested-blocks
         argv = args.argv[:]
         argv[remote_arg] = ''   # Change `-r github` to `-r ''`. # pylint: disable=used-before-assignment.
@@ -1115,8 +1117,8 @@ def main(argv):
                 filters.append('--exclude=*')
                 sync_reverse(
                         remote, remote_dir,
-                        f'aptest-wheelhouse/',
-                        f'aptest-wheelhouse/',
+                        f'{state.wheelhouse}/',
+                        f'{state.wheelhouse}/',
                         ssh_command=ssh_command,
                         filters=filters,
                         )
@@ -1186,7 +1188,7 @@ def main(argv):
     def build_sdist(package, directory):
         if package == 'pymupdf':
             pipcl.run(
-                    f'cd {directory} && python setup.py -d {g_root_abs}/wheelhouse sdist',
+                    f'cd {directory} && python setup.py -d {os.path.abspath(state.wheelhouse)} sdist',
                     prefix='sdist {package}: ',
                     )
     
@@ -1209,17 +1211,24 @@ def main(argv):
         #
         for command in state.commands:
             pipcl.log(f'### {command=}.')
+            
+            if command in ('build', 'cibw'):
+                # 2025-11-14: piprepo seems to also required setuptools.
+                pipcl.run(f'pip install --upgrade piprepo setuptools')
+                pipcl.fs_ensure_empty_dir(state.wheelhouse)
+                pipcl.run(
+                        f'piprepo build {state.wheelhouse}',
+                        prefix='piprepo build: ',
+                        )
+                
             if 0:
                 pass
 
             elif command == 'build':
-
-                pipcl.run(f'pip install --upgrade piprepo setuptools')
-                pypi_local = os.path.abspath(f'aptest-pypi')
-                wheelhouse_local = os.path.abspath(f'aptest-wheelhouse')
-                pipcl.fs_ensure_empty_dir(pypi_local)
-                pipcl.fs_ensure_empty_dir(wheelhouse_local)
-                pipcl.run(f'piprepo build {pypi_local}')
+            
+                # We use `pip --extra-index-url {pip_index_url}` so that pip
+                # finds prerequisite wheels in state.wheelhouse.
+                pip_index_url = f'file://{os.path.abspath(state.wheelhouse)}/simple'
 
                 for package in state.packages_build:
                     pipcl.log(f'{package=}')
@@ -1284,23 +1293,23 @@ def main(argv):
                                 if package == 'pymupdf_layout':
                                     state.env_extra['PYMUPDF_LAYOUT_SETUP_BUILD_TYPE'] = state.build_type
                                     
-                            new_files = pipcl.NewFiles(f'{wheelhouse_local}/{package}*.whl')
+                            new_files = pipcl.NewFiles(f'{state.wheelhouse}/{package}*.whl')
                             pipcl.run(
-                                    #f'pip wheel -v --extra-index-url file://{pypi_local}/simple --no-cache-dir -w {wheelhouse_local} {directory_abs}',
-                                    f'pip wheel -v --extra-index-url file://{pypi_local}/simple -w {wheelhouse_local} {directory_abs}',
+                                    #f'pip wheel -v --extra-index-url {pip_index_url} --no-cache-dir -w {state.wheelhouse} {directory_abs}',
+                                    f'pip wheel -v --extra-index-url {pip_index_url} -w {state.wheelhouse} {directory_abs}',
                                     env_extra=state.env_extra,
                                     prefix=f'build {package}: ',
                                     )
                             wheel = new_files.get_one()
                             pipcl.run(
-                                    #f'pip install -v --extra-index-url file://{pypi_local}/simple --no-cache-dir {wheel}',
-                                    f'pip install -v --extra-index-url file://{pypi_local}/simple {wheel}',
+                                    #f'pip install -v --extra-index-url {pip_index_url} --no-cache-dir {wheel}',
+                                    f'pip install -v --extra-index-url {pip_index_url} {wheel}',
                                     env_extra=state.env_extra,
                                     prefix=f'install {package}: ',
                                     )
                         pipcl.run(
-                                f'piprepo sync {wheelhouse_local} {pypi_local}',
-                                prefix='piprepo sync: ',
+                                f'piprepo build {state.wheelhouse}',
+                                prefix='piprepo build: ',
                                 )
 
             elif command == 'cibw':
@@ -1308,20 +1317,13 @@ def main(argv):
                 # and using piprepo to update a local pypi-style tree.
                 
                 pipcl.run(f'pip install --upgrade --force-reinstall {state.cibw_name}', prefix=f'pip install {state.cibw_name}: ')
-                pipcl.run(f'pip install --upgrade piprepo setuptools', prefix=f'pip install piprepo setuptools: ')
-                cibw_pypi = os.path.abspath(f'cibw-pypi')
-                #shutil.rmtree(cibw_wheelhouse, ignore_errors=True)
-                #shutil.rmtree(cibw_pypi, ignore_errors=True)
-                os.makedirs(cibw_pypi, exist_ok=1)
-                pipcl.run(f'piprepo build {cibw_pypi}')
 
                 # Some general flags.
                 if 'CIBW_BUILD_VERBOSITY' not in state.env_extra:
                     state.env_extra['CIBW_BUILD_VERBOSITY'] = '1'
 
                 # Add default flags to CIBW_SKIP.
-                # 2025-10-07: `cp3??t-*` excludes free-threading, which currently breaks
-                # some tests.
+                # 2025-10-07: `cp3??t-*` excludes free-threading.
 
                 if state.cibw_skip_add_defaults:
                     CIBW_SKIP = state.env_extra.get('CIBW_SKIP', '')
@@ -1465,10 +1467,11 @@ def main(argv):
                                 ' && yum install -y openssh-clients'
                                 )
                     
-                    # Ensure that when cibuildwheel runs pip to install
-                    # prerequisite packages, it also looks in cibw_pypi. PIP_EXTRA_INDEX_URL
-                    # is equivalent to pip's `--extra-index-url`.
-                    env_extra['PIP_EXTRA_INDEX_URL'] = f'file://{prefix}{cibw_pypi}/simple'.replace('\\', '/')
+                    # Ensure that when cibuildwheel runs pip to
+                    # install prerequisite packages, it also looks in
+                    # state.wheelhouse. PIP_EXTRA_INDEX_URL is equivalent to
+                    # pip's `--extra-index-url`.
+                    env_extra['PIP_EXTRA_INDEX_URL'] = f'file://{prefix}{os.path.abspath(state.wheelhouse)}/simple'.replace('\\', '/')
                     
                     env_extra['CIBW_BUILD'] = CIBW_BUILD
                     
@@ -1483,17 +1486,17 @@ def main(argv):
                     env_extra['CIBW_ENVIRONMENT_PASS_LINUX'] = CIBW_ENVIRONMENT_PASS_LINUX
 
                     pipcl.run(
-                            f'cd {directory} && cibuildwheel{cibw_pyodide_args} --output-dir {g_root_abs}/wheelhouse',
+                            f'cd {directory} && cibuildwheel{cibw_pyodide_args} --output-dir {os.path.abspath(state.wheelhouse)}',
                             env_extra=env_extra,
                             prefix=f'cibw {package}: ',
                             )
 
-                    pipcl.run(f'ls -ld {g_root_abs}/wheelhouse/*')
-                    pipcl.run(f'piprepo sync {g_root_abs}/wheelhouse {cibw_pypi}')
+                    pipcl.run(f'ls -ld {state.wheelhouse}/*')
+                    pipcl.run(f'piprepo build {state.wheelhouse}')
                     packages.append(package)
                     
-                    pipcl.log(f'Contents of: {cibw_pypi=} are:')
-                    for dirpath, dirnames, filenames in os.walk(cibw_pypi):
+                    pipcl.log(f'Contents of: {state.wheelhouse=} are:')
+                    for dirpath, dirnames, filenames in os.walk(state.wheelhouse):
                         for filename in filenames:
                             path = os.path.join(dirpath, filename)
                             st = os.stat(path)
