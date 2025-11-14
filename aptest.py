@@ -1137,6 +1137,7 @@ def main(argv):
     pipcl.log(f'{swig_binary=}')
     if swig_binary:
         # Prevent individual builds from installing default swig.
+        swig_binary = os.path.abspath(swig_binary)
         state.env_extra['PYMUPDF_SETUP_SWIG'] = swig_binary
         state.env_extra['PYMUPDFPRO_SETUP_SWIG'] = swig_binary
         state.env_extra['PYMUPDF_LAYOUT_SETUP_SWIG'] = swig_binary
