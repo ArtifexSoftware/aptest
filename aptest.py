@@ -339,6 +339,9 @@ Args:
         --ticker <delay>
             Use ticker with specified delay. Disabled if delay==0. Default is
             0.5.
+        
+        -V
+            Verbose.
             
     Commands:
     
@@ -364,6 +367,23 @@ Args:
         
         test
             Runs pytest tests.
+    
+    Other:
+    
+        completion
+            Must be the only arg. Prints a bash completion script for
+            aptest.py, to stdout.
+            
+            This can be sourced into the current bash shell with:
+            
+                source <(aptest/aptest.py completion)
+            
+            Thr script works by using aptest.py itself to write valid
+            completions to stdout (which it does if environment variable
+            COMP_LINE is defined).
+            
+            If APTEST_COMPLETION_DEBUG is defined, it is a path to which
+            diagnostics are appended.
             
 Other:
 
@@ -413,7 +433,9 @@ import shutil
 import subprocess
 import sys
 import sysconfig
+import textwrap
 import time
+import traceback
 
 
 g_root_abs = os.path.abspath( f'{__file__}/..')
@@ -424,6 +446,25 @@ try:
     import pipcl
 finally:
     del sys.path[0]
+
+# Support for command completion.
+COMP_LINE = os.environ.get('COMP_LINE')
+if COMP_LINE:
+    completion_f = None
+    APTEST_COMPLETION_DEBUG = os.environ.get('APTEST_COMPLETION_DEBUG', '/home/jules/artifex/aptest.py-completion-debug')
+    if APTEST_COMPLETION_DEBUG:
+        completion_f = open(APTEST_COMPLETION_DEBUG, 'a')
+    def log(text):
+        if completion_f:
+            print(text, file=completion_f)
+    pipcl.log = log
+    pipcl.log('{COMP_LINE=}')
+    pipcl.log('os.environ COMP_*:')
+    for n in sorted(os.environ.keys()):
+        if n.startswith('COMP_'):
+            v = os.environ[n]
+            pipcl.log(f'    {n}: {v!r}')
+    
 
 g_root = pipcl.relpath(g_root_abs)
 
@@ -591,21 +632,90 @@ class NameInfo:
         self.git_remote = f'git@github.com:{self.github_name}.git'
 
 
-class ArgsIterator:
-    def __init__(self, argv):
+class Arg:
+    '''
+    Represents an arg on aptest.py's command line. We add information about
+    failed comparisons to the Args object so that we can use them later in
+    diagnostics or arg completion.
+    '''
+    def __init__(self, args_iterator, text):
+        self.text = text
+        self.args_iterator = args_iterator
+        self.pos = args_iterator.pos
+    def __repr__(self):
+        return self.text if isinstance(self.text, str) else 'StopIteration'
+    def __eq__(self, rhs):
+        ret = self.text == rhs
+        if not ret:
+            if isinstance(self.text, StopIteration) or rhs.startswith(self.text):
+                self.args_iterator.suggestions.append(rhs)
+        return ret
+    def startswith(self, rhs):
+        if isinstance(self.text, StopIteration):
+            return False
+        return self.text.startswith(rhs)
+    def as_bool(self):
+        ret = None
+        if self in ('1', 'true', 'True'):
+            ret = True
+        if self in ('0', 'false', 'False'):
+            ret = False
+        if ret is None:
+            if isinstance(self.text, StopIteration):
+                raise StopIteration
+            raise Exception(f'Unrecognised bool value: {self.text!r}')
+        else:
+            return ret
+    def as_float(self):
+        try:
+            return float(self.text)
+        except Exception:
+            self.args_iterator.suggestions.append('<float>')
+            raise
+    def as_int(self):
+        try:
+            return int(self.text)
+        except Exception:
+            self.args_iterator.suggestions.append('<int>')
+            raise
+                
+        
+class Args:
+    '''
+    Represents all args on aptest.py's command line, and supports iteration
+    through these args.
+    '''
+    def __init__(self, argv, pos=0):
         self.argv = argv
-        self.pos = 0
-    
+        self.pos = pos
+        self.suggestions = list()
     def __next__(self):
         if self.pos == len(self.argv):
-            raise StopIteration()
+            return Arg(self, StopIteration())
         ret = self.argv[self.pos]
+        ret = Arg(self, ret)
         self.pos += 1
         return ret
 
 
 def main(argv):
-    pipcl.show_system()
+    if sys.argv[1:] == ['completion']:
+        # Write bash completion script to stdout and exit.
+        print(textwrap.dedent(f'''
+                _aptest_py() {{
+                    COMPREPLY=($( \\
+                            COMP_LINE="$COMP_LINE" \\
+                            COMP_POINT="$COMP_POINT" \\
+                            COMP_TYPE="$COMP_TYPE" \\
+                            {os.path.abspath(sys.argv[0])} \\
+                            ))
+                }}
+                complete -F _aptest_py aptest.py
+                '''))
+        sys.exit()
+    
+    if COMP_LINE:
+        pipcl.log(f'COMP_LINE is set')
     
     if github_workflow_unimportant():
         return
@@ -652,6 +762,7 @@ def main(argv):
     state.system_packages = True if os.environ.get('GITHUB_ACTIONS') == 'true' else False   # pylint: disable=simplifiable-if-expression
     state.system_site_packages = False
     state.valgrind = False
+    state.verbose = 0
     state.wheelhouse = 'aptest-wheelhouse'
     
     def add_package(name, location, args_pos):
@@ -695,183 +806,235 @@ def main(argv):
     #
     options = os.environ.get('APTEST_options', '')
     options = shlex.split(options)
-    args_list = options + argv[1:]
-    args = ArgsIterator(args_list)
-    i = 0
-    while 1:
-        try:
-            arg = next(args)
-        except StopIteration:
-            arg = None
-            break
-        
-        if 0:
-            pass
-        
-        elif arg == '-a':
-            pos1 = args.pos - 1
-            _name = next(args)
-            _value = os.environ.get(_name, '')
-            pos2 = args.pos
-            new_args = shlex.split(_value)
-            args.argv[pos1:pos2] = new_args
-            args.pos = pos1
-        
-        elif arg == '-b':
-            state.packages_build = next(args).split(',')
-        
-        elif arg == '--build-type':
-            state.build_type = next(args)
-            assert state.build_type in ('release', 'debug', 'memento')
-        
-        elif arg == '--cibw-name':
-            state.cibw_name = next(args)
-        
-        elif arg == '--cibw-pyodide':
-            state.cibw_pyodide = int(next(args))
-        
-        elif arg == '--cibw-pyodide-version':
-            state.cibw_pyodide_version = next(args)
-        
-        elif arg == '--cibw-skip-add-defaults':
-            state.cibw_skip_add_defaults = int(next(args))
-        
-        elif arg == '-e':
-            _nv = next(args)
-            assert '=' in _nv, f'-e <name>=<value> does not contain "=": {_nv!r}'
-            _name, _value = _nv.split('=', 1)
-            state.env_extra[_name] = _value
-        
-        elif arg == '--graal':
-            state.graal = int(next(args))
-        
-        elif arg in ('-h', '--help'):
-            show_help = True
-        
-        elif arg == '-i':
-            _name = next(args)
-            _location = next(args)
-            add_package(_name, _location, args.pos - 1)
-        
-        elif arg in ('--pymupdf_layout', '--layout', '-l'):
-            add_package('pymupdf_layout', next(args), args.pos - 1)
-        
-        elif arg in ('--mupdf', '-m'):
-            add_package('mupdf', next(args), args.pos - 1)
-        
-        elif arg == '-o':
-            state.os_names += next(args).lower().split(',')
-            names = ('linux', 'windows', 'darwin')
-            for os_name in state.os_names:
-                assert os_name in names, f'OS names should be from {names!r} but {names=}.'
-        
-        elif arg in ('--pymupdf', '-p'):
-            add_package('pymupdf', next(args), args.pos - 1)
-        
-        elif arg in ('--pymupdfpro', '--pro', '-P'):
-            add_package('pymupdfpro', next(args), args.pos - 1)
-        
-        elif arg == '-r':
-            remote_arg = args.pos
-            remote = next(args)
-        
-        elif arg == '--run':
-            package = next(args)
-            command = next(args)
-            state.run_commands.append((package, command))
-        
-        elif arg == '-t':
-            _names = next(args).split(',')
-            apply_deltas(state.packages_test, _names)
-        
-        elif arg == '--pybind':
-            state.pybind = int(next(args))
-        
-        elif arg == '--pytest':
-            state.pytest_options = next(args)
-        
-        elif arg == '--pytest-path':
-            state.pytest_paths.append(next(args))
-        
-        elif arg == '--pytest-wrap':
-            state.pytest_wrap = next(args)
-        
-        elif arg == '--python':
-            python_args_pos = args.pos
-            python = next(args)
-        
-        elif arg.startswith('--release-'):
-            pos = args.pos - 1
-            assert args.pos == 1 and len(args.argv) == 1, f'args `--release-*` must be only arg.'
-            if arg == '--release-1':
-                new_args = '-r @github -u 1 -p git: -P git: -l git: cibw --sdists 1'
-            elif arg == '--release-2':
-                new_args = '-r @github -u 1 -p git: -P git: -l git: cibw -o linux -e CIBW_ARCHS_LINUX=aarch64 -e "CIBW_BUILD=cp310*"'
-            elif arg == '--release-3':
-                new_args = '-r @github -u 1 -p git: cibw -o windows -e CIBW_ARCHS_WINDOWS=x86 --cibw-skip-add-defaults 0'
+    args_list = [argv[0]] + options
+    if COMP_LINE:
+        args_list += shlex.split(os.environ['COMP_LINE'])[1:]
+    else:
+        args_list += argv[1:]
+    args = Args(args_list, 1)
+    try:
+        i = 0
+        while 1:
+            args.suggestions.clear()
+            try:
+                arg = next(args)
+            except StopIteration:
+                arg = None
+                break
+            if 0:
+                pass
+
+            elif arg == '-a':
+                pos1 = args.pos - 1
+                _name = next(args)
+                _value = os.environ.get(_name, '')
+                pos2 = args.pos
+                new_args = shlex.split(_value)
+                args.argv[pos1:pos2] = new_args
+                args.pos = pos1
+
+            elif arg == '-b':
+                state.packages_build = next(args).split(',')
+
+            elif arg == '--build-type':
+                state.build_type = next(args)
+                assert state.build_type in ('release', 'debug', 'memento')
+
+            elif arg == '--cibw-name':
+                state.cibw_name = next(args)
+
+            elif arg == '--cibw-pyodide':
+                state.cibw_pyodide = next(args).as_bool()
+
+            elif arg == '--cibw-pyodide-version':
+                state.cibw_pyodide_version = next(args)
+
+            elif arg == '--cibw-skip-add-defaults':
+                state.cibw_skip_add_defaults = next(args).as_bool()
+
+            elif arg == '-e':
+                _nv = next(args)
+                assert '=' in _nv, f'-e <name>=<value> does not contain "=": {_nv!r}'
+                _name, _value = _nv.split('=', 1)
+                state.env_extra[_name] = _value
+
+            elif arg == '--graal':
+                state.graal = next(args).as_bool()
+
+            elif arg in ('-h', '--help'):
+                show_help = True
+
+            elif arg == '-i':
+                _name = next(args)
+                _location = next(args)
+                add_package(_name, _location, args.pos - 1)
+
+            elif arg in ('--pymupdf_layout', '--layout', '-l'):
+                add_package('pymupdf_layout', next(args), args.pos - 1)
+
+            elif arg in ('--mupdf', '-m'):
+                add_package('mupdf', next(args), args.pos - 1)
+
+            elif arg == '-o':
+                state.os_names += next(args).lower().split(',')
+                names = ('linux', 'windows', 'darwin')
+                for os_name in state.os_names:
+                    assert os_name in names, f'OS names should be from {names!r} but {names=}.'
+
+            elif arg in ('--pymupdf', '-p'):
+                add_package('pymupdf', next(args), args.pos - 1)
+
+            elif arg in ('--pymupdfpro', '--pro', '-P'):
+                add_package('pymupdfpro', next(args), args.pos - 1)
+
+            elif arg == '-r':
+                remote_arg = args.pos
+                remote = next(args)
+
+            elif arg == '--run':
+                package = next(args)
+                command = next(args)
+                state.run_commands.append((package, command))
+
+            elif arg == '-t':
+                _names = next(args).split(',')
+                apply_deltas(state.packages_test, _names)
+
+            elif arg == '--pybind':
+                state.pybind = next(args).as_bool()
+
+            elif arg == '--pytest':
+                state.pytest_options = next(args)
+
+            elif arg == '--pytest-path':
+                state.pytest_paths.append(next(args))
+
+            elif arg == '--pytest-wrap':
+                state.pytest_wrap = next(args)
+
+            elif arg == '--python':
+                python_args_pos = args.pos
+                python = next(args)
+
+            elif arg.startswith('--release-'):
+                pos = args.pos - 1
+                assert args.pos == 1 and len(args.argv) == 1, f'args `--release-*` must be only arg.'
+                if arg == '--release-1':
+                    new_args = '-r @github -u 1 -p git: -P git: -l git: cibw --sdists 1'
+                elif arg == '--release-2':
+                    new_args = '-r @github -u 1 -p git: -P git: -l git: cibw -o linux -e CIBW_ARCHS_LINUX=aarch64 -e "CIBW_BUILD=cp310*"'
+                elif arg == '--release-3':
+                    new_args = '-r @github -u 1 -p git: cibw -o windows -e CIBW_ARCHS_WINDOWS=x86 --cibw-skip-add-defaults 0'
+                else:
+                    assert 0, f'Unrecognised {arg=}, should be one of --release-1, --release-2, --release-3.'
+                new_args = shlex.split(new_args)
+                args.argv[pos:] = new_args
+                args.pos = pos
+                pipcl.log(f'{args.pos=}: {args.argv=}')
+                sys.exit(0)
+
+            elif arg == '--remote-do':
+                remote_do = next(args).as_bool()
+
+            elif arg == '--remote-github-workflow':
+                remote_github_workflow_id = next(args)
+
+            elif arg == '--remote-github-yml':
+                state.remote_github_yml = next(args)
+                assert state.remote_github_yml.endswith('.yml'), (
+                        f'Should end with `.yml`: {state.remote_github_yml=}'
+                        )
+
+            elif arg == '--remote-github-yml-inputs':
+                state.remote_github_yml_inputs = next(args)
+
+            elif arg == '--remote-prefix':
+                remote_prefix = next(args)
+
+            elif arg == '--sdists':
+                state.sdists = next(args).as_bool()
+
+            elif arg == '--system-site-packages':
+                state.system_site_packages = next(args).as_bool()
+
+            elif arg == '--swig':
+                state.swig = next(args)
+
+            elif arg == '--swig-quick':
+                state.swig_quick = next(args).as_bool()
+
+            elif arg == '--system-packages':
+                state.system_packages = int(next(args))
+
+            elif arg == '--system-site-packages':
+                state.system_site_packages = next(args).as_bool()
+
+            elif arg == '--ticker':
+                ticker = next(args).as_float()
+
+            elif arg == '-u':
+                state.github_upload = int(next(args))
+
+            elif arg == '-v':
+                state.venv = int(next(args))
+                assert state.venv in (0, 1, 2, 3), f'Invalid {state.venv=} should be 0, 1, 2 or 3.'
+            
+            elif arg == '-V':
+                state.verbose += 1
+
+            elif arg.startswith('-'):
+                assert 0, f'Unrecognised option: {arg=}.'
+
+            elif arg in ('build', 'cibw', 'run', 'test'):
+                state.commands.append(arg)
+
             else:
-                assert 0, f'Unrecognised {arg=}, should be one of --release-1, --release-2, --release-3.'
-            new_args = shlex.split(new_args)
-            args.argv[pos:] = new_args
-            args.pos = pos
-            pipcl.log(f'{args.pos=}: {args.argv=}')
-            sys.exit(0)
-        
-        elif arg == '--remote-do':
-            remote_do = int(next(args))
-        
-        elif arg == '--remote-github-workflow':
-            remote_github_workflow_id = next(args)
-        
-        elif arg == '--remote-github-yml':
-            state.remote_github_yml = next(args)
-            assert state.remote_github_yml.endswith('.yml'), (
-                    f'Should end with `.yml`: {state.remote_github_yml=}'
-                    )
-            
-        elif arg == '--remote-github-yml-inputs':
-            state.remote_github_yml_inputs = next(args)
-            
-        elif arg == '--remote-prefix':
-            remote_prefix = next(args)
-        
-        elif arg == '--sdists':
-            state.sdists = int(next(args))
-        
-        elif arg == '--system-site-packages':
-            state.system_site_packages = int(next(args))
-        
-        elif arg == '--swig':
-            state.swig = next(args)
-        
-        elif arg == '--swig-quick':
-            state.swig_quick = int(next(args))
-        
-        elif arg == '--system-packages':
-            state.system_packages = int(next(args))
-        
-        elif arg == '--system-site-packages':
-            state.system_site_packages = int(next(args))
-        
-        elif arg == '--ticker':
-            ticker = float(next(args))
-        
-        elif arg == '-u':
-            state.github_upload = int(next(args))
-        
-        elif arg == '-v':
-            state.venv = int(next(args))
-            assert state.venv in (0, 1, 2, 3), f'Invalid {state.venv=} should be 0, 1, 2 or 3.'
-        
-        elif arg.startswith('-'):
-            assert 0, f'Unrecognised option: {arg=}.'
-            
-        elif arg in ('build', 'cibw', 'run', 'test'):
-            state.commands.append(arg)
-        
+                if isinstance(arg.text, StopIteration):
+                    break
+                assert 0, f'Unrecognised command: {arg=}.'
+
+    except Exception as e:
+        # We write out detailed information about the error, including
+        # information about what args would have been valid.
+        if COMP_LINE:
+            try:
+                for suggestion in args.suggestions:
+                    print(suggestion)
+                sys.exit()
+            except Exception as e:
+                pipcl.log(f'completion: error: {traceback.format_exc()}')
         else:
-            assert 0, f'Unrecognised command: {arg=}.'
+            # Print command line with caret showing where error occurred.
+            for i, arg in enumerate(args.argv):
+                sys.stdout.write(f'{" " if i else ""}{shlex.quote(arg)}')
+            sys.stdout.write('\n')
+            for i, arg in enumerate(args.argv):
+                if i:
+                    sys.stdout.write(' ')
+                if i+1 == args.pos:
+                    sys.stdout.write('^')
+                    break
+                sys.stdout.write(' ' * len(shlex.quote(arg)))
+            sys.stdout.write('\n')
+            if isinstance(e, StopIteration):
+                print(f'Ran out of arguments')
+            if args.suggestions:
+                print(f'Expected one of:')
+                for suggestion in args.suggestions:
+                    print(f'    {suggestion}')
+            else:
+                print(f'(No suggestions.)')
+            return 1
     
+    if COMP_LINE:
+        pipcl.log(f'completion: no error. {args.suggestions=}')
+        for suggestion in args.suggestions:
+            print(suggestion)
+        sys.exit()
+    
+    if state.verbose:
+        pipcl.show_system()
+        
     if show_help:
         print(__doc__)
         return
