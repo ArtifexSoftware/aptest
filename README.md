@@ -100,6 +100,26 @@ Use of keys with remote runs:
   access.
 
 
+### Argument completion with Bash
+
+`aptest/aptest.py completion` writes a bash completion script for aptest to
+stdout.
+
+* Add argument completion for aptest.py to the current Bash session with:
+
+  `source <(aptest/aptest.py completion)`
+            
+  Subsequently when entering an aptest.py command, bash will respond to <tab>
+  by completing and/or showing valid args.
+
+* Or write into relevant files with:
+
+  ` aptest/aptest.py completion >/etc/bash_completion.d/aptest.py.bash_completion`
+  `aptest/aptest.py completion >> ~/.bash_completion
+  
+  See Bash's `help complete` for more information.
+
+
 ### More information
 
 Please run `aptest.py -h` or read the same text in the doc-comment at the start
