@@ -430,6 +430,7 @@ Environment:
         Is prepended to command line args.
 '''
 
+import glob
 import os
 import platform
 import shlex
@@ -453,17 +454,16 @@ finally:
 
 # Support for command completion.
 COMP_LINE = os.environ.get('COMP_LINE')
+COMP_POINT = os.environ.get('COMP_POINT')
+COMP_TYPE = os.environ.get('COMP_TYPE')
 if COMP_LINE:
     completion_f = None
     APTEST_COMPLETION_DEBUG = os.environ.get('APTEST_COMPLETION_DEBUG', '/home/jules/artifex/aptest.py-completion-debug')
     if APTEST_COMPLETION_DEBUG:
         completion_f = open(APTEST_COMPLETION_DEBUG, 'a')
-    def log(text):
-        if completion_f:
-            print(text, file=completion_f)
-    pipcl.log = log
-    pipcl.log('{COMP_LINE=}')
-    pipcl.log('os.environ COMP_*:')
+    pipcl._log_f = completion_f
+    pipcl.log(f'{COMP_LINE=}')
+    pipcl.log(f'os.environ COMP_*:')
     for n in sorted(os.environ.keys()):
         if n.startswith('COMP_'):
             v = os.environ[n]
@@ -655,8 +655,14 @@ class Arg:
     def __eq__(self, rhs):
         ret = self.text == rhs
         if not ret:
-            if isinstance(self.text, StopIteration) or rhs.startswith(self.text):
-                self.args_iterator.suggestions.append(rhs)
+            # 9: <tab>  normal completion
+            # 33: ! listing alternatives on partial word completion
+            # 37: % menu completion
+            # 63: ? listing completions after successive tabs
+            # 64: @ list completions if the word is not unmodified
+            if 1 or COMP_TYPE=='63' or isinstance(self.text, StopIteration) or rhs.startswith(self.text):
+                pipcl.log(f'Adding suggestion {rhs=}. {COMP_TYPE=} {self.text=}')
+                self.args_iterator._add_suggestion(rhs)
         return ret
     def startswith(self, rhs):
         if isinstance(self.text, StopIteration):
@@ -678,13 +684,13 @@ class Arg:
         try:
             return float(self.text)
         except Exception:
-            self.args_iterator.suggestions.append('<float>')
+            self.args_iterator._add_suggestion('FLOAT')
             raise
     def as_int(self):
         try:
             return int(self.text)
         except Exception:
-            self.args_iterator.suggestions.append('<int>')
+            self.args_iterator._add_suggestion('<int>')
             raise
                 
         
@@ -698,12 +704,18 @@ class Args:
         self.pos = pos
         self.suggestions = list()
     def __next__(self):
+        self.suggestions.clear()
         if self.pos == len(self.argv):
+            pipcl.log(f'Returning StopIteration()')
             return Arg(self, StopIteration())
         ret = self.argv[self.pos]
         ret = Arg(self, ret)
         self.pos += 1
+        pipcl.log(f'Returning {ret=}')
         return ret
+    def _add_suggestion(self, suggestion):
+        #pipcl.log(f'Adding {suggestion=}', caller=3)
+        self.suggestions.append(suggestion)
 
 
 def main(argv):
@@ -777,6 +789,13 @@ def main(argv):
         if isinstance(name, Arg):
             name = name.text
         if isinstance(location, Arg):
+            if not location.text.startswith(('git:', 'pip:')):
+                for path in glob.glob(f'*/.git/'):
+                    d = path[:-6]
+                    if location == d:
+                        break
+                else:
+                    assert 0, f'Directory does not exist: {location}'
             location = location.text
         if name in state.packages:
             pipcl.log(f'Adding second location for {name=} testing only: {location=}')
@@ -807,6 +826,7 @@ def main(argv):
                 try:
                     items.remove(delta[1:])
                 except Exception:
+                    pipcl.log(f'Failed to remove {delta[1:]=} from {items=}')
                     if check:
                         raise
             else:
@@ -821,7 +841,15 @@ def main(argv):
     options = shlex.split(options)
     args_list = [argv[0]] + options
     if COMP_LINE:
-        args_list += shlex.split(os.environ['COMP_LINE'])[1:]
+        line = COMP_LINE
+        if 0 and COMP_POINT:
+            COMP_POINT_int = int(COMP_POINT)
+            assert COMP_POINT_int <= len(line)
+            line = line[:COMP_POINT_int]
+        pipcl.log(f'{COMP_LINE=}')
+        pipcl.log(f'     {line=}')
+        args_list += shlex.split(line)[1:]
+        pipcl.log(f'     {args_list=}')
     else:
         args_list += argv[1:]
     args = Args(args_list, 1)
@@ -834,6 +862,7 @@ def main(argv):
             except StopIteration:
                 arg = None
                 break
+            pipcl.log(f'{arg=}')
             if 0:
                 pass
 
@@ -1007,15 +1036,25 @@ def main(argv):
             else:
                 if isinstance(arg.text, StopIteration):
                     break
+                pipcl.log(f'{arg=}')
+                pipcl.log(f'{args.suggestions=}')
                 assert 0, f'Unrecognised command: {arg=}.'
 
     except Exception as e:
         # We write out detailed information about the error, including
         # information about what args would have been valid.
         if COMP_LINE:
+            pipcl.log(f'Exception: {e}')
+            pipcl.log(f'{args.suggestions=}')
+            arg = args.argv[args.pos-1]
+            pipcl.log(f'{arg=}')
             try:
                 for suggestion in args.suggestions:
-                    print(suggestion)
+                    if COMP_TYPE == 63 or suggestion.startswith(arg):
+                        pipcl.log(f'Writing out {suggestion=}')
+                        print(suggestion)
+                    sys.stdout.flush()
+                pipcl.log(f'Calling sys.exit()')
                 sys.exit()
             except Exception as e:
                 pipcl.log(f'completion: error: {traceback.format_exc()}')
