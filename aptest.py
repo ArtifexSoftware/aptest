@@ -117,7 +117,7 @@ Args:
         -i <package-name> <location>
             Add an input package.
             package-name:
-                One of: mupdf pymupdf pymupdfpro layout
+                One of: mupdf pymupdf pymupdf4llm pymupdfpro layout
             location:
                 `pip:`
                     Install from pypi.org using pip.
@@ -155,6 +155,10 @@ Args:
             Control which OS's we run on. If current OS is not in
             (comma-separated) list, we do nothing. <os_names> is case
             insensitive. Should match linux, windows or darwin.
+        
+        --pymupdf4llm <location>
+        --4llm <location>
+            Aliases for `-i pymupdf4llm <location>
         
         --pymupdf <location>
         -p <location>
@@ -618,6 +622,9 @@ class NameInfo:
         elif name == 'pymupdf':
             self.github_name = 'pymupdf/PyMuPDF'
             self.git_branch = 'main'
+        elif name == 'pymupdf4llm':
+            self.github_name = 'pymupdf/pymupdf4llm'
+            self.git_branch = 'main'
         elif name == 'pymupdfpro':
             self.github_name = 'ArtifexSoftware/PyMuPDFPro'
             self.git_branch = 'main'
@@ -643,6 +650,7 @@ class Arg:
         self.args_iterator = args_iterator
         self.pos = args_iterator.pos
     def __repr__(self):
+        return self.text if isinstance(self.text, str) else 'StopIteration'
         return f'Arg:{self.text!r}' if isinstance(self.text, str) else 'StopIteration'
     def __eq__(self, rhs):
         ret = self.text == rhs
@@ -781,6 +789,7 @@ def main(argv):
         names = [
             'mupdf',
             'pymupdf',
+            'pymupdf4llm',
             'pymupdf_layout',
             'pymupdfpro',
             ]
@@ -887,6 +896,9 @@ def main(argv):
 
             elif arg in ('--pymupdf', '-p'):
                 add_package('pymupdf', next(args), args.pos - 1)
+
+            elif arg in ('--pymupdf4llm', '--4llm'):
+                add_package('pymupdf4llm', next(args), args.pos - 1)
 
             elif arg in ('--pymupdfpro', '--pro', '-P'):
                 add_package('pymupdfpro', next(args), args.pos - 1)
@@ -1412,6 +1424,9 @@ def main(argv):
                         pipcl.run(command)
                     else:
                         directory = _get_local(package, state)
+                        if package == 'pymupdf4llm':
+                            # setup.py is in subdirectory pymupdf4llm/.
+                            directory += '/pymupdf4llm'
                         directory_abs = os.path.abspath(directory)
                         pipcl.log(f'{package=}')
                         if package == 'mupdf':
@@ -1768,11 +1783,11 @@ def main(argv):
                             )
                     if e:
                         failed_packages.append(package)
-                    if failed_packages:
-                        pipcl.log(f'Tests failed for these packages:')
-                        for package in failed_packages:
-                            pipcl.log(f'    {package}')
-                        raise Exception(f'Packages failed tests: {failed_packages}')
+                if failed_packages:
+                    pipcl.log(f'Tests failed for these packages:')
+                    for package in failed_packages:
+                        pipcl.log(f'    {package}')
+                    raise Exception(f'Packages failed tests: {failed_packages}')
 
             else:
                 assert 0, f'{command=}'
