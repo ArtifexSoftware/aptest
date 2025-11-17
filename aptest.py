@@ -643,7 +643,7 @@ class Arg:
         self.args_iterator = args_iterator
         self.pos = args_iterator.pos
     def __repr__(self):
-        return self.text if isinstance(self.text, str) else 'StopIteration'
+        return f'Arg:{self.text!r}' if isinstance(self.text, str) else 'StopIteration'
     def __eq__(self, rhs):
         ret = self.text == rhs
         if not ret:
@@ -766,6 +766,10 @@ def main(argv):
     state.wheelhouse = 'aptest-wheelhouse'
     
     def add_package(name, location, args_pos):
+        if isinstance(name, Arg):
+            name = name.text
+        if isinstance(location, Arg):
+            location = location.text
         if name in state.packages:
             pipcl.log(f'Adding second location for {name=} testing only: {location=}')
             state.packages2[name] = (location, args_pos)
@@ -889,7 +893,7 @@ def main(argv):
 
             elif arg == '-r':
                 remote_arg = args.pos
-                remote = next(args)
+                remote = next(args).text
 
             elif arg == '--run':
                 package = next(args)
@@ -897,7 +901,7 @@ def main(argv):
                 state.run_commands.append((package, command))
 
             elif arg == '-t':
-                _names = next(args).split(',')
+                _names = next(args).text.split(',')
                 apply_deltas(state.packages_test, _names)
 
             elif arg == '--pybind':
@@ -1024,6 +1028,7 @@ def main(argv):
                     print(f'    {suggestion}')
             else:
                 print(f'(No suggestions.)')
+                raise
             return 1
     
     if COMP_LINE:
@@ -1061,7 +1066,7 @@ def main(argv):
             pipcl.log(f'{python=}: rerunning because {platform.python_version_tuple()[:2]=} != {python_version_tuple[:2]=}')
             argv = args.argv[:]
             argv[python_args_pos] = ''  # pylint: disable=used-before-assignment
-            e = pipcl.run(f'{python} {shlex.join(argv)}', check=0)
+            e = pipcl.run(f'{python} {shlex.join(argv[1:])}', check=0)
             sys.exit(e)
             
     # Hard-coded ssh/git key paths.
@@ -1168,7 +1173,7 @@ def main(argv):
                     # Run ourselves on Github, passing argv.
                     data = dict(
                             ref = branch,
-                            inputs = dict(args=shlex.join(argv)),
+                            inputs = dict(args=shlex.join(argv[1:])),
                             )
                     workflow_id = github.gh_run_workflow(
                             'https://api.github.com/repos/ArtifexSoftware/aptest',
@@ -1218,6 +1223,7 @@ def main(argv):
                 sync_artifex_software_ssh_key = False
                 for package_name, (package_location, args_pos) in list(state.packages.items()) + list(state.packages2.items()):
                     if not package_location.startswith(('git:', 'pip:')):
+                        pipcl.log(f'{remote=} {remote_dir=} {package_location=} {ssh_command=}')
                         if sync(remote, remote_dir, package_location, ssh_command=ssh_command, verbose=verbose):
                             git_paths.append(package_location)
                     if package_location.startswith('git:'):
@@ -1250,7 +1256,7 @@ def main(argv):
                     remote_command += f'{remote_prefix} '
                 elif remote and 'windows' in remote:
                     remote_command += f'py '
-                remote_command += f'{os.path.basename(g_root_abs)}/aptest.py {shlex.join(argv)}'
+                remote_command += f'{os.path.basename(g_root_abs)}/aptest.py {shlex.join(argv[1:])}'
 
                 command = f'{ssh_command} {remote if remote else ""} {shlex.quote(remote_command)}'
                 pipcl.log(f'{command=}')
