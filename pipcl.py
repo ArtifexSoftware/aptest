@@ -3354,7 +3354,7 @@ def _log_prefix(format_, caller):
     return ret
 
 _log_text_line_start = True
-
+_log_f = sys.stdout
 
 def _log(text, level, caller, raw=False, nl=True):
     '''
@@ -3372,19 +3372,19 @@ def _log(text, level, caller, raw=False, nl=True):
         if not raw or _log_text_line_start:
             if prefix is None:
                 prefix = _log_prefix(g_log_format, caller+1)
-            sys.stdout.write(prefix)
+            _log_f.write(prefix)
         nlp = text.find('\n', pos)
         if nlp == -1:
-            sys.stdout.write(text[pos:])
+            _log_f.write(text[pos:])
             if not raw and nl:
-                sys.stdout.write('\n')
+                _log_f.write('\n')
             pos = len(text)
         else:
-            sys.stdout.write(text[pos:nlp+1])
+            _log_f.write(text[pos:nlp+1])
             pos = nlp+1
         if raw:
             _log_text_line_start = (nlp >= 0)
-    sys.stdout.flush()
+    _log_f.flush()
 
 
 def relpath(path, start=None, allow_up=True):
