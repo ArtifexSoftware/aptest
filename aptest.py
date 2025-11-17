@@ -462,12 +462,12 @@ if COMP_LINE:
     if APTEST_COMPLETION_DEBUG:
         completion_f = open(APTEST_COMPLETION_DEBUG, 'a')
     pipcl._log_f = completion_f
-    pipcl.log(f'{COMP_LINE=}')
-    pipcl.log(f'os.environ COMP_*:')
-    for n in sorted(os.environ.keys()):
-        if n.startswith('COMP_'):
-            v = os.environ[n]
-            pipcl.log(f'    {n}: {v!r}')
+    #pipcl.log(f'{COMP_LINE=}')
+    #pipcl.log(f'os.environ COMP_*:')
+    #for n in sorted(os.environ.keys()):
+    #    if n.startswith('COMP_'):
+    #        v = os.environ[n]
+    #        pipcl.log(f'    {n}: {v!r}')
     
 
 g_root = pipcl.relpath(g_root_abs)
@@ -661,7 +661,7 @@ class Arg:
             # 63: ? listing completions after successive tabs
             # 64: @ list completions if the word is not unmodified
             if 1 or COMP_TYPE=='63' or isinstance(self.text, StopIteration) or rhs.startswith(self.text):
-                pipcl.log(f'Adding suggestion {rhs=}. {COMP_TYPE=} {self.text=}')
+                #pipcl.log(f'Adding suggestion {rhs=}. {COMP_TYPE=} {self.text=}')
                 self.args_iterator._add_suggestion(rhs)
         return ret
     def startswith(self, rhs):
@@ -706,12 +706,12 @@ class Args:
     def __next__(self):
         self.suggestions.clear()
         if self.pos == len(self.argv):
-            pipcl.log(f'Returning StopIteration()')
+            #pipcl.log(f'Returning StopIteration()')
             return Arg(self, StopIteration())
         ret = self.argv[self.pos]
         ret = Arg(self, ret)
         self.pos += 1
-        pipcl.log(f'Returning {ret=}')
+        #pipcl.log(f'Returning {ret=}')
         return ret
     def _add_suggestion(self, suggestion):
         #pipcl.log(f'Adding {suggestion=}', caller=3)
@@ -734,8 +734,8 @@ def main(argv):
                 '''))
         sys.exit()
     
-    if COMP_LINE:
-        pipcl.log(f'COMP_LINE is set')
+    #if COMP_LINE:
+    #    pipcl.log(f'COMP_LINE is set')
     
     if github_workflow_unimportant():
         return
@@ -846,10 +846,10 @@ def main(argv):
             COMP_POINT_int = int(COMP_POINT)
             assert COMP_POINT_int <= len(line)
             line = line[:COMP_POINT_int]
-        pipcl.log(f'{COMP_LINE=}')
-        pipcl.log(f'     {line=}')
+        #pipcl.log(f'{COMP_LINE=}')
+        #pipcl.log(f'     {line=}')
         args_list += shlex.split(line)[1:]
-        pipcl.log(f'     {args_list=}')
+        #pipcl.log(f'     {args_list=}')
     else:
         args_list += argv[1:]
     args = Args(args_list, 1)
@@ -862,7 +862,7 @@ def main(argv):
             except StopIteration:
                 arg = None
                 break
-            pipcl.log(f'{arg=}')
+            #pipcl.log(f'{arg=}')
             if 0:
                 pass
 
@@ -1044,17 +1044,27 @@ def main(argv):
         # We write out detailed information about the error, including
         # information about what args would have been valid.
         if COMP_LINE:
-            pipcl.log(f'Exception: {e}')
-            pipcl.log(f'{args.suggestions=}')
             arg = args.argv[args.pos-1]
-            pipcl.log(f'{arg=}')
+            #pipcl.log(f'Exception: {e}')
+            #pipcl.log(f'{args.suggestions=}')
+            #pipcl.log(f'{arg=}')
+            #pipcl.log(f'{COMP_LINE=}')
+            #pipcl.log(f'{COMP_POINT=}')
+            #pipcl.log(f'{COMP_TYPE=}')
             try:
+                # COMP_TYPE
+                # 9: <tab>  normal completion
+                # 33: ! listing alternatives on partial word completion
+                # 37: % menu completion
+                # 63: ? listing completions after successive tabs
+                # 64: @ list completions if the word is not unmodified
+                #
                 for suggestion in args.suggestions:
-                    if COMP_TYPE == 63 or suggestion.startswith(arg):
-                        pipcl.log(f'Writing out {suggestion=}')
+                    if COMP_TYPE == '63' or suggestion.startswith(arg):
+                        #pipcl.log(f'Writing out {suggestion=}')
                         print(suggestion)
                     sys.stdout.flush()
-                pipcl.log(f'Calling sys.exit()')
+                #pipcl.log(f'Calling sys.exit()')
                 sys.exit()
             except Exception as e:
                 pipcl.log(f'completion: error: {traceback.format_exc()}')
