@@ -2172,6 +2172,7 @@ def git_get(
         remote=None,
         branch=None,
         tag=None,
+        sha=None,
         text=None,
         depth=1,
         env_extra=None,
@@ -2198,6 +2199,9 @@ def git_get(
             Branch to use; can be overridden by <text>.
         tag:
             Tag to use; can be overridden by <text>.
+        sha:
+            Use this sha; must be the full length sha,
+            e.g. `5ea4449c3edba8840d5c27e15095536cbfc7c1f`
         text:
             If None or empty:
                 Ignored.
@@ -2245,20 +2249,27 @@ def git_get(
                 if arg in ('-b', '--branch'):
                     branch = next(args)
                     tag = None
+                    sha = None
                 elif arg in ('-t', '--tag'):
                     tag = next(args)
                     branch = None
+                    sha = None
+                elif arg in ('-s', '--sha'):
+                    sha = next(args)
+                    branch = None
+                    tag = None
                 elif arg.startswith('-'):
                     assert 0, f'Unrecognised {arg=} in {text=}.'
                 else:
                     remote = arg
             assert remote, f'<remote> unset and no remote specified in {text=}.'
-            assert branch or tag, f'<branch> and <tag> unset and no branch/tag specified in {text=}.'
+            assert branch or tag or sha, f'<branch> and <tag> unset and no branch/tag specified in {text=}.'
         else:
             log0(f'Using local directory {text!r}.')
             return os.path.abspath(text)
         
-    assert (branch and not tag) or (not branch and tag), f'Must specify exactly one of <branch> and <tag>; {branch=} {tag=}.'
+    assert bool(branch) ^ bool(tag) ^ bool(sha), \
+            f'Must specify exactly one of <branch>, <tag> or <tag>; {branch=} {tag=} {sha=}.'
     
     depth_arg = f' --depth {depth}' if depth else ''
     
@@ -2271,6 +2282,7 @@ def git_get(
                 env_extra=env_extra,
                 prefix='git reset: ',
                 )
+        
         if tag:
             # `-u` avoids `fatal: Refusing to fetch into current branch`.
             # Using '+' and `revs/tags/` prefix seems to avoid errors like:
@@ -2298,6 +2310,18 @@ def git_get(
                     )
             run(
                     f'cd {local} && git checkout -f {branch}',
+                    env_extra=env_extra,
+                    prefix='git checkout: ',
+                    )
+        if sha:
+            # `-u` avoids `fatal: Refusing to fetch into current branch`.
+            run(
+                    f'cd {local} && git fetch -fuv{depth_arg} {remote} {sha}',
+                    env_extra=env_extra,
+                    prefix='git fetch: ',
+                    )
+            run(
+                    f'cd {local} && git checkout -f {sha}',
                     env_extra=env_extra,
                     prefix='git checkout: ',
                     )
@@ -3660,10 +3684,26 @@ def swig_get(swig, quick, swig_local='pipcl-swig-git'):
                 run(f'which bison')
                 run(f'which bison', env_extra=swig_env_extra)
             # Build swig.
-            run(f'cd {swig_local} && ./autogen.sh', env_extra=swig_env_extra)
-            run(f'cd {swig_local} && ./configure --prefix={swig_local}/install-dir', env_extra=swig_env_extra)
-            run(f'cd {swig_local} && make', env_extra=swig_env_extra)
-            run(f'cd {swig_local} && make install', env_extra=swig_env_extra)
+            run(f'cd {swig_local} && ./autogen.sh',
+                    out=log,
+                    env_extra=swig_env_extra,
+                    prefix='build swig autogen.sh: ',
+                    )
+            run(f'cd {swig_local} && ./configure --prefix={swig_local}/install-dir',
+                    out=log,
+                    env_extra=swig_env_extra,
+                    prefix='build swig configure: ',
+                    )
+            run(f'cd {swig_local} && make',
+                    out=log,
+                    env_extra=swig_env_extra,
+                    prefix='build swig make: ',
+                    )
+            run(f'cd {swig_local} && make install',
+                    out=log,
+                    env_extra=swig_env_extra,
+                    prefix='build swig install: ',
+                    )
         assert os.path.isfile(swig_binary)
         return swig_binary
     # Disabled support for installing a specific swig with pip, because it
