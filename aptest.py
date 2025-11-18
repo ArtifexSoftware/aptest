@@ -895,12 +895,13 @@ def main(argv):
                 state.cibw_skip_add_defaults = next(args).as_bool()
 
             elif arg == '-e':
-                _nv = next(args)
+                _nv = next(args).text
                 assert '=' in _nv, f'-e <name>=<value> does not contain "=": {_nv!r}'
                 _name, _value = _nv.split('=', 1)
                 state.env_extra[_name] = _value
 
             elif arg == '--graal':
+                state.graal_arg = args.pos
                 state.graal = next(args).as_bool()
 
             elif arg in ('-h', '--help'):
@@ -1003,7 +1004,7 @@ def main(argv):
                 state.system_site_packages = next(args).as_bool()
 
             elif arg == '--swig':
-                state.swig = next(args)
+                state.swig = next(args).text
 
             elif arg == '--swig-quick':
                 state.swig_quick = next(args).as_bool()
@@ -1134,19 +1135,26 @@ def main(argv):
     pymupdfpro_key_path_leaf = 'thirdparty-so-key'
     artifex_software_ssh_key = 'artifex-software-ssh-key'
     
-    if state.commands or remote == '@github':
+    #if state.graal:
+    #    # First build non-graal wheels, but don't run any tests.
+    #    args_nongraal = args.argv.copy()
+    #    args_nongraal[state.graal_arg] = '0'
+    #    args_nongraal += ['-t', '-']
+    #    command = shlex.join(args.argv)
+    
+    if (not remote and state.commands) or remote == '@github':
         if venv:
             # Rerun ourselves inside a venv if not already in a venv.
             if venv_in():
                 pipcl.log(f'Already in venv')
             else:
             
-                if state.graal:
+                if not remote and state.graal:
                     if 'cibw' in state.commands:
                         # We don't create graal/pyenv so wheel/build commands
                         # will not work.
                         assert 'build' not in state.commands
-                if state.graal and 'cibw' not in state.commands:
+                if not remote and state.graal and 'cibw' not in state.commands:
                     # Re-run ourselves in a pyenv/Graal venv.
                     # 2025-07-24: We need the latest pyenv.
                     graalpy = 'graalpy-24.2.1'
@@ -1446,7 +1454,7 @@ def main(argv):
             if command in ('build', 'cibw'):
                 # 2025-11-14: piprepo seems to also required setuptools.
                 pipcl.run(f'pip install --upgrade piprepo setuptools')
-                pipcl.fs_ensure_empty_dir(state.wheelhouse)
+                #pipcl.fs_ensure_empty_dir(state.wheelhouse)
                 pipcl.run(
                         f'piprepo build {state.wheelhouse}',
                         prefix='piprepo build: ',
@@ -1468,9 +1476,14 @@ def main(argv):
                         continue
                     if location.startswith('pip:'):
                         assert package != 'mupdf', f'Not a package on pypi.org: {package}'
-                        command = f'pip install -v'
-                        command += f' {package}{location[4:]}'
-                        pipcl.run(command)
+                        name = f'{package}{location[4:]}'
+                        newfiles = pipcl.NewFiles(f'{state.wheelhouse}/{name}-*.whl')
+                        # Get wheel from pypi.org and put into our wheelhouse
+                        # so it is available for later builds.
+                        pipcl.run(f'pip wheel -w {state.wheelhouse} {name}')
+                        wheel_path = newfiles.get_one()
+                        # Install wheel into current venv.
+                        pipcl.run(f'pip install -v {wheel_path}')
                     else:
                         directory = _get_local(package, state)
                         if package == 'pymupdf4llm':
