@@ -5,7 +5,7 @@
 # This ensures we behave exactly like scripts/test.py, without confusion caused
 # by having to translate between differing APIs.
 
-name: Tests
+name: test_multiple
 
 on:
   schedule:
@@ -20,7 +20,7 @@ on:
 jobs:
 
   test:
-    name: Test
+    name: test_multiple
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -47,7 +47,7 @@ jobs:
         with:
           python-version: '3.13'
 
-      - name: test
+      - name: test_multiple
         env:
           APTEST_args: ${{inputs.args}}
           ARTIFEX_SOFTWARE_SSH_KEY: ${{secrets.ARTIFEX_SOFTWARE_SSH_KEY}}
