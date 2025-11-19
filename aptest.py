@@ -44,6 +44,10 @@ Examples:
 
     ./aptest/aptest.py -r @github --remote-github-yml test_multiple.yml -P PyMuPDFPlus --remote-github-yml-inputs 'args=-o windows'
         Runs specific Github workflow PyMuPDFPlus/.github/workflows/test_multiple.yml.
+    
+    ./aptest/aptest.py -r @github -p pip: -P pip: -l pip: -p git: -P git: -l git: build test
+        Tests pypi.org's pymupdf, pymupdfpro and pymupdf_layout with the test
+        suites on central git.
 
 Args:
 
@@ -1266,7 +1270,7 @@ def main(argv):
                             inputs = dict(args=shlex.join(argv[1:])),
                             )
                     workflow_id = github.gh_run_workflow(
-                            'https://api.github.com/repos/{info.github_name}',
+                            f'https://api.github.com/repos/{info.github_name}',
                             'test.yml',
                             data,
                             )
