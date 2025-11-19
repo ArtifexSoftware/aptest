@@ -285,14 +285,16 @@ Args:
             
             The default is 2.
         
-        --remote-github-workflow <workflow_id>
+        --remote-github-workflow-id <workflow_id>
             Changes behaviour of `-r @github`. Don't run anything Github,
             instead continue from previous `-r @github` invocation by waiting
             for <workflow_id> to finish and then downloadings logs and wheels
             etc. Note that you still need to include `-r @github cibw`.
         
         --remote-github-yml <yml>
-            With @github, run .yml file instead of running aptest.py.
+            With @github, run .yml file instead of running aptest.py. If no packages
+            are specified, runs on aptest repository; otherwise exactly one package
+            must be specified.
             
         --remote-github-yml-inputs <inputs>
             Specify inputs used with --github-yml. <inputs> is comma-separated
@@ -442,6 +444,10 @@ import textwrap
 import time
 import traceback
 
+import backtrace
+
+
+backtrace.exception_hook_install()
 
 g_root_abs = os.path.abspath( f'{__file__}/..')
 
@@ -457,11 +463,9 @@ COMP_LINE = os.environ.get('COMP_LINE')
 COMP_POINT = os.environ.get('COMP_POINT')
 COMP_TYPE = os.environ.get('COMP_TYPE')
 if COMP_LINE:
-    completion_f = None
-    APTEST_COMPLETION_DEBUG = os.environ.get('APTEST_COMPLETION_DEBUG', '/home/jules/artifex/aptest.py-completion-debug')
+    APTEST_COMPLETION_DEBUG = os.environ.get('APTEST_COMPLETION_DEBUG')
     if APTEST_COMPLETION_DEBUG:
-        completion_f = open(APTEST_COMPLETION_DEBUG, 'a')
-    pipcl._log_f = completion_f
+        pipcl._log_f = open(APTEST_COMPLETION_DEBUG, 'a')
     #pipcl.log(f'{COMP_LINE=}')
     #pipcl.log(f'os.environ COMP_*:')
     #for n in sorted(os.environ.keys()):
@@ -616,7 +620,10 @@ class NameInfo:
     '''
     def __init__(self, name):
         self.submodules = True
-        if name == 'mupdf':
+        if name == 'aptest':
+            self.github_name = 'ArtifexSoftware/aptest'
+            self.git_branch = 'main'
+        elif name == 'mupdf':
             self.github_name = 'ArtifexSoftware/mupdf'
             self.git_branch = 'master'
         elif name == 'pymupdf':
@@ -862,13 +869,16 @@ def main(argv):
             except StopIteration:
                 arg = None
                 break
+            if isinstance(arg.text, StopIteration):
+                arg = None
+                break
             #pipcl.log(f'{arg=}')
             if 0:
                 pass
 
             elif arg == '-a':
                 pos1 = args.pos - 1
-                _name = next(args)
+                _name = next(args).text
                 _value = os.environ.get(_name, '')
                 pos2 = args.pos
                 new_args = shlex.split(_value)
@@ -919,10 +929,10 @@ def main(argv):
                 add_package('mupdf', next(args), args.pos - 1)
 
             elif arg == '-o':
-                state.os_names += next(args).lower().split(',')
+                state.os_names += next(args).text.lower().split(',')
                 names = ('linux', 'windows', 'darwin')
                 for os_name in state.os_names:
-                    assert os_name in names, f'OS names should be from {names!r} but {names=}.'
+                    assert os_name in names, f'{os_name=} should be one of {names!r}.'
 
             elif arg in ('--pymupdf', '-p'):
                 add_package('pymupdf', next(args), args.pos - 1)
@@ -950,21 +960,23 @@ def main(argv):
                 state.pybind = next(args).as_bool()
 
             elif arg == '--pytest':
-                state.pytest_options = next(args)
+                state.pytest_options = next(args).text
 
             elif arg == '--pytest-path':
-                state.pytest_paths.append(next(args))
+                state.pytest_paths.append(next(args).text)
 
             elif arg == '--pytest-wrap':
                 state.pytest_wrap = next(args)
+                assert state.pytest_wrap in ('gdb', 'valgrind', 'helgrind')
 
             elif arg == '--python':
                 python_args_pos = args.pos
-                python = next(args)
+                python = next(args).text
 
-            elif arg.startswith('--release-'):
+            elif arg.text.startswith('--release-'):
+                args.suggestions.clear()
                 pos = args.pos - 1
-                assert args.pos == 1 and len(args.argv) == 1, f'args `--release-*` must be only arg.'
+                assert pos == 1 and len(args.argv) == 2, f'{pos=} {len(sys.argv)=} args `--release-*` must be only arg.'
                 if arg == '--release-1':
                     new_args = '-r @github -u 1 -p git: -P git: -l git: cibw --sdists 1'
                 elif arg == '--release-2':
@@ -977,22 +989,20 @@ def main(argv):
                 args.argv[pos:] = new_args
                 args.pos = pos
                 pipcl.log(f'{args.pos=}: {args.argv=}')
-                sys.exit(0)
+                continue
 
             elif arg == '--remote-do':
                 remote_do = next(args).as_bool()
 
-            elif arg == '--remote-github-workflow':
-                remote_github_workflow_id = next(args)
+            elif arg == '--remote-github-workflow-id':
+                remote_github_workflow_id = next(args).text
 
             elif arg == '--remote-github-yml':
-                state.remote_github_yml = next(args)
-                assert state.remote_github_yml.endswith('.yml'), (
-                        f'Should end with `.yml`: {state.remote_github_yml=}'
-                        )
+                state.remote_github_yml = next(args).text
+                assert state.remote_github_yml.endswith('.yml')
 
             elif arg == '--remote-github-yml-inputs':
-                state.remote_github_yml_inputs = next(args)
+                state.remote_github_yml_inputs = next(args).text
 
             elif arg == '--remote-prefix':
                 remote_prefix = next(args)
@@ -1019,11 +1029,11 @@ def main(argv):
                 ticker = next(args).as_float()
 
             elif arg == '-u':
-                state.github_upload = int(next(args))
+                state.github_upload = next(args).as_int()
 
             elif arg == '-v':
-                state.venv = int(next(args))
-                assert state.venv in (0, 1, 2, 3), f'Invalid {state.venv=} should be 0, 1, 2 or 3.'
+                venv = next(args).as_int()
+                assert venv in (0, 1, 2, 3), f'Invalid {venv=} should be 0, 1, 2 or 3.'
             
             elif arg == '-V':
                 state.verbose += 1
@@ -1046,6 +1056,7 @@ def main(argv):
         # information about what args would have been valid.
         if COMP_LINE:
             arg = args.argv[args.pos-1]
+            pipcl.log(f'backtrace.show()')
             #pipcl.log(f'Exception: {e}')
             #pipcl.log(f'{args.suggestions=}')
             #pipcl.log(f'{arg=}')
@@ -1069,8 +1080,10 @@ def main(argv):
                 sys.exit()
             except Exception as e:
                 pipcl.log(f'completion: error: {traceback.format_exc()}')
-        else:
+                sys.exit(1)
+        elif arg is not None:
             # Print command line with caret showing where error occurred.
+            backtrace.show()
             for i, arg in enumerate(args.argv):
                 sys.stdout.write(f'{" " if i else ""}{shlex.quote(arg)}')
             sys.stdout.write('\n')
@@ -1092,6 +1105,9 @@ def main(argv):
                 print(f'(No suggestions.)')
                 raise
             return 1
+        else:
+            backtrace.show()
+            sys.exit(1)
     
     if COMP_LINE:
         pipcl.log(f'completion: no error. {args.suggestions=}')
@@ -1110,10 +1126,10 @@ def main(argv):
     if not remote:
         os_self = platform.system().lower()
         oss = [os_self]
-        pipcl.log(f'{oss=}')
+        #pipcl.log(f'{oss=}')
         apply_deltas(oss, state.os_names, check=0)
-        pipcl.log(f'{state.os_names=}')
-        pipcl.log(f'{os_self=}')
+        #pipcl.log(f'{state.os_names=}')
+        #pipcl.log(f'{os_self=}')
         if os_self not in oss:
             pipcl.log(f'Not running on {os_self=}: {state.os_names=}')
             return
@@ -1134,13 +1150,6 @@ def main(argv):
     # Hard-coded ssh/git key paths.
     pymupdfpro_key_path_leaf = 'thirdparty-so-key'
     artifex_software_ssh_key = 'artifex-software-ssh-key'
-    
-    #if state.graal:
-    #    # First build non-graal wheels, but don't run any tests.
-    #    args_nongraal = args.argv.copy()
-    #    args_nongraal[state.graal_arg] = '0'
-    #    args_nongraal += ['-t', '-']
-    #    command = shlex.join(args.argv)
     
     if (not remote and state.commands) or remote == '@github':
         if venv:
@@ -1179,6 +1188,7 @@ def main(argv):
                             )
                 else:
                     # Re-run ourselves in a Python venv.
+                    pipcl.log(f'{venv=}')
                     Py_GIL_DISABLED = sysconfig.get_config_var('Py_GIL_DISABLED')
                     t = '-t' if Py_GIL_DISABLED else ''
                     venv_name = f'venv-aptest-{platform.python_version()}{t}-{int.bit_length(sys.maxsize+1)}'
@@ -1189,6 +1199,8 @@ def main(argv):
                             clean=(venv>=3),
                             )
                 sys.exit(e)
+    
+    os.makedirs(state.wheelhouse, exist_ok=1)
         
     if remote:  # pylint: disable=too-many-nested-blocks
         argv = args.argv[:]
@@ -1198,9 +1210,10 @@ def main(argv):
             branch = f'aptest-{os.environ["USER"]}'    # -{time.strftime("%F-%T")}'
             pipcl.log(f'{branch=}.')
 
-            github_name = 'ArtifexSoftware/aptest'
             if remote_github_workflow_id:
                 workflow_id = remote_github_workflow_id
+                remote_github_workflow_package = 'aptest'
+                info = NameInfo(remote_github_workflow_package)
             else:
                 # Push ourselves to Git.
                 git_push(g_root, 'git@github.com:ArtifexSoftware/aptest.git', branch)
@@ -1220,41 +1233,49 @@ def main(argv):
                 if state.remote_github_yml:
                     # Run .yml directly.
                     pipcl.log(f'Running .yml instead of aptest.py: {state.remote_github_yml}')
-                    assert len(state.packages) == 1, f'Running yml directly requires exactly one package, but {len(state.packages)=}.'
-                    for package_name, (package_location, args_pos) in state.packages.items():
-                        pass
-                    info = NameInfo(package_name)
-                    github_name = info.github_name
+                    if not state.packages:
+                        # Run on aptest.
+                        info = NameInfo('aptest')
+                    elif len(state.packages) == 1:
+                        for package_name, (package_location, args_pos) in state.packages.items():
+                            pass
+                        info = NameInfo(package_name)
+                    else:
+                        assert 0, 'Running yml directly requires exactly zero or one package, but {len(state.packages)=}.'
                     data = dict()
                     data['ref'] = branch
                     if state.remote_github_yml_inputs:
                         inputs = dict()
                         for nv in state.remote_github_yml_inputs.split(','):
-                            n, v = nv.split('=', 1)
+                            try:
+                                n, v = nv.split('=', 1)
+                            except Exception as e:
+                                raise Exception(f'Expected <name>=<value> in {nv!r} from {state.remote_github_yml_inputs=}.') from e
                             inputs[n] = v
                         data['inputs'] = inputs
                     workflow_id = github.gh_run_workflow(
-                            f'https://api.github.com/repos/{github_name}',
+                            f'https://api.github.com/repos/{info.github_name}',
                             state.remote_github_yml,
                             data,
                             )
                 else:
                     # Run ourselves on Github, passing argv.
+                    info = NameInfo('aptest')
                     data = dict(
                             ref = branch,
                             inputs = dict(args=shlex.join(argv[1:])),
                             )
                     workflow_id = github.gh_run_workflow(
-                            'https://api.github.com/repos/ArtifexSoftware/aptest',
+                            'https://api.github.com/repos/{info.github_name}',
                             'test.yml',
                             data,
                             )
             
             assert isinstance(workflow_id, str)
+            url = f'https://api.github.com/repos/{info.github_name}'
+            #pipcl.log(f'Calling github.gh_workflow_download_multiple() with {url=} {workflow_id=}.')
             github.gh_workflow_download_multiple(
-                    #rest_url_base,
-                    f'https://api.github.com/repos/{github_name}',
-                    'test.yml',
+                    url,
                     workflow_id,
                     #extra_wheels=upload_extra_wheels,
                     upload='pypi' if state.github_upload else None,
@@ -1371,8 +1392,8 @@ def main(argv):
     
     # Clone/update/build swig if specified.
     swig_binary = pipcl.swig_get(state.swig, state.swig_quick)
-    pipcl.log(f'{state.swig=}')
-    pipcl.log(f'{swig_binary=}')
+    #pipcl.log(f'{state.swig=}')
+    #pipcl.log(f'{swig_binary=}')
     if swig_binary:
         # Prevent individual builds from installing default swig.
         swig_binary = os.path.abspath(swig_binary)
@@ -1404,7 +1425,7 @@ def main(argv):
             ssh_key_path_abs = state.ssh_key_path_abs.replace('\\', '/')
             GIT_SSH_COMMAND = f'ssh -i {ssh_key_path_abs} -o StrictHostKeyChecking=no'
             state.env_extra['GIT_SSH_COMMAND'] = GIT_SSH_COMMAND
-            pipcl.log(f'Using {GIT_SSH_COMMAND=}.')
+            #pipcl.log(f'Using {GIT_SSH_COMMAND=}.')
             #APTEST_SSH_KEY = os.path.abspath(key_path)
             #state.env_extra['APTEST_SSH_KEY'] = APTEST_SSH_KEY
 
@@ -1935,6 +1956,7 @@ def venv_run(args, path, recreate=True, clean=False):
         clean:
             If true we first delete <path>.
     '''
+    #pipcl.log(f'{path=} {recreate=} {clean=}')
     if clean:
         pipcl.log(f'Removing any existing venv {path}.')
         assert path.startswith('venv-')
