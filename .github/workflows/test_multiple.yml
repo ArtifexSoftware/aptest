@@ -15,7 +15,7 @@ on:
       args:
         type: string
         default: ''
-        description: 'Arguments to pass to scripts/test.py'
+        description: 'Arguments to pass to aptest.py'
 
 jobs:
 
@@ -53,7 +53,7 @@ jobs:
           ARTIFEX_SOFTWARE_SSH_KEY: ${{secrets.ARTIFEX_SOFTWARE_SSH_KEY}}
           PYMUPDFPRO_SETUP_SOT_KEY: ${{secrets.PYMUPDFPRO_SETUP_SOT_KEY}}
         run:
-          python aptest.py ${{matrix.args}} build test -a APTEST_args ${{matrix.args}}
+          python aptest.py ${{matrix.args}} build test -a APTEST_args
       
       # Upload generated wheels, to be accessible from github Actions page.
       #
