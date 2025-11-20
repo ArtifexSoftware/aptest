@@ -2427,7 +2427,7 @@ def run(
             If true:
             * We run command with stdout=subprocess.PIPE and
               stderr=subprocess.STDOUT, repetaedly reading the command's output
-              and writing it to stdout with <prefix>.
+              and writing it with <prefix>.
             * We do not support <timeout>, which must be None.
         encoding:
         errors:
@@ -2441,7 +2441,7 @@ def run(
         tee:
             Name of file to also write to. We refuse to overwrite existing file.
         log:
-            If true we write to pipcl.log() instead of sys.stdout.
+            If true we write to pipcl.log(). This is the default.
     
     On Windows:
         <ticker> is not supported and ignored.
@@ -2495,7 +2495,7 @@ def run(
     if log:
         out.append('log')
     if not out:
-        out = [sys.stdout]
+        out = ['log']
     
     if tee:
         assert not os.path.exists(tee), f'Tee file already exists: {tee}'
