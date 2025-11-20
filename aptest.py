@@ -1493,6 +1493,10 @@ def main(argv):
                 # We use `pip --extra-index-url {pip_index_url}` so that pip
                 # finds prerequisite wheels in state.wheelhouse.
                 pip_index_url = f'file://{os.path.abspath(state.wheelhouse)}/simple'
+                # pip fails if pip_index_url contains back-slashes, with
+                # `ERROR: Could not install packages due to an OSError: [Errno
+                # 13] Permission denied:...`.
+                pip_index_url = pip_index_url.replace('\\', '/')
 
                 for package in state.packages_build:
                     pipcl.log(f'{package=}')
@@ -1502,13 +1506,11 @@ def main(argv):
                     if location.startswith('pip:'):
                         assert package != 'mupdf', f'Not a package on pypi.org: {package}'
                         name = f'{package}{location[4:]}'
-                        newfiles = pipcl.NewFiles(f'{state.wheelhouse}/{name}-*.whl')
                         # Get wheel from pypi.org and put into our wheelhouse
-                        # so it is available for later builds.
+                        # so it is available for later builds. Then install;
+                        # pip uses a cache so will not download twice.
                         pipcl.run(f'pip wheel -w {state.wheelhouse} {name}')
-                        wheel_path = newfiles.get_one()
-                        # Install wheel into current venv.
-                        pipcl.run(f'pip install -v {wheel_path}')
+                        pipcl.run(f'pip install -v {name}')
                     else:
                         directory = _get_local(package, state)
                         if package == 'pymupdf4llm':
