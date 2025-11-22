@@ -121,7 +121,13 @@ Args:
         -i <package-name> <location>
             Add an input package.
             package-name:
-                One of: mupdf pymupdf pymupdf4llm pymupdfpro layout
+                One of:
+                    langchain_pymupdf_layout
+                    mupdf
+                    pymupdf
+                    pymupdf4llm
+                    pymupdf_layout
+                    pymupdfpro
             location:
                 `pip:`
                     Install from pypi.org using pip.
@@ -146,6 +152,10 @@ Args:
                 aptest.py -i pymupdf pip: -i pymupdf git: build test
                     Test current pymupdf release with testsuite in current git.
 
+        --langchain-pymupdf-layout <location>
+        --langchain <location>
+            Aliases for `-i langchain_pymupdf_layout <location>
+        
         --pymupdf_layout <location>
         --layout <location>
         -l <location>
@@ -618,36 +628,76 @@ def sync(remote, remote_dir, path, ssh_command, verbose):
     return ret
 
 
-class NameInfo:
+g_package_info = {
+        'aptest':
+            {
+                'github_name': 'ArtifexSoftware/aptest',
+                'git_branch': 'main',
+                'aliases':  [],
+            },
+        'mupdf': 
+            {
+                'github_name': 'ArtifexSoftware/mupdf',
+                'git_branch': 'master',
+                'aliases':  ['m'],
+                'order': 0,
+            },
+        'pymupdf': 
+            {
+                'github_name': 'pymupdf/PyMuPDF',
+                'git_branch': 'main',
+                'aliases':  ['p'],
+                'order': 1,
+            },
+        'pymupdf4llm': 
+            {
+                'github_name': 'pymupdf/pymupdf4llm',
+                'git_branch': 'main',
+                'aliases':  ['4llm'],
+                'order': 2,
+            },
+        'pymupdfpro': 
+            {
+                'github_name': 'ArtifexSoftware/PyMuPDFPro',
+                'git_branch': 'main',
+                'aliases':  ['pro', 'P'],
+                'order': 2,
+            },
+        'pymupdf_layout': 
+            {
+                'github_name': 'ArtifexSoftware/sce',
+                'git_branch': 'master',
+                'aliases':  ['layout', 'l'],
+                'submodules': False,
+                'order': 2,
+            },
+        'langchain_pymupdf_layout': 
+            {
+                'github_name': 'ArtifexSoftware/langchain-pymupdf-layout',
+                'git_branch': 'main',
+                'aliases':  ['langchain'],
+                'order': 3,
+            },
+        }
+
+for name, value in g_package_info.items():
+    if value.get('submodules') is None:
+        value['submodules'] = True
+    value['git_remote'] = f'git@github.com:{value["github_name"]}.git'
+
+
+def arg_alias(arg):
     '''
-    Hard-coded info about package.
+    Returns full name if arg is --<alias>.
     '''
-    def __init__(self, name):
-        self.submodules = True
-        if name == 'aptest':
-            self.github_name = 'ArtifexSoftware/aptest'
-            self.git_branch = 'main'
-        elif name == 'mupdf':
-            self.github_name = 'ArtifexSoftware/mupdf'
-            self.git_branch = 'master'
-        elif name == 'pymupdf':
-            self.github_name = 'pymupdf/PyMuPDF'
-            self.git_branch = 'main'
-        elif name == 'pymupdf4llm':
-            self.github_name = 'pymupdf/pymupdf4llm'
-            self.git_branch = 'main'
-        elif name == 'pymupdfpro':
-            self.github_name = 'ArtifexSoftware/PyMuPDFPro'
-            self.git_branch = 'main'
-        elif name == 'pymupdf_layout':
-            self.github_name = 'ArtifexSoftware/sce'
-            self.git_branch = 'master'
-            # Have seen problems with clong after we've pushed local checkout to
-            # branch but submodule `mupdf` not present.
-            self.submodules = False
-        else:
-            assert 0, f'{name=}'
-        self.git_remote = f'git@github.com:{self.github_name}.git'
+    for fullname, info in g_package_info.items():
+        for alias in [fullname] + info['aliases']:
+            alias = f'-{alias}' if len(alias) == 1 else f'--{alias}'
+            if arg == alias:
+                return fullname
+
+def name_info(package):
+    return g_package_info[package]
 
 
 class Arg:
@@ -816,14 +866,7 @@ def main(argv):
         state.packages_build.append(name)
         state.packages_test.append(name)
 
-        names = [
-            'mupdf',
-            'pymupdf',
-            'pymupdf4llm',
-            'pymupdf_layout',
-            'pymupdfpro',
-            ]
-        keyfn = lambda name: names.index(name)
+        keyfn = lambda name: g_package_info[name]['order']
         state.packages_build.sort(key=keyfn)
         state.packages_test.sort(key=keyfn)
     
@@ -925,27 +968,15 @@ def main(argv):
                 _name = next(args)
                 _location = next(args)
                 add_package(_name, _location, args.pos - 1)
-
-            elif arg in ('--pymupdf_layout', '--layout', '-l'):
-                add_package('pymupdf_layout', next(args), args.pos - 1)
-
-            elif arg in ('--mupdf', '-m'):
-                add_package('mupdf', next(args), args.pos - 1)
+            
+            elif package := arg_alias(arg):
+                add_package(package, next(args), args.pos - 1)
 
             elif arg == '-o':
                 state.os_names += next(args).text.lower().split(',')
                 names = ('linux', 'windows', 'darwin')
                 for os_name in state.os_names:
                     assert os_name in names, f'{os_name=} should be one of {names!r}.'
-
-            elif arg in ('--pymupdf', '-p'):
-                add_package('pymupdf', next(args), args.pos - 1)
-
-            elif arg in ('--pymupdf4llm', '--4llm'):
-                add_package('pymupdf4llm', next(args), args.pos - 1)
-
-            elif arg in ('--pymupdfpro', '--pro', '-P'):
-                add_package('pymupdfpro', next(args), args.pos - 1)
 
             elif arg == '-r':
                 remote_arg = args.pos
@@ -1060,7 +1091,7 @@ def main(argv):
         # information about what args would have been valid.
         if COMP_LINE:
             arg = args.argv[args.pos-1]
-            pipcl.log(f'backtrace.show()')
+            #pipcl.log(f'backtrace.show()')
             #pipcl.log(f'Exception: {e}')
             #pipcl.log(f'{args.suggestions=}')
             #pipcl.log(f'{arg=}')
@@ -1217,7 +1248,7 @@ def main(argv):
             if remote_github_workflow_id:
                 workflow_id = remote_github_workflow_id
                 remote_github_workflow_package = 'aptest'
-                info = NameInfo(remote_github_workflow_package)
+                info = name_info(remote_github_workflow_package)
             else:
                 # Push ourselves to Git.
                 git_push(g_root, 'git@github.com:ArtifexSoftware/aptest.git', branch)
@@ -1228,22 +1259,22 @@ def main(argv):
                     if not package_location.startswith(('git:', 'pip:')):
                         # Push to a Github branch and update argv[] to refer to this
                         # Github branch.
-                        info = NameInfo(package_name)
+                        info = name_info(package_name)
                         pipcl.log(f'{package_name=}.')
-                        pipcl.log(f'{info.git_remote=}.')
-                        git_push(package_location, info.git_remote, branch)
-                        argv[args_pos] = f'git:-b {branch} {info.git_remote}'
+                        pipcl.log(f'{info["git_remote"]=}.')
+                        git_push(package_location, info["git_remote"], branch)
+                        argv[args_pos] = f'git:-b {branch} {info["git_remote"]}'
 
                 if state.remote_github_yml:
                     # Run .yml directly.
                     pipcl.log(f'Running .yml instead of aptest.py: {state.remote_github_yml}')
                     if not state.packages:
                         # Run on aptest.
-                        info = NameInfo('aptest')
+                        info = name_info('aptest')
                     elif len(state.packages) == 1:
                         for package_name, (package_location, args_pos) in state.packages.items():
                             pass
-                        info = NameInfo(package_name)
+                        info = name_info(package_name)
                     else:
                         assert 0, 'Running yml directly requires exactly zero or one package, but {len(state.packages)=}.'
                     data = dict()
@@ -1258,25 +1289,25 @@ def main(argv):
                             inputs[n] = v
                         data['inputs'] = inputs
                     workflow_id = github.gh_run_workflow(
-                            f'https://api.github.com/repos/{info.github_name}',
+                            f'https://api.github.com/repos/{info["github_name"]}',
                             state.remote_github_yml,
                             data,
                             )
                 else:
                     # Run ourselves on Github, passing argv.
-                    info = NameInfo('aptest')
+                    info = name_info('aptest')
                     data = dict(
                             ref = branch,
                             inputs = dict(args=shlex.join(argv[1:])),
                             )
                     workflow_id = github.gh_run_workflow(
-                            f'https://api.github.com/repos/{info.github_name}',
+                            f'https://api.github.com/repos/{info["github_name"]}',
                             'test.yml',
                             data,
                             )
             
             assert isinstance(workflow_id, str)
-            url = f'https://api.github.com/repos/{info.github_name}'
+            url = f'https://api.github.com/repos/{info["github_name"]}'
             #pipcl.log(f'Calling github.gh_workflow_download_multiple() with {url=} {workflow_id=}.')
             github.gh_workflow_download_multiple(
                     url,
@@ -1891,7 +1922,7 @@ def _get_local(package, state, test=False):
     location is pip:.
     '''
     location, _ = state.packages[package]
-    info = NameInfo(package)
+    info = name_info(package)
     if location.startswith('pip:'):
         if test:
             # Use second location of <package> if specified.
@@ -1904,11 +1935,11 @@ def _get_local(package, state, test=False):
     if location.startswith('git:'):
         directory = pipcl.git_get(
                 local=f'aptest-git-{package}',
-                remote=info.git_remote,
-                branch=info.git_branch,
+                remote=info['git_remote'],
+                branch=info['git_branch'],
                 text=location,
                 env_extra=state.env_extra,
-                submodules=info.submodules,
+                submodules=info['submodules'],
                 )
     else:
         directory = location
