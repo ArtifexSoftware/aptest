@@ -696,6 +696,7 @@ def arg_alias(arg):
             if arg == alias:
                 return fullname
 
+
 def name_info(package):
     return g_package_info[package]
 
@@ -1606,6 +1607,13 @@ def main(argv):
                                     prefix=f'build {package}: ',
                                     )
                             wheel = new_files.get_one()
+                            
+                            if package == 'pymupdf':
+                                # Set PYMUPDF_SETUP_VERSION so subsequent builds are configured
+                                # for the PyMuPDF we have just built.
+                                PYMUPDF_SETUP_VERSION = os.path.basename(wheel).split('-')[1]
+                                state.env_extra['PYMUPDF_SETUP_VERSION'] = PYMUPDF_SETUP_VERSION
+                                pipcl.log(f'### Have set {PYMUPDF_SETUP_VERSION=}')
                             pipcl.run(
                                     #f'pip install -v --extra-index-url {pip_index_url} --no-cache-dir {wheel}',
                                     f'pip install -v --extra-index-url {pip_index_url} {wheel}',
@@ -2041,12 +2049,21 @@ def fs_write_key(path, data):
 
 
 if __name__ == '__main__':
-    try:
-        sys.exit(main(sys.argv))
-    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
-        # Terminate relatively quietly, failed commands will usually have
-        # generated diagnostics.
-        pipcl.log(f'{e}')
-        sys.exit(1)
-    # Other exceptions should not happen, and will generate a full Python
-    # backtrace etc here.
+    if sys.argv[1:2] == ['--doctest']:
+        import doctest
+        if sys.argv[2:]:
+            for ff in sys.argv[2:]:
+                fff = globals()[ff]
+                doctest.run_docstring_examples(fff, globals())
+        else:
+            doctest.testmod(None)
+    else:
+        try:
+            sys.exit(main(sys.argv))
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
+            # Terminate relatively quietly, failed commands will usually have
+            # generated diagnostics.
+            pipcl.log(f'{e}')
+            sys.exit(1)
+        # Other exceptions should not happen, and will generate a full Python
+        # backtrace etc here.
