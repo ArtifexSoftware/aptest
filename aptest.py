@@ -275,7 +275,7 @@ Args:
             In addition if the first item does not start with '+' or '-' we
             first remove all packages from the list.
             
-            We allow single-letter aliases for package names.
+            We allow aliases for package names.
             
             For example:
                 -t -,P
@@ -673,7 +673,7 @@ g_package_info = {
             },
         'langchain_pymupdf_layout': 
             {
-                'github_name': 'ArtifexSoftware/langchain-pymupdf-layout',
+                'github_name': 'pymupdf/langchain-pymupdf-layout',
                 'git_branch': 'main',
                 'aliases':  ['langchain'],
                 'order': 3,
@@ -695,6 +695,14 @@ def arg_alias(arg):
             alias = f'-{alias}' if len(alias) == 1 else f'--{alias}'
             if arg == alias:
                 return fullname
+
+def package_alias(package):
+    '''
+    Returns full name if arg is an alias.
+    '''
+    for fullname, info in g_package_info.items():
+        if package in [fullname] + info['aliases']:
+            return fullname
 
 
 def name_info(package):
@@ -879,7 +887,7 @@ def main(argv):
                 del items[:]
             elif delta.startswith('-'):
                 try:
-                    items.remove(delta[1:])
+                    items.remove(package_alias(delta[1:]))
                 except Exception:
                     pipcl.log(f'Failed to remove {delta[1:]=} from {items=}')
                     if check:
@@ -887,6 +895,7 @@ def main(argv):
             else:
                 if delta.startswith('+'):
                     delta = delta[1:]
+                delta = package_alias(delta)
                 items.append(delta)
     
     # Parse args and update the above state. We do this before moving into a
@@ -1848,67 +1857,76 @@ def main(argv):
                     directory = _get_local(package, state, test=1)
                     if not directory:
                         continue
-                    command = f'pytest'
-                    if state.pytest_options:
-                        command += f' {state.pytest_options}'
-                    if state.pytest_paths:
-                        for path in state.pytest_paths:
-                            command += f' {directory}/{path}'
+                    if package == 'langchain_pymupdf_layout':
+                        command = f'{sys.executable} {directory}/simple_test.py'
+                        e = pipcl.run(
+                                command,
+                                env_extra=state.env_extra,
+                                prefix=f'langchain_pymupdf_layout simple_test.py: ',
+                                check=0,
+                                )
                     else:
-                        # We need to somehow limit things to {package}/tests/
-                        # because otherwise pytest can recurse into other
-                        # directories (e.g. mupdf checkout in pympdf) and get
-                        # hopelessly confused.
-                        #
-                        # Would like to do `pytest {directory}` and let
-                        # pytest.ini identify `tests/` as the directory look
-                        # in for tests. But unfortunately pytest configuration
-                        # doesn't seem to allow this sort of thing, for example
-                        # `testpaths = tests` only effects `cd {package} &&
-                        # pytest` - i.e. running pytest on current directory
-                        # without specifying any location.
-                        #
-                        command += f' {directory}/tests'
-                    if state.pytest_wrap in ('valgrind', 'helgrind'):
-                        if not state.pytest_options:
-                            command += ' -sv'
-                    if state.pytest_wrap:
-                        command = f'python -m {command}'
-                        if state.pytest_wrap == 'gdb':
-                            command = f'gdb --args {command}'
-                        elif state.pytest_wrap == 'valgrind':
-                            state.env_extra['PYMUPDF_RUNNING_ON_VALGRIND'] = '1'
-                            state.env_extra['PYTHONMALLOC'] = 'malloc'
-                            command = (
-                                    f' valgrind'
-                                    f' --suppressions={g_root_abs}/valgrind.supp'
-                                    f' --trace-children=no'
-                                    f' --num-callers=20'
-                                    f' --error-exitcode=100'
-                                    f' --errors-for-leak-kinds=none'
-                                    f' --fullpath-after='
-                                    f' {command}'
-                                    )
-                        elif state.pytest_wrap == 'helgrind':
-                            state.env_extra['PYMUPDF_RUNNING_ON_VALGRIND'] = '1'
-                            state.env_extra['PYTHONMALLOC'] = 'malloc'
-                            command = (
-                                    f' valgrind'
-                                    f' --tool=helgrind'
-                                    f' --trace-children=no'
-                                    f' --num-callers=20'
-                                    f' --error-exitcode=100'
-                                    f' --fullpath-after='
-                                    f' {command}'
-                                    )
+                        command = f'pytest'
+                        if state.pytest_options:
+                            command += f' {state.pytest_options}'
+                        if state.pytest_paths:
+                            for path in state.pytest_paths:
+                                command += f' {directory}/{path}'
                         else:
-                            assert 0, f'Unrecognised {state.pytest_wrap=}.'
-                    e = pipcl.run(
-                            command,
-                            env_extra=state.env_extra,
-                            prefix=f'pytest {package}: ',
-                            check=0,
-                            )
+                            # We need to somehow limit things to {package}/tests/
+                            # because otherwise pytest can recurse into other
+                            # directories (e.g. mupdf checkout in pympdf) and get
+                            # hopelessly confused.
+                            #
+                            # Would like to do `pytest {directory}` and let
+                            # pytest.ini identify `tests/` as the directory look
+                            # in for tests. But unfortunately pytest configuration
+                            # doesn't seem to allow this sort of thing, for example
+                            # `testpaths = tests` only effects `cd {package} &&
+                            # pytest` - i.e. running pytest on current directory
+                            # without specifying any location.
+                            #
+                            command += f' {directory}/tests'
+                        if state.pytest_wrap in ('valgrind', 'helgrind'):
+                            if not state.pytest_options:
+                                command += ' -sv'
+                        if state.pytest_wrap:
+                            command = f'python -m {command}'
+                            if state.pytest_wrap == 'gdb':
+                                command = f'gdb --args {command}'
+                            elif state.pytest_wrap == 'valgrind':
+                                state.env_extra['PYMUPDF_RUNNING_ON_VALGRIND'] = '1'
+                                state.env_extra['PYTHONMALLOC'] = 'malloc'
+                                command = (
+                                        f' valgrind'
+                                        f' --suppressions={g_root_abs}/valgrind.supp'
+                                        f' --trace-children=no'
+                                        f' --num-callers=20'
+                                        f' --error-exitcode=100'
+                                        f' --errors-for-leak-kinds=none'
+                                        f' --fullpath-after='
+                                        f' {command}'
+                                        )
+                            elif state.pytest_wrap == 'helgrind':
+                                state.env_extra['PYMUPDF_RUNNING_ON_VALGRIND'] = '1'
+                                state.env_extra['PYTHONMALLOC'] = 'malloc'
+                                command = (
+                                        f' valgrind'
+                                        f' --tool=helgrind'
+                                        f' --trace-children=no'
+                                        f' --num-callers=20'
+                                        f' --error-exitcode=100'
+                                        f' --fullpath-after='
+                                        f' {command}'
+                                        )
+                            else:
+                                assert 0, f'Unrecognised {state.pytest_wrap=}.'
+                        e = pipcl.run(
+                                command,
+                                env_extra=state.env_extra,
+                                prefix=f'pytest {package}: ',
+                                check=0,
+                                )
                     if e:
                         failed_packages.append(package)
                 if failed_packages:
