@@ -444,6 +444,8 @@ Environment:
 
     APTEST_options
         Is prepended to command line args.
+    APTEST_COMPLETION_DEBUG
+        Filename to use for completion diagnostics.
 '''
 
 import glob
@@ -471,22 +473,6 @@ try:
     import pipcl
 finally:
     del sys.path[0]
-
-# Support for command completion.
-COMP_LINE = os.environ.get('COMP_LINE')
-COMP_POINT = os.environ.get('COMP_POINT')
-COMP_TYPE = os.environ.get('COMP_TYPE')
-if COMP_LINE:
-    APTEST_COMPLETION_DEBUG = os.environ.get('APTEST_COMPLETION_DEBUG')
-    if APTEST_COMPLETION_DEBUG:
-        pipcl._log_f = open(APTEST_COMPLETION_DEBUG, 'a')
-    #pipcl.log(f'{COMP_LINE=}')
-    #pipcl.log(f'os.environ COMP_*:')
-    #for n in sorted(os.environ.keys()):
-    #    if n.startswith('COMP_'):
-    #        v = os.environ[n]
-    #        pipcl.log(f'    {n}: {v!r}')
-    
 
 g_root = pipcl.relpath(g_root_abs)
 
@@ -588,7 +574,6 @@ def sync(remote, remote_dir, path, ssh_command, verbose):
     true.
     '''
     ret = None
-    #ssh_command2 = f'{ssh_command} {remote}'
     ssh_command2 = f'{ssh_command}'
     if remote:
         ssh_command2 += f' {remote}'
@@ -735,7 +720,7 @@ class Arg:
                 self.args_iterator._add_suggestion(rhs)
         return ret
     def startswith(self, rhs):
-        if isinstance(self.text, StopIteration):
+        if self.text is None or isinstance(self.text, StopIteration):
             return False
         return self.text.startswith(rhs)
     def as_bool(self):
@@ -754,14 +739,20 @@ class Arg:
         try:
             return float(self.text)
         except Exception:
-            self.args_iterator._add_suggestion('FLOAT')
+            self.args_iterator._add_suggestion('<FLOAT>')
             raise
     def as_int(self):
         try:
             return int(self.text)
         except Exception:
-            self.args_iterator._add_suggestion('<int>')
+            self.args_iterator._add_suggestion('<INT>')
             raise
+    def as_text(self):
+        if isinstance(self.text, str):
+            return self.text
+        else:
+            self.args_iterator._add_suggestion('<TEXT>')
+            raise Exception(f'Expected <text>')
                 
         
 class Args:
@@ -773,22 +764,81 @@ class Args:
         self.argv = argv
         self.pos = pos
         self.suggestions = list()
+        self.current = None
     def __next__(self):
         self.suggestions.clear()
         if self.pos == len(self.argv):
             #pipcl.log(f'Returning StopIteration()')
-            return Arg(self, StopIteration())
-        ret = self.argv[self.pos]
+            ret = StopIteration()
+        else:
+            self.suggestions.clear()
+            ret = self.argv[self.pos]
+            self.pos += 1
         ret = Arg(self, ret)
-        self.pos += 1
-        #pipcl.log(f'Returning {ret=}')
+        self.current = ret
         return ret
     def _add_suggestion(self, suggestion):
         #pipcl.log(f'Adding {suggestion=}', caller=3)
         self.suggestions.append(suggestion)
 
 
+def _test_completion(COMP_LINE):
+    '''
+    Internal, runs with COMP_LINE set to mimic completion request from shell.
+    '''
+    os.environ['COMP_LINE'] = COMP_LINE
+    os.environ['COMP_POINT'] = str(len(COMP_LINE))
+    os.environ['COMP_TYPE'] = '63'
+    return main(shlex.split(COMP_LINE))
+
+
+def dummy_completion1():
+    '''
+    >>> _test_completion('./aptest/aptest.py --sdi')
+    --sdists
+    0
+    '''
+    
+def dummy_completion2():
+    '''
+    >>> _test_completion('./aptest/aptest.py --sdists')
+    1
+    true
+    True
+    0
+    false
+    False
+    0
+    '''
+    
+def dummy_completion3():
+    '''
+    >>> _test_completion('./aptest/aptest.py -r')   # doctest: +REPORT_UDIFF +ELLIPSIS
+    <TEXT>
+    0
+    '''
+
 def main(argv):
+    COMP_LINE = os.environ.get('COMP_LINE')
+    COMP_POINT = os.environ.get('COMP_POINT')
+    COMP_TYPE = os.environ.get('COMP_TYPE')
+    #pipcl.log(f'{COMP_LINE=}')
+    #pipcl.log(f'{COMP_POINT=}')
+    if COMP_LINE:
+        APTEST_COMPLETION_DEBUG = os.environ.get('APTEST_COMPLETION_DEBUG')
+        #print(f'{APTEST_COMPLETION_DEBUG=}', file=sys.stderr, flush=1)
+        if APTEST_COMPLETION_DEBUG:
+            pipcl._log_f = open(APTEST_COMPLETION_DEBUG, 'a')
+        else:
+            pipcl._log_f = open('/dev/null', 'a')
+        pipcl.log(f'{COMP_LINE=}')
+        pipcl.log(f'os.environ COMP_*:')
+        for n in sorted(os.environ.keys()):
+            if n.startswith('COMP_'):
+                v = os.environ[n]
+                pipcl.log(f'    {n}: {v!r}')
+    
+    
     if sys.argv[1:] == ['completion']:
         # Write bash completion script to stdout and exit.
         print(textwrap.dedent(f'''
@@ -913,7 +963,7 @@ def main(argv):
         #pipcl.log(f'{COMP_LINE=}')
         #pipcl.log(f'     {line=}')
         args_list += shlex.split(line)[1:]
-        #pipcl.log(f'     {args_list=}')
+        pipcl.log(f'     {args_list=}')
     else:
         args_list += argv[1:]
     args = Args(args_list, 1)
@@ -923,19 +973,25 @@ def main(argv):
             args.suggestions.clear()
             try:
                 arg = next(args)
+                pipcl.log(f'{arg=}')
             except StopIteration:
                 arg = None
                 break
+            pipcl.log(f'{arg=} {COMP_LINE=}')
             if isinstance(arg.text, StopIteration):
-                arg = None
-                break
+                if COMP_LINE:
+                    pass
+                    #arg = Arg(args, None)
+                else:
+                    arg = None
+                    break
             #pipcl.log(f'{arg=}')
             if 0:
                 pass
 
             elif arg == '-a':
                 pos1 = args.pos - 1
-                _name = next(args).text
+                _name = next(args).as_text()
                 _value = os.environ.get(_name, '')
                 pos2 = args.pos
                 new_args = shlex.split(_value)
@@ -962,7 +1018,7 @@ def main(argv):
                 state.cibw_skip_add_defaults = next(args).as_bool()
 
             elif arg == '-e':
-                _nv = next(args).text
+                _nv = next(args).as_text()
                 assert '=' in _nv, f'-e <name>=<value> does not contain "=": {_nv!r}'
                 _name, _value = _nv.split('=', 1)
                 state.env_extra[_name] = _value
@@ -983,14 +1039,15 @@ def main(argv):
                 add_package(package, next(args), args.pos - 1)
 
             elif arg == '-o':
-                state.os_names += next(args).text.lower().split(',')
+                state.os_names += next(args).as_text().lower().split(',')
                 names = ('linux', 'windows', 'darwin')
                 for os_name in state.os_names:
                     assert os_name in names, f'{os_name=} should be one of {names!r}.'
 
             elif arg == '-r':
                 remote_arg = args.pos
-                remote = next(args).text
+                remote = next(args).as_text()
+                pipcl.log(f'Found -r: {arg=} {remote=}')
 
             elif arg == '--run':
                 package = next(args)
@@ -998,17 +1055,17 @@ def main(argv):
                 state.run_commands.append((package, command))
 
             elif arg == '-t':
-                _names = next(args).text.split(',')
+                _names = next(args).as_text().split(',')
                 apply_deltas(state.packages_test, _names)
 
             elif arg == '--pybind':
                 state.pybind = next(args).as_bool()
 
             elif arg == '--pytest':
-                state.pytest_options = next(args).text
+                state.pytest_options = next(args).as_text()
 
             elif arg == '--pytest-path':
-                state.pytest_paths.append(next(args).text)
+                state.pytest_paths.append(next(args).as_text())
 
             elif arg == '--pytest-wrap':
                 state.pytest_wrap = next(args)
@@ -1016,9 +1073,9 @@ def main(argv):
 
             elif arg == '--python':
                 python_args_pos = args.pos
-                python = next(args).text
+                python = next(args).as_text()
 
-            elif arg.text.startswith('--release-'):
+            elif arg.startswith('--release-'):
                 args.suggestions.clear()
                 pos = args.pos - 1
                 assert pos == 1 and len(args.argv) == 2, f'{pos=} {len(sys.argv)=} args `--release-*` must be only arg.'
@@ -1040,14 +1097,14 @@ def main(argv):
                 remote_do = next(args).as_bool()
 
             elif arg == '--remote-github-workflow-id':
-                remote_github_workflow_id = next(args).text
+                remote_github_workflow_id = next(args).as_text()
 
             elif arg == '--remote-github-yml':
-                state.remote_github_yml = next(args).text
+                state.remote_github_yml = next(args).as_text()
                 assert state.remote_github_yml.endswith('.yml')
 
             elif arg == '--remote-github-yml-inputs':
-                state.remote_github_yml_inputs = next(args).text
+                state.remote_github_yml_inputs = next(args).as_text()
 
             elif arg == '--remote-prefix':
                 remote_prefix = next(args)
@@ -1059,7 +1116,7 @@ def main(argv):
                 state.system_site_packages = next(args).as_bool()
 
             elif arg == '--swig':
-                state.swig = next(args).text
+                state.swig = next(args).as_text()
 
             elif arg == '--swig-quick':
                 state.swig_quick = next(args).as_bool()
@@ -1095,19 +1152,24 @@ def main(argv):
                 pipcl.log(f'{arg=}')
                 pipcl.log(f'{args.suggestions=}')
                 assert 0, f'Unrecognised command: {arg=}.'
+            
+            pipcl.log(f'End of loop: {args.current=} {args.suggestions=}')
+            #if isinstance(args.current.text, StopIteration):
+            #    raise args.current.text
 
     except Exception as e:
         # We write out detailed information about the error, including
         # information about what args would have been valid.
         if COMP_LINE:
-            arg = args.argv[args.pos-1]
-            #pipcl.log(f'backtrace.show()')
-            #pipcl.log(f'Exception: {e}')
-            #pipcl.log(f'{args.suggestions=}')
-            #pipcl.log(f'{arg=}')
-            #pipcl.log(f'{COMP_LINE=}')
-            #pipcl.log(f'{COMP_POINT=}')
-            #pipcl.log(f'{COMP_TYPE=}')
+            pipcl.log(f'{backtrace.show(file=str)}')
+            pipcl.log(f'Exception: {e}')
+            pipcl.log(f'{args.argv=}')
+            pipcl.log(f'{args.pos=}')
+            pipcl.log(f'{args.suggestions=}')
+            pipcl.log(f'{arg=}')
+            pipcl.log(f'{COMP_LINE=}')
+            pipcl.log(f'{COMP_POINT=}')
+            pipcl.log(f'{COMP_TYPE=}')
             try:
                 # COMP_TYPE
                 # 9: <tab>  normal completion
@@ -1117,31 +1179,39 @@ def main(argv):
                 # 64: @ list completions if the word is not unmodified
                 #
                 for suggestion in args.suggestions:
-                    if COMP_TYPE == '63' or suggestion.startswith(arg):
-                        #pipcl.log(f'Writing out {suggestion=}')
+                    #if COMP_TYPE == '63' or suggestion.startswith(arg):
+                    if isinstance(args.current.text, StopIteration):
                         print(suggestion)
+                    elif suggestion.startswith(args.current.text):
+                            pipcl.log(f'Writing out {suggestion=}')
+                            print(suggestion)
                     sys.stdout.flush()
-                #pipcl.log(f'Calling sys.exit()')
-                sys.exit()
+                pipcl.log(f'Calling sys.exit()')
+                #sys.exit()
+                return 0
             except Exception as e:
                 pipcl.log(f'completion: error: {traceback.format_exc()}')
-                sys.exit(1)
+                #sys.exit(1)
+                return 1
         elif arg is not None:
             # Print command line with caret showing where error occurred.
-            backtrace.show()
+            #pipcl.log(f'{args.current=}')
+            #backtrace.show()
             for i, arg in enumerate(args.argv):
                 sys.stdout.write(f'{" " if i else ""}{shlex.quote(arg)}')
             sys.stdout.write('\n')
             for i, arg in enumerate(args.argv):
                 if i:
                     sys.stdout.write(' ')
-                if i+1 == args.pos:
+                if not isinstance(args.current.text, StopIteration) and i+1 == args.pos:
                     sys.stdout.write('^')
                     break
                 sys.stdout.write(' ' * len(shlex.quote(arg)))
+            if isinstance(args.current.text, StopIteration):
+                sys.stdout.write('^')
             sys.stdout.write('\n')
             if isinstance(e, StopIteration):
-                print(f'Ran out of arguments')
+                print(f'Ran out of arguments.')
             if args.suggestions:
                 print(f'Expected one of:')
                 for suggestion in args.suggestions:
@@ -1152,13 +1222,14 @@ def main(argv):
             return 1
         else:
             backtrace.show()
-            sys.exit(1)
+            return 1
     
     if COMP_LINE:
         pipcl.log(f'completion: no error. {args.suggestions=}')
+        pipcl.log(f'{sys.argv=}')
         for suggestion in args.suggestions:
             print(suggestion)
-        sys.exit()
+        return 0
     
     if state.verbose:
         pipcl.show_system()
@@ -1865,6 +1936,7 @@ def main(argv):
                                 prefix=f'langchain_pymupdf_layout simple_test.py: ',
                                 check=0,
                                 )
+                        pipcl.log(f'langchain_pymupdf_layout command returned {e=}.')
                     else:
                         command = f'pytest'
                         if state.pytest_options:
