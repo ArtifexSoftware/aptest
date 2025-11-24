@@ -156,11 +156,6 @@ Args:
         --langchain <location>
             Aliases for `-i langchain_pymupdf_layout <location>
         
-        --pymupdf_layout <location>
-        --layout <location>
-        -l <location>
-            Aliases for `-i pymupdf_layout <location>
-        
         --mupdf <location>
         -m <location>
             Aliases for `-i mupdf <location>
@@ -170,10 +165,6 @@ Args:
             (comma-separated) list, we do nothing. <os_names> is case
             insensitive. Should match linux, windows or darwin.
         
-        --pymupdf4llm <location>
-        --4llm <location>
-            Aliases for `-i pymupdf4llm <location>
-        
         --pymupdf <location>
         -p <location>
             Aliases for `-i pymupdf <location>
@@ -182,6 +173,15 @@ Args:
         --pro <location>
         -P <location>
             Aliases for `-i pymupdfpro <location>
+        
+        --pymupdf4llm <location>
+        --4llm <location>
+            Aliases for `-i pymupdf4llm <location>
+        
+        --pymupdf_layout <location>
+        --layout <location>
+        -l <location>
+            Aliases for `-i pymupdf_layout <location>
         
         --pytest <pytest-flags>
             Specify pytest flags, for example `--pytest '-k test_123'`.
@@ -261,43 +261,10 @@ Args:
             aptest/aptest.py --release-3
                 Build wheels for win32 (pymupdf only).
         
-        -t <packages>
-            Comma-separated ordered list of modifications to the list of
-            packages tested by the 'test' command.
-            
-            This list defaults to all packages specified by `-i`. Then for each
-            comma-separated item in <packages>:
-            
-                '-<name>' removes package <name> from the list.
-                '+<name>' and '<name>' adds package <name> to the list.
-                '-' removes all packages from the list.
-            
-            In addition if the first item does not start with '+' or '-' we
-            first remove all packages from the list.
-            
-            We allow aliases for package names.
-            
-            For example:
-                -t -,P
-                -t -,pymudfpro
-                    Tests only pymupdfpro.
-                -t -m,-l
-                -t -mupdf,-pymupdf_layout
-                    Removes mupdf and layout from list of packages to test.
-
-        -u 0|1
-            If 1, if `-r @github` is used then on success we ask the user to
-            confirm and then upload wheels to pypi.org.
-            
-        -v <venv>
-            0 - do not use a venv.
-            1 - Use venv. If it already exists, we assume the existing
-                directory was created by us earlier and is a valid venv
-                containing all necessary packages; this saves a little time.
-            2 - Use venv.
-            3 - Use venv but delete it first if it already exists.
-            
-            The default is 2.
+        --remote-do 0|1
+            [For debugging.]
+            If 0 we don't sync to remote and we don't run any commands on
+            remote. But we do sync remote wheels to local.
         
         --remote-github-workflow-id <workflow_id>
             Changes behaviour of `-r @github`. Don't run anything Github,
@@ -316,11 +283,6 @@ Args:
         
         --remote-prefix <remote_prefix>
             Run remote using specified Python command. Ignored by `-r @github`.
-        
-        --remote-do 0|1
-            [For debugging.]
-            If 0 we don't sync to remote and we don't run any commands on
-            remote. But we do sync remote wheels to local.
         
         --run <package> <command>
             Make `run` command run specified command within checkout of
@@ -356,9 +318,47 @@ Args:
         --system-site-packages 0|1
             If 1, use `--system-site-packages` when creating venv. Defaults is 0.
         
+        -t <packages>
+            Comma-separated ordered list of modifications to the list of
+            packages tested by the 'test' command.
+            
+            This list defaults to all packages specified by `-i`. Then for each
+            comma-separated item in <packages>:
+            
+                '-<name>' removes package <name> from the list.
+                '+<name>' and '<name>' adds package <name> to the list.
+                '-' removes all packages from the list.
+            
+            In addition if the first item does not start with '+' or '-' we
+            first remove all packages from the list.
+            
+            We allow aliases for package names.
+            
+            For example:
+                -t -,P
+                -t -,pymudfpro
+                    Tests only pymupdfpro.
+                -t -m,-l
+                -t -mupdf,-pymupdf_layout
+                    Removes mupdf and layout from list of packages to test.
+
         --ticker <delay>
             Use ticker with specified delay. Disabled if delay==0. Default is
             0.5.
+        
+        -u 0|1
+            If 1, if `-r @github` is used then on success we ask the user to
+            confirm and then upload wheels to pypi.org.
+            
+        -v <venv>
+            0 - do not use a venv.
+            1 - Use venv. If it already exists, we assume the existing
+                directory was created by us earlier and is a valid venv
+                containing all necessary packages; this saves a little time.
+            2 - Use venv.
+            3 - Use venv but delete it first if it already exists.
+            
+            The default is 2.
         
         -V
             Verbose.
