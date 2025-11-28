@@ -68,9 +68,31 @@ Args:
             * Useful when running via Github action.
     
         -b <packages>
-            Modifies behaviour of 'build' command to build/install only
-            the specified comma-separated packages instead of all packages
-            specified by `-i`.
+            Comma-separated ordered list of modifications to the list of
+            packages built and installed by the 'build' command.
+            
+            This list defaults to all packages specified by `-i`. Then for each
+            comma-separated item in <packages>:
+            
+                '-<name>' removes package <name> from the list.
+                '+<name>' and '<name>' adds package <name> to the list.
+                '-' removes all packages from the list.
+            
+            In addition if the first item does not start with '+' or '-' we
+            first remove all packages from the list.
+            
+            We allow aliases for package names.
+            
+            For example:
+                -b -,P
+                -b -,pymudfpro
+                    Builds only pymupdfpro.
+                -b -m,-l
+                -b -mupdf,-pymupdf_layout
+                    Removes mupdf and layout from list of packages to build.
+            
+            If 'mupdf' is removed, we set PYMUPDF_SETUP_MUPDF_REBUILD=0 so
+            pymupdf will not rebuild its mupdf.
         
         --build-type debug|memento|release
             Set build type. Default is relese.
@@ -350,6 +372,10 @@ Args:
                 -t -mupdf,-pymupdf_layout
                     Removes mupdf and layout from list of packages to test.
 
+        --test-extra-packages <names>
+            Installs specified comma-separated packages from pypi.org before
+            running tests.
+        
         --ticker <delay>
             Use ticker with specified delay. Disabled if delay==0. Default is
             0.5.
@@ -915,6 +941,7 @@ def main(argv):
     state.swig_quick = None
     state.system_packages = True if os.environ.get('GITHUB_ACTIONS') == 'true' else False   # pylint: disable=simplifiable-if-expression
     state.system_site_packages = False
+    state.test_extra_packages = list()
     state.valgrind = False
     state.verbose = 0
     state.wheelhouse = 'aptest-wheelhouse'
@@ -1013,7 +1040,8 @@ def main(argv):
                 args.pos = pos1
 
             elif arg == '-b':
-                state.packages_build = next(args).split(',')
+                _names = next(args).as_text().split(',')
+                apply_deltas(state.packages_build, _names)
 
             elif arg == '--build-type':
                 state.build_type = next(args)
@@ -1146,6 +1174,9 @@ def main(argv):
 
             elif arg == '--system-site-packages':
                 state.system_site_packages = next(args).as_bool()
+
+            elif arg == '--test-extra-packages':
+                state.test_extra_packages += next(args).as_text().split(',')
 
             elif arg == '--ticker':
                 ticker = next(args).as_float()
@@ -1629,7 +1660,14 @@ def main(argv):
                 # `ERROR: Could not install packages due to an OSError: [Errno
                 # 13] Permission denied:...`.
                 pip_index_url = pip_index_url.replace('\\', '/')
-
+                if 'mupdf' in state.packages:
+                    directory = _get_local('mupdf', state)
+                    if directory:
+                        state.env_extra['PYMUPDF_SETUP_MUPDF_BUILD'] = os.path.abspath(directory)
+                if 'mupdf' not in state.packages_build:
+                    PYMUPDF_SETUP_MUPDF_REBUILD = '0'
+                    pipcl.log(f'Setting {PYMUPDF_SETUP_MUPDF_REBUILD=}')
+                    state.env_extra['PYMUPDF_SETUP_MUPDF_REBUILD'] = PYMUPDF_SETUP_MUPDF_REBUILD
                 for package in state.packages_build:
                     pipcl.log(f'{package=}')
                     location, args_pos = state.packages[package]
@@ -1939,6 +1977,9 @@ def main(argv):
                     pipcl.log(f'    {i!r}')
                 
                 failed_packages = list()
+                
+                if state.test_extra_packages:
+                    pipcl.run(f'pip install {" ".join(state.test_extra_packages)}')
                 
                 for package in state.packages_test:
                     location, _ = state.packages[package]
