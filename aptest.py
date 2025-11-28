@@ -284,6 +284,14 @@ Args:
         --remote-prefix <remote_prefix>
             Run remote using specified Python command. Ignored by `-r @github`.
         
+        --remote-rsync-path <remote_rsync_path>
+            Specify `--rsync-path` when running rsync, to identify location of
+            rsync on remote. E.g. `--remote-rsync-path 'wsl rsync` if remote is
+            Windows machine with rsync installed in default wsl.
+        
+        --remote-rsync-wsl 0|1
+            Tweak various things to cope with remote using wsl rsync.
+        
         --run <package> <command>
             Make `run` command run specified command within checkout of
             <package>.
@@ -552,7 +560,7 @@ def sync_reverse(
     if remote:
         ssh_command2 += f' {remote}'
     command = (
-            f'rsync -aizr '
+            f'rsync -aizr'
             f'{"--stats " if verbose else ""}'
             f'--rsh {shlex.quote(ssh_command2)} '
             )
@@ -566,7 +574,7 @@ def sync_reverse(
     pipcl.run(command, prefix=f'reverse sync {path_remote} => {path_local}: ', log=1)
         
 
-def sync(remote, remote_dir, path, ssh_command, verbose):
+def sync(remote, remote_dir, path, ssh_command, verbose, *, rsync_path=None, remote_rsync_wsl=None):
     '''
     Syncs <path> to <remote>:<remote_dir>/ using rsync.
 
@@ -582,6 +590,10 @@ def sync(remote, remote_dir, path, ssh_command, verbose):
             f'{"--stats " if verbose else ""}'
             f'--rsh {shlex.quote(ssh_command2)} '
             )
+    if rsync_path:
+        command += f'--rsync-path {shlex.quote(rsync_path)} '
+    if remote_rsync_wsl:
+        command += f'--no-p --rsync-path "wsl rsync" '
     path = os.path.relpath(path)
     path = path.rstrip('/')
     filenames_path = None
@@ -895,6 +907,8 @@ def main(argv):
     state.pytest_wrap = None
     state.remote_github_yml = None
     state.remote_github_yml_inputs = None
+    state.remote_rsync_path = None
+    state.remote_rsync_wsl = False
     state.run_commands = list()
     state.sdists = False
     state.swig = None
@@ -973,11 +987,11 @@ def main(argv):
             args.suggestions.clear()
             try:
                 arg = next(args)
-                pipcl.log(f'{arg=}')
+                #pipcl.log(f'{arg=}')
             except StopIteration:
                 arg = None
                 break
-            pipcl.log(f'{arg=} {COMP_LINE=}')
+            #pipcl.log(f'{arg=} {COMP_LINE=}')
             if isinstance(arg.text, StopIteration):
                 if COMP_LINE:
                     pass
@@ -1047,7 +1061,7 @@ def main(argv):
             elif arg == '-r':
                 remote_arg = args.pos
                 remote = next(args).as_text()
-                pipcl.log(f'Found -r: {arg=} {remote=}')
+                #pipcl.log(f'Found -r: {arg=} {remote=}')
 
             elif arg == '--run':
                 package = next(args)
@@ -1090,7 +1104,7 @@ def main(argv):
                 new_args = shlex.split(new_args)
                 args.argv[pos:] = new_args
                 args.pos = pos
-                pipcl.log(f'{args.pos=}: {args.argv=}')
+                #pipcl.log(f'{args.pos=}: {args.argv=}')
                 continue
 
             elif arg == '--remote-do':
@@ -1108,6 +1122,12 @@ def main(argv):
 
             elif arg == '--remote-prefix':
                 remote_prefix = next(args)
+
+            elif arg == '--remote-rsync-path':
+                state.remote_rsync_path = next(args).as_text()
+
+            elif arg == '--remote-rsync-wsl':
+                state.remote_rsync_wsl = next(args).as_bool()
 
             elif arg == '--sdists':
                 state.sdists = next(args).as_bool()
@@ -1149,11 +1169,11 @@ def main(argv):
             else:
                 if isinstance(arg.text, StopIteration):
                     break
-                pipcl.log(f'{arg=}')
-                pipcl.log(f'{args.suggestions=}')
+                #pipcl.log(f'{arg=}')
+                #pipcl.log(f'{args.suggestions=}')
                 assert 0, f'Unrecognised command: {arg=}.'
             
-            pipcl.log(f'End of loop: {args.current=} {args.suggestions=}')
+            #pipcl.log(f'End of loop: {args.current=} {args.suggestions=}')
             #if isinstance(args.current.text, StopIteration):
             #    raise args.current.text
 
@@ -1430,27 +1450,27 @@ def main(argv):
                 for package_name, (package_location, args_pos) in list(state.packages.items()) + list(state.packages2.items()):
                     if not package_location.startswith(('git:', 'pip:')):
                         pipcl.log(f'{remote=} {remote_dir=} {package_location=} {ssh_command=}')
-                        if sync(remote, remote_dir, package_location, ssh_command=ssh_command, verbose=verbose):
+                        if sync(remote, remote_dir, package_location, ssh_command=ssh_command, verbose=verbose, rsync_path=state.remote_rsync_path, remote_rsync_wsl=state.remote_rsync_wsl):
                             git_paths.append(package_location)
                     if package_location.startswith('git:'):
                         sync_artifex_software_ssh_key = True
 
                 # Sync aptest/ checkout.
-                if sync(remote, remote_dir, g_root, ssh_command=ssh_command, verbose=verbose):
+                if sync(remote, remote_dir, g_root, ssh_command=ssh_command, verbose=verbose, rsync_path=state.remote_rsync_path, remote_rsync_wsl=state.remote_rsync_wsl):
                     git_paths.append(g_root)
 
                 if sync_artifex_software_ssh_key:
                     if os.path.isfile(artifex_software_ssh_key):
-                        sync(remote, remote_dir, artifex_software_ssh_key, ssh_command=ssh_command, verbose=verbose)
+                        sync(remote, remote_dir, artifex_software_ssh_key, ssh_command=ssh_command, verbose=verbose, rsync_path=state.remote_rsync_path, remote_rsync_wsl=state.remote_rsync_wsl)
                     else:
                         pipcl.log(f'## Warning: may not be able to remote clone/update pro or layout checkouts because not a file: {artifex_software_ssh_key}')
 
-                if 'pro' in state.packages_build:
+                if 'pymupdfpro' in state.packages_build:
                     if os.path.isfile(pymupdfpro_key_path_leaf):
-                        sync(remote, remote_dir, pymupdfpro_key_path_leaf, ssh_command=ssh_command, verbose=verbose)
+                        sync(remote, remote_dir, pymupdfpro_key_path_leaf, ssh_command=ssh_command, verbose=verbose, rsync_path=state.remote_rsync_path, remote_rsync_wsl=state.remote_rsync_wsl)
                     else:
                         pipcl.log(f'## Warning: may not be able to remote build SmartOffice because not a file: {artifex_software_ssh_key}')
-                    sync(remote, remote_dir, pymupdfpro_key_path_leaf, ssh_command=ssh_command, verbose=verbose)
+                    sync(remote, remote_dir, pymupdfpro_key_path_leaf, ssh_command=ssh_command, verbose=verbose, rsync_path=state.remote_rsync_path, remote_rsync_wsl=state.remote_rsync_wsl)
 
                 # Run remote command.
                 #
@@ -1643,7 +1663,7 @@ def main(argv):
                                     and state.graal
                                     and (
                                         'pymupdfpro' in state.packages_build
-                                        or 'layout' in state.packages_build
+                                        or 'pymupdf_layout' in state.packages_build
                                         )
                                     ):
                                 # As of 2025-08-07, pipcl does graal builds by
@@ -1888,16 +1908,17 @@ def main(argv):
                     pipcl.run(f'piprepo build {state.wheelhouse}')
                     packages.append(package)
                     
-                    pipcl.log(f'Contents of: {state.wheelhouse=} are:')
-                    for dirpath, dirnames, filenames in os.walk(state.wheelhouse):
-                        for filename in filenames:
-                            path = os.path.join(dirpath, filename)
-                            st = os.stat(path)
-                            pipcl.log(f'{st=}: {path=}')
-                        for dirname in dirnames:
-                            path_dir = os.path.join(dirpath, dirname)
-                            st = os.stat(path_dir)
-                            pipcl.log(f'{st=}: {path_dir=}')
+                    if 0:
+                        pipcl.log(f'Contents of: {state.wheelhouse=} are:')
+                        for dirpath, dirnames, filenames in os.walk(state.wheelhouse):
+                            for filename in filenames:
+                                path = os.path.join(dirpath, filename)
+                                st = os.stat(path)
+                                pipcl.log(f'{st=}: {path=}')
+                            for dirname in dirnames:
+                                path_dir = os.path.join(dirpath, dirname)
+                                st = os.stat(path_dir)
+                                pipcl.log(f'{st=}: {path_dir=}')
 
             elif command == 'run':
                 for package, command in state.run_commands:
@@ -2097,7 +2118,10 @@ def venv_run(args, path, recreate=True, clean=False):
         assert path.startswith('venv-')
         shutil.rmtree(path, ignore_errors=1)
     if recreate or not os.path.isdir(path):
-        pipcl.run(f'{sys.executable} -m venv {path}')
+        if platform.system() == 'Windows':
+            pipcl.run(f'"{sys.executable}" -m venv {path}')
+        else:
+            pipcl.run(f'{shlex.quote(sys.executable)} -m venv {path}')
     if platform.system() == 'Windows':
         command = f'{path}\\Scripts\\activate && python'
         # shlex not reliable on Windows.
