@@ -2178,6 +2178,7 @@ def git_get(
         env_extra=None,
         update=True,
         submodules=True,
+        devel=1,
         ):
     '''
     Creates/updates local checkout <local> of remote repository and returns
@@ -2542,20 +2543,31 @@ def run(
                     )
 
             class TickerState:
-                def __init__(self):
-                    self.count = 0
-                def increment(self):
-                    c = '-\\|/'[self.count % 4]
-                    if self.count:
-                        sys.stdout.write(f'\b{c}')
-                    else:
-                        sys.stdout.write(c)
+                def __init__(self, format_='time'):
+                    self.format_ = format_
+                    self.current_length = 0
+                    self.rotate_count = 0
+                    self.time_t0 = None
+                def increment(self, t1, t2):
+                    self.rotate_count += 1
+                    rotate_c = '\\|/-'[self.rotate_count % 4]
+                    if self.time_t0 is None:
+                        self.time_t0 = t1
+                    dt = _duration(t2 - self.time_t0)
+                    dt = f'[{rotate_c} {dt}]'
+                    sys.stdout.write('\b' * self.current_length)
+                    sys.stdout.write(dt)
+                    d = self.current_length - len(dt)
+                    if d > 0:
+                        sys.stdout.write(' ' * d + '\b' * d)
+                    self.current_length = len(dt)
                     sys.stdout.flush()
-                    self.count += 1
                 def cancel(self):
-                    if self.count:
-                        sys.stdout.write('\b \b')
-                        self.count = 0
+                    if self.rotate_count:
+                        sys.stdout.write('\b \b' * self.current_length)
+                        self.current_length = 0
+                        self.rotate_count = 0
+                        self.time_t0 = None
             ticker_state = TickerState()
             cleanup.append(ticker_state.cancel)
 
@@ -2567,43 +2579,55 @@ def run(
             decoder = codecs.getincrementaldecoder(child.stdout.encoding)(errors)
             line_start = True
             timed_out = False
-            if timeout or ticker:
-                t = time.time()
-                if timeout:
-                    endtime = t + timeout
+            
+            if ticker:
+                endtime_ticker0 = None
+            if timeout:
+                endtime = time.time() + timeout
             
             while 1:
                 if timeout or ticker:
                     # We need to use a timeout.
+                    t = time.time()
                     if ticker:
-                        endtime_ticker = t + ticker
+                        if endtime_ticker0 is None:
+                            endtime_ticker0 = t
+                        assert t >= endtime_ticker0
+                        endtime_ticker = endtime_ticker0 + ((t - endtime_ticker0) // ticker + 1) * ticker
+                        assert endtime_ticker > endtime_ticker0
+                        assert endtime_ticker > t
+                        assert endtime_ticker <= t + ticker
+                    
                     if ticker and timeout:
                         endtime2 = min(endtime, endtime_ticker) # pylint: disable=possibly-used-before-assignment
                     elif ticker:
                         endtime2 = endtime_ticker
                     else:
                         endtime2 = endtime
+                    
+                    assert endtime2 > t, f'{t=} {endtime2=}'
                     events = selector.select(endtime2 - t)
+                    
+                    t2 = time.time()
                     if not events:
                         # timeout
-                        t2 = time.time()
                         if timeout and t2 >= endtime:
                             child.terminate()
                             timed_out = True
                             break
                         if ticker and t2 >= endtime_ticker:
-                            ticker_state.increment()
-                        t = t2
+                            ticker_state.increment(endtime_ticker0, endtime_ticker)
                         continue
 
                 raw = os.read( child.stdout.fileno(), 10000)
                 text = decoder.decode(raw, final=not raw)
                 if capture:
                     capture_text += text
-                if text:
-                    ticker_state.cancel()
                 # Unhelpfully, ''.split('\n') is [''], not [].
                 if text:
+                    ticker_state.cancel()
+                    endtime_ticker0 = None
+                    # Unhelpfully, ''.split('\n') is [''], not [].
                     lines = text.split('\n')
                     for i, line in enumerate(lines):
                         if line_start:
@@ -3380,13 +3404,15 @@ def _log_prefix(format_, caller):
 _log_text_line_start = True
 _log_f = sys.stdout
 
-def _log(text, level, caller, raw=False, nl=True):
+def _log(text, level, caller, raw=False, nl=True, format_=None):
     '''
     Logs lines with prefix, if <level> is lower or equal to <g_verbose>.
     '''
     
     if level > g_verbose:
         return
+    if format_ is None:
+        format_ = g_log_format
     prefix = None
     global _log_text_line_start
     pos = 0
@@ -3395,7 +3421,7 @@ def _log(text, level, caller, raw=False, nl=True):
             break
         if not raw or _log_text_line_start:
             if prefix is None:
-                prefix = _log_prefix(g_log_format, caller+1)
+                prefix = _log_prefix(format_, caller+1)
             _log_f.write(prefix)
         nlp = text.find('\n', pos)
         if nlp == -1:
