@@ -115,6 +115,9 @@ Args:
             If 1 (the default) we add defaults to CIBW_SKIP such as `pp*` (to
             exclude pypy) and `cp3??t-*` (to exclude free-threading).
         
+        --devel 0|1
+            If 1, output extra information, e.g. backtrace on error.
+        
         -e <name>=<value>
             Set specified environment variable.
         
@@ -210,8 +213,8 @@ Args:
         
         --pytest-path <pytest_path>
             Specify a directory/file/function to test, relative to each project
-            root directory. Can be specified multiple times. Default is the
-            project root directory itself.
+            root directory. Can be specified multiple times. Default is
+            <package_root>/tests/.
 
         --pytest-wrap gdb|valgrind|helgrind
             Run tests under specified tool
@@ -587,7 +590,7 @@ def sync_reverse(
         ssh_command2 += f' {remote}'
     command = (
             f'rsync -aizr'
-            f'{"--stats " if verbose else ""}'
+            f'{" --stats " if verbose else ""}'
             f'--rsh {shlex.quote(ssh_command2)} '
             )
     if filters:
@@ -644,7 +647,7 @@ def sync(remote, remote_dir, path, ssh_command, verbose, *, rsync_path=None, rem
             # Sync the file or directory directly.
             pipcl.log(f'syncing: {path}')
             command += f'{path} :{remote_dir}/'
-        pipcl.run(command, prefix=f'sync {path}: ', out='log')
+        pipcl.run(command, prefix=f'sync {path}: ', out='log', ticker=0.5)
     finally:
         if filenames_path:
             pipcl.fs_remove(filenames_path)
@@ -729,8 +732,17 @@ def package_alias(package):
 
 
 def name_info(package):
-    return g_package_info[package]
-
+    ret = g_package_info.get(package)
+    if ret:
+        return ret
+    ret = {
+            'github_name': None,
+            'git_branch': None,
+            'aliases':  list(),
+            'submodules': True,
+            'order': 0,
+            }
+    return ret
 
 class Arg:
     '''
@@ -919,6 +931,7 @@ def main(argv):
     state.cibw_test_project = None
     state.cibw_test_project_setjmp = False
     state.commands = list()
+    state.devel = False
     state.env_extra = dict()
     state.github_upload = None
     state.graal = False
@@ -951,7 +964,9 @@ def main(argv):
             name = name.text
         if isinstance(location, Arg):
             if not location.text.startswith(('git:', 'pip:')):
+                # Match with local checkouts to help arg completion.
                 for path in glob.glob(f'*/.git/'):
+                    #pipcl.log(f'{path=}')
                     d = path[:-6]
                     if location == d:
                         break
@@ -966,7 +981,12 @@ def main(argv):
         state.packages_build.append(name)
         state.packages_test.append(name)
 
-        keyfn = lambda name: g_package_info[name]['order']
+        def keyfn(name):
+            info = g_package_info.get(name)
+            if info:
+                return info['order']
+            else:
+                return 0
         state.packages_build.sort(key=keyfn)
         state.packages_test.sort(key=keyfn)
     
@@ -1058,6 +1078,9 @@ def main(argv):
 
             elif arg == '--cibw-skip-add-defaults':
                 state.cibw_skip_add_defaults = next(args).as_bool()
+            
+            elif arg == '--devel':
+                state.devel = next(args).as_bool()
 
             elif arg == '-e':
                 _nv = next(args).as_text()
@@ -1247,7 +1270,8 @@ def main(argv):
         elif arg is not None:
             # Print command line with caret showing where error occurred.
             #pipcl.log(f'{args.current=}')
-            #backtrace.show()
+            if state.devel:
+                backtrace.show()
             for i, arg in enumerate(args.argv):
                 sys.stdout.write(f'{" " if i else ""}{shlex.quote(arg)}')
             sys.stdout.write('\n')
@@ -1281,6 +1305,10 @@ def main(argv):
         for suggestion in args.suggestions:
             print(suggestion)
         return 0
+    
+    if not state.devel:
+        # Don't output file:line etc, just output elapsed time.
+        pipcl.g_log_format = '[+%d]: '
     
     if state.verbose:
         pipcl.show_system()
@@ -1352,6 +1380,7 @@ def main(argv):
                         pipcl.run(f'{pyenv_dir}/versions/{graalpy}/bin/graalpy -m venv {venv_name}')
                     e = pipcl.run(f'. {venv_name}/bin/activate && python {shlex.join(sys.argv)}',
                             check=False,
+                            prefix='{venv_name}: ',
                             )
                 else:
                     # Re-run ourselves in a Python venv.
@@ -1687,12 +1716,13 @@ def main(argv):
                             # setup.py is in subdirectory pymupdf4llm/.
                             directory += '/pymupdf4llm'
                         directory_abs = os.path.abspath(directory)
-                        pipcl.log(f'{package=}')
+                        pipcl.log(f'{package=} {directory=}')
                         if package == 'mupdf':
                             state.env_extra['PYMUPDF_SETUP_MUPDF_BUILD'] = directory_abs
                             # fixme: be able to set to '' for system install?
                         else:
-                            pipcl.run(f'pip uninstall -y {package}')
+                            if package:
+                                pipcl.run(f'pip uninstall -y {package}')
                             
                             if state.sdists:
                                 build_sdist(package, directory)
@@ -2168,11 +2198,14 @@ def venv_run(args, path, recreate=True, clean=False):
         # shlex not reliable on Windows.
         # Use crude quoting with "...". Seems to work.
         for arg in args:
-            assert '"' not in arg
-            command += f' "{arg}"'
+            if arg.startswith('"') and arg.endswith('"'):
+                command += f'{arg}'
+            else:
+                assert '"' not in arg, f'{arg=}'
+                command += f' "{arg}"'
     else:
         command = f'. {path}/bin/activate && python {shlex.join(args)}'
-    e = pipcl.run(command, check=0)
+    e = pipcl.run(command, check=0, prefix=f'{path}: ')
     return e
 
 
