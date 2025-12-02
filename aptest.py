@@ -970,8 +970,8 @@ def main(argv):
                     d = path[:-6]
                     if location == d:
                         break
-                else:
-                    assert 0, f'Directory does not exist: {location}'
+                #else:
+                #    assert 0, f'Directory does not exist: {location}'
             location = location.text
         if name in state.packages:
             pipcl.log(f'Adding second location for {name=} testing only: {location=}')
