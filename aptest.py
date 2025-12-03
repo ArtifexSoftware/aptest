@@ -2110,19 +2110,22 @@ def _get_local(package, state, test=False):
     '''
     Returns local directory containing <package> checkout. Returns None if
     location is pip:.
+    
+    test: If true, we return second location if specified.
     '''
-    location, _ = state.packages[package]
-    info = name_info(package)
-    if location.startswith('pip:'):
-        if test:
-            # Use second location of <package> if specified.
-            location, _ = state.packages2.get(package, (None, None))
-            if location is None:
-                return None
+    location = None
+    if test:
+        # Use second location of <package> if specified.
+        location, _ = state.packages2.get(package, (None, None))
+    if location is None:
+        location, _ = state.packages[package]
+        if location:
             pipcl.log(f'Using second specified location for {package=}: {location}')
-        else:
-            return location[4:]
+    
+    if location is None or location.startswith('pip:'):
+        return None
     if location.startswith('git:'):
+        info = name_info(package)
         directory = pipcl.git_get(
                 local=f'aptest-git-{package}',
                 remote=info['git_remote'],
