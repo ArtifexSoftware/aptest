@@ -607,12 +607,13 @@ def sync_reverse(
     pipcl.run(command, prefix=f'reverse sync {path_remote} => {path_local}: ', log=1)
         
 
-def sync(remote, remote_dir, path, ssh_command, verbose, *, rsync_path=None, remote_rsync_wsl=None):
+def sync(remote, remote_dir, path, ssh_command, verbose, state):
     '''
     Syncs <path> to <remote>:<remote_dir>/ using rsync.
+    
+    If <path>/.git is a directory we sync only files known to git.
 
-    If <path>/.git is a directory we sync only files known to git, and return
-    true.
+    Returns true if <path>/.git is a directory.
     '''
     ret = None
     ssh_command2 = f'{ssh_command}'
@@ -623,9 +624,9 @@ def sync(remote, remote_dir, path, ssh_command, verbose, *, rsync_path=None, rem
             f'{"--stats " if verbose else ""}'
             f'--rsh {shlex.quote(ssh_command2)} '
             )
-    if rsync_path:
+    if state.remote_rsync_path:
         command += f'--rsync-path {shlex.quote(rsync_path)} '
-    if remote_rsync_wsl:
+    if state.remote_rsync_wsl:
         command += f'--no-p --rsync-path "wsl rsync" '
     path = os.path.relpath(path)
     path = path.rstrip('/')
@@ -1347,8 +1348,8 @@ def main(argv):
             sys.exit(e)
             
     # Hard-coded ssh/git key paths.
-    pymupdfpro_key_path_leaf = 'thirdparty-so-key'
-    artifex_software_ssh_key = 'artifex-software-ssh-key'
+    path_pro_key = 'thirdparty-so-key'
+    path_artifex_key = 'artifex-software-ssh-key'
     
     if (not remote and state.commands) or remote == '@github':
         if venv:
@@ -1405,12 +1406,15 @@ def main(argv):
     if remote:  # pylint: disable=too-many-nested-blocks
         argv = args.argv[:]
         argv[remote_arg] = ''   # Change `-r github` to `-r ''`. # pylint: disable=used-before-assignment.
+        
         if remote == '@github':
+            # Run on Github.
             pipcl.run('pip install requests')
             branch = f'aptest-{os.environ["USER"]}'    # -{time.strftime("%F-%T")}'
             pipcl.log(f'{branch=}.')
 
             if remote_github_workflow_id:
+                # Wait for existing workflow istead of creating a new one.
                 workflow_id = remote_github_workflow_id
                 remote_github_workflow_package = 'aptest'
                 info = name_info(remote_github_workflow_package)
@@ -1459,7 +1463,7 @@ def main(argv):
                             data,
                             )
                 else:
-                    # Run ourselves on Github, passing argv.
+                    # Run ourselves on Github using test.yml, passing argv.
                     info = name_info('aptest')
                     data = dict(
                             ref = branch,
@@ -1482,6 +1486,7 @@ def main(argv):
                     )
         
         else:
+            # Use rsync/ssh to sync to/run on remote machine.
             verbose = 1
             jumps = None
             if ' ' not in remote:
@@ -1514,27 +1519,27 @@ def main(argv):
                 for package_name, (package_location, args_pos) in list(state.packages.items()) + list(state.packages2.items()):
                     if not package_location.startswith(('git:', 'pip:')):
                         pipcl.log(f'{remote=} {remote_dir=} {package_location=} {ssh_command=}')
-                        if sync(remote, remote_dir, package_location, ssh_command=ssh_command, verbose=verbose, rsync_path=state.remote_rsync_path, remote_rsync_wsl=state.remote_rsync_wsl):
+                        if sync(remote, remote_dir, package_location, ssh_command=ssh_command, verbose=verbose, state=state):
                             git_paths.append(package_location)
                     if package_location.startswith('git:'):
                         sync_artifex_software_ssh_key = True
 
                 # Sync aptest/ checkout.
-                if sync(remote, remote_dir, g_root, ssh_command=ssh_command, verbose=verbose, rsync_path=state.remote_rsync_path, remote_rsync_wsl=state.remote_rsync_wsl):
+                if sync(remote, remote_dir, g_root, ssh_command=ssh_command, verbose=verbose, state=state):
                     git_paths.append(g_root)
 
                 if sync_artifex_software_ssh_key:
-                    if os.path.isfile(artifex_software_ssh_key):
-                        sync(remote, remote_dir, artifex_software_ssh_key, ssh_command=ssh_command, verbose=verbose, rsync_path=state.remote_rsync_path, remote_rsync_wsl=state.remote_rsync_wsl)
+                    if os.path.isfile(path_artifex_key):
+                        sync(remote, remote_dir, path_artifex_key, ssh_command=ssh_command, verbose=verbose, state=state)
                     else:
-                        pipcl.log(f'## Warning: may not be able to remote clone/update pro or layout checkouts because not a file: {artifex_software_ssh_key}')
+                        pipcl.log(f'## Warning: may not be able to remote clone/update pro or layout checkouts because not a file: {path_artifex_key}')
 
                 if 'pymupdfpro' in state.packages_build:
-                    if os.path.isfile(pymupdfpro_key_path_leaf):
-                        sync(remote, remote_dir, pymupdfpro_key_path_leaf, ssh_command=ssh_command, verbose=verbose, rsync_path=state.remote_rsync_path, remote_rsync_wsl=state.remote_rsync_wsl)
+                    if os.path.isfile(path_pro_key):
+                        sync(remote, remote_dir, path_pro_key, ssh_command=ssh_command, verbose=verbose, state=state)
                     else:
-                        pipcl.log(f'## Warning: may not be able to remote build SmartOffice because not a file: {artifex_software_ssh_key}')
-                    sync(remote, remote_dir, pymupdfpro_key_path_leaf, ssh_command=ssh_command, verbose=verbose, rsync_path=state.remote_rsync_path, remote_rsync_wsl=state.remote_rsync_wsl)
+                        pipcl.log(f'## Warning: may not be able to remote build SmartOffice because not a file: {path_artifex_key}')
+                    sync(remote, remote_dir, path_pro_key, ssh_command=ssh_command, verbose=verbose, state=state)
 
                 # Run remote command.
                 #
@@ -1611,14 +1616,14 @@ def main(argv):
         ARTIFEX_SOFTWARE_SSH_KEY = os.environ.get('ARTIFEX_SOFTWARE_SSH_KEY')
         if ARTIFEX_SOFTWARE_SSH_KEY:
             # Write to temp file.
-            temp_key_path = f'{artifex_software_ssh_key}-tmp'
+            temp_key_path = f'{path_artifex_key}-tmp'
             paths_to_delete.append(temp_key_path)
             fs_write_key(temp_key_path, ARTIFEX_SOFTWARE_SSH_KEY)
             state.ssh_key_path_abs = os.path.abspath(temp_key_path)
-        elif os.path.isfile(artifex_software_ssh_key):
-            state.ssh_key_path_abs = os.path.abspath(artifex_software_ssh_key)
+        elif os.path.isfile(path_artifex_key):
+            state.ssh_key_path_abs = os.path.abspath(path_artifex_key)
         else:
-            pipcl.log(f'## May not be able to clone/update/test pymupdfpro/layout because ARTIFEX_SOFTWARE_SSH_KEY unset and file {artifex_software_ssh_key!r} does not exist')
+            pipcl.log(f'## May not be able to clone/update/test pymupdfpro/layout because ARTIFEX_SOFTWARE_SSH_KEY unset and file {path_artifex_key!r} does not exist')
             state.ssh_key_path_abs = None
         if state.ssh_key_path_abs:
             # We need to use forward slashes on Windows.
@@ -1636,7 +1641,7 @@ def main(argv):
             pipcl.log(f'PYMUPDFPRO_SETUP_SOT_KEY is set.')
         else:
             # With non-github builds we rely on this file existing.
-            PYMUPDFPRO_SETUP_SOT_KEY_PATH = os.path.abspath(pymupdfpro_key_path_leaf)
+            PYMUPDFPRO_SETUP_SOT_KEY_PATH = os.path.abspath(path_pro_key)
             if os.path.isfile(PYMUPDFPRO_SETUP_SOT_KEY_PATH):
                 state.env_extra['PYMUPDFPRO_SETUP_SOT_KEY_PATH'] = PYMUPDFPRO_SETUP_SOT_KEY_PATH
                 pipcl.log(f'Using {PYMUPDFPRO_SETUP_SOT_KEY_PATH=}.')
