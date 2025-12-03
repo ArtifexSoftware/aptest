@@ -926,43 +926,51 @@ def main(argv):
     ticker = 0.5
     
     class State:
-        pass
+        _frozen = False # So self._frozen exists at start of __init__().
+        def __init__(self):
+            self.build_type = None
+            self.cibw_name = 'cibuildwheel'
+            self.cibw_pyodide = None
+            self.cibw_pyodide_version = None
+            self.cibw_skip_add_defaults = True
+            self.cibw_test_project = None
+            self.cibw_test_project_setjmp = False
+            self.commands = list()
+            self.devel = False
+            self.env_extra = dict()
+            self.github_upload = None
+            self.graal = False
+            self.os_names = list()
+            self.packages = dict()   # map from name to location.
+            self.packages2 = dict()   # map from name to location.
+            self.packages_build = list() # Sorted list of names.
+            self.packages_test = list()  # Sorted list of names.
+            self.pybind = False
+            self.pytest_options = ''
+            self.pytest_paths = list()
+            self.pytest_wrap = None
+            self.remote_github_yml = None
+            self.remote_github_yml_inputs = None
+            self.remote_rsync_path = None
+            self.remote_rsync_wsl = False
+            self.run_commands = list()
+            self.sdists = False
+            self.ssh_key_path_abs = None
+            self.swig = None
+            self.swig_quick = None
+            self.system_packages = True if os.environ.get('GITHUB_ACTIONS') == 'true' else False   # pylint: disable=simplifiable-if-expression
+            self.system_site_packages = False
+            self.test_extra_packages = list()
+            self.valgrind = False
+            self.verbose = 0
+            self.wheelhouse = 'aptest-wheelhouse'
+            self._frozen = True
+        def __setattr__(self, name, value):
+            if self._frozen:
+                assert hasattr(self, name), f'Unrecognised state {name=}.'
+            super.__setattr__(self, name, value)
+    
     state = State()
-    state.build_type = None
-    state.cibw_name = 'cibuildwheel'
-    state.cibw_pyodide = None
-    state.cibw_pyodide_version = None
-    state.cibw_skip_add_defaults = True
-    state.cibw_test_project = None
-    state.cibw_test_project_setjmp = False
-    state.commands = list()
-    state.devel = False
-    state.env_extra = dict()
-    state.github_upload = None
-    state.graal = False
-    state.os_names = list()
-    state.packages = dict()   # map from name to location.
-    state.packages2 = dict()   # map from name to location.
-    state.packages_build = list() # Sorted list of names.
-    state.packages_test = list()  # Sorted list of names.
-    state.pybind = False
-    state.pytest_options = ''
-    state.pytest_paths = list()
-    state.pytest_wrap = None
-    state.remote_github_yml = None
-    state.remote_github_yml_inputs = None
-    state.remote_rsync_path = None
-    state.remote_rsync_wsl = False
-    state.run_commands = list()
-    state.sdists = False
-    state.swig = None
-    state.swig_quick = None
-    state.system_packages = True if os.environ.get('GITHUB_ACTIONS') == 'true' else False   # pylint: disable=simplifiable-if-expression
-    state.system_site_packages = False
-    state.test_extra_packages = list()
-    state.valgrind = False
-    state.verbose = 0
-    state.wheelhouse = 'aptest-wheelhouse'
     
     def add_package(name, location, args_pos):
         if isinstance(name, Arg):
