@@ -2483,50 +2483,49 @@ def run(
         ticker = False
     
     cleanup = list()
-    
-    if out:
-        if isinstance(out, tuple):
-            out = list(out)
-        elif not isinstance(out, list):
-            out = [out]
-        else:
-            out = out.copy()
-    else:
-        out = list()
-    if log:
-        out.append('log')
-    if not out:
-        out = ['log']
-    
-    if tee:
-        assert not os.path.exists(tee), f'Tee file already exists: {tee}'
-        tee_f = open(tee, 'w')  # pylint: disable=consider-using-with
-        cleanup.append(tee_f.close)
-        out.append(tee_f)
-    
-    # Convert `out` into list of (write, flush) callables.
-    for i, o in enumerate(out):
-        if callable(o):
-            out[i] = (o, lambda: None)
-        elif o == 'log':
-            write2 = lambda text: _log(text, level=0, caller=caller+3, raw=True)
-            out[i] = (write2, None)
-            def log_cleanup():
-                if not _log_text_line_start:
-                    write2('\n')
-            cleanup.append(log_cleanup)
-        else:
-            out[i] = (o.write, o.flush)
-    
-    def write(text):
-        for write2, _flush2 in out:
-            write2(text)
-    def flush():
-        for _write2, flush2 in out:
-            if flush2:
-                flush2()
-    
     try:
+        if out:
+            if isinstance(out, tuple):
+                out = list(out)
+            elif not isinstance(out, list):
+                out = [out]
+            else:
+                out = out.copy()
+        else:
+            out = list()
+        if log:
+            out.append('log')
+        if not out:
+            out = ['log']
+
+        if tee:
+            assert not os.path.exists(tee), f'Tee file already exists: {tee}'
+            tee_f = open(tee, 'w')  # pylint: disable=consider-using-with
+            cleanup.append(tee_f.close)
+            out.append(tee_f)
+
+        # Convert `out` into list of (write, flush) callables.
+        for i, o in enumerate(out):
+            if callable(o):
+                out[i] = (o, lambda: None)
+            elif o == 'log':
+                write2 = lambda text: _log(text, level=0, caller=caller+3, raw=True)
+                out[i] = (write2, None)
+                def log_cleanup():
+                    if not _log_text_line_start:
+                        write2('\n')
+                cleanup.append(log_cleanup)
+            else:
+                out[i] = (o.write, o.flush)
+
+        def write(text):
+            for write2, _flush2 in out:
+                write2(text)
+        def flush():
+            for _write2, flush2 in out:
+                if flush2:
+                    flush2()
+
         if prefix or ticker or out!=[sys.stdout]:
             # Use explicit read loop from child process.
             if platform.system() == 'Windows':
@@ -2542,34 +2541,9 @@ def run(
                     env=env,
                     )
 
-            class TickerState:
-                def __init__(self, format_='time'):
-                    self.format_ = format_
-                    self.current_length = 0
-                    self.rotate_count = 0
-                    self.time_t0 = None
-                def increment(self, t1, t2):
-                    self.rotate_count += 1
-                    rotate_c = '\\|/-'[self.rotate_count % 4]
-                    if self.time_t0 is None:
-                        self.time_t0 = t1
-                    dt = _duration(t2 - self.time_t0)
-                    dt = f'[{rotate_c} {dt}]'
-                    sys.stdout.write('\b' * self.current_length)
-                    sys.stdout.write(dt)
-                    d = self.current_length - len(dt)
-                    if d > 0:
-                        sys.stdout.write(' ' * d + '\b' * d)
-                    self.current_length = len(dt)
-                    sys.stdout.flush()
-                def cancel(self):
-                    if self.rotate_count:
-                        sys.stdout.write('\b \b' * self.current_length)
-                        self.current_length = 0
-                        self.rotate_count = 0
-                        self.time_t0 = None
-            ticker_state = TickerState()
-            cleanup.append(ticker_state.cancel)
+            if ticker:
+                ticker_state = _TickerState()
+                cleanup.append(ticker_state.cancel)
 
             if timeout or ticker:
                 selector = selectors.DefaultSelector()
@@ -2625,7 +2599,8 @@ def run(
                     capture_text += text
                 # Unhelpfully, ''.split('\n') is [''], not [].
                 if text:
-                    ticker_state.cancel()
+                    if ticker:
+                        ticker_state.cancel()
                     endtime_ticker0 = None
                     # Unhelpfully, ''.split('\n') is [''], not [].
                     lines = text.split('\n')
@@ -2641,7 +2616,8 @@ def run(
                     flush()
                 if not raw:
                     break
-            ticker_state.cancel()
+            if ticker:
+                ticker_state.cancel()
             if not line_start:
                 write('\n')
             e = child.wait()
@@ -2936,6 +2912,41 @@ def _macos_fixup_platform_tag(tag):
 
 # Internal helpers.
 #
+
+class _TickerState:
+    '''
+    Helper for ticker in pipcl.run().
+    '''
+    def __init__(self):
+        self.current_length = 0
+        self.rotate_count = 0
+        self.time_t0 = None
+    
+    def increment(self, t1, t2):
+        '''
+        Update the ticker display.
+        t1: Start time; only used if we were not already showing ticker.
+        t2: Current time to show.
+        '''
+        self.rotate_count += 1
+        rotate_c = '\\|/-'[self.rotate_count % 4]
+        if self.time_t0 is None:
+            self.time_t0 = t1
+        dt = _duration(t2 - self.time_t0)
+        dt = f'[{rotate_c} {dt}]'
+        tail_len = max(0, self.current_length - len(dt))
+        tail = ' ' * tail_len + '\b' * tail_len
+        sys.stdout.write('\b' * self.current_length + dt + tail)
+        self.current_length = len(dt)
+        sys.stdout.flush()
+    def cancel(self):
+        if self.rotate_count:
+            sys.stdout.write('\b \b' * self.current_length)
+            sys.stdout.flush()
+            self.current_length = 0
+            self.rotate_count = 0
+            self.time_t0 = None
+
 
 def _command_lines( command):
     '''
