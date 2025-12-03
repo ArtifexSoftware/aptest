@@ -15,7 +15,7 @@ Python packages together.
 ### Package locations
 
 * Build from local checkout.
-* Build from specific branch or tag on remote git repository.
+* Build from specific branch, tag or sha on remote git repository.
 * Install directly from pypi.org.
 
 See `-i` option, or aliases `-m`, `-p`, `-P` and `-l`.
@@ -23,9 +23,9 @@ See `-i` option, or aliases `-m`, `-p`, `-P` and `-l`.
 
 ### Run in different places
 
-* Local machine
-* Remote machine (uses ssh/rsync).
-* Github runner (pushes to unique(ish) branches and runs a workflow).
+* Local machine.
+* Remote machine (with ssh/rsync).
+* Github runner (push to unique(ish) branches and run a workflow).
 
 See the `-r` option.
 
@@ -36,7 +36,7 @@ For each package:
 * The package is built as a wheel using `pip wheel`. This will typically
   take place in an internal pip venv.
 * The wheel is installed into the current venv.
-* The wheel is added to a pypip-style PEP-503 internal package repository.
+* The wheel is added to a local pypi-style PEP-503 package repository.
 * We use pip's `--extra-index-url` option to refer to our internal package
   repository.
 * Thus pip will use previously built wheels as prerequisites, as required.
@@ -45,9 +45,9 @@ For each package:
 ### Test
 
 * We run tests in the current venv for each package, using pytest.
-* Packages on pypi.org do not contain test suites, but one can test with
-  a separate package location, for example a local checkout or remote git
-  repository.
+* Packages on pypi.org do not contain test suites, but one can specify a second
+  package location to be used for testing, for example a local checkout or
+  remote git repository.
 
 
 ### Build/test with cibuildwheel
