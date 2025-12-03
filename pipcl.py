@@ -2531,6 +2531,7 @@ def run(
             if platform.system() == 'Windows':
                 # The `selectors` module does not support pipes.
                 assert not timeout, 'timeout with (prefix or out) not supported on Windows'
+            
             child = subprocess.Popen(   # pylint: disable=consider-using-with
                     command2,
                     shell=True,
@@ -2541,68 +2542,27 @@ def run(
                     env=env,
                     )
 
-            if ticker:
-                ticker_state = _TickerState()
-                cleanup.append(ticker_state.cancel)
-
-            if timeout or ticker:
-                selector = selectors.DefaultSelector()
-                selector.register(child.stdout.fileno(), selectors.EVENT_READ)
             if capture:
                 capture_text = ''
             decoder = codecs.getincrementaldecoder(child.stdout.encoding)(errors)
             line_start = True
             timed_out = False
             
-            if ticker:
-                endtime_ticker0 = None
-            if timeout:
-                endtime = time.time() + timeout
+            waiter = _Wait(child.stdout.fileno(), ticker, timeout)
+            cleanup.append(waiter.close)
             
             while 1:
-                if timeout or ticker:
-                    # We need to use a timeout.
-                    t = time.time()
-                    if ticker:
-                        if endtime_ticker0 is None:
-                            endtime_ticker0 = t
-                        assert t >= endtime_ticker0
-                        endtime_ticker = endtime_ticker0 + ((t - endtime_ticker0) // ticker + 1) * ticker
-                        assert endtime_ticker > endtime_ticker0
-                        assert endtime_ticker > t
-                        assert endtime_ticker <= t + ticker
-                    
-                    if ticker and timeout:
-                        endtime2 = min(endtime, endtime_ticker) # pylint: disable=possibly-used-before-assignment
-                    elif ticker:
-                        endtime2 = endtime_ticker
-                    else:
-                        endtime2 = endtime
-                    
-                    assert endtime2 > t, f'{t=} {endtime2=}'
-                    events = selector.select(endtime2 - t)
-                    
-                    t2 = time.time()
-                    if not events:
-                        # timeout
-                        if timeout and t2 >= endtime:
-                            child.terminate()
-                            timed_out = True
-                            break
-                        if ticker and t2 >= endtime_ticker:
-                            ticker_state.increment(endtime_ticker0, endtime_ticker)
-                        continue
+                if waiter.wait():
+                    child.terminate()
+                    timed_out = True
+                    break
 
                 raw = os.read( child.stdout.fileno(), 10000)
                 text = decoder.decode(raw, final=not raw)
-                if capture:
-                    capture_text += text
-                # Unhelpfully, ''.split('\n') is [''], not [].
                 if text:
-                    if ticker:
-                        ticker_state.cancel()
-                    endtime_ticker0 = None
-                    # Unhelpfully, ''.split('\n') is [''], not [].
+                    waiter.cancel_ticker()
+                    if capture:
+                        capture_text += text
                     lines = text.split('\n')
                     for i, line in enumerate(lines):
                         if line_start:
@@ -2616,8 +2576,7 @@ def run(
                     flush()
                 if not raw:
                     break
-            if ticker:
-                ticker_state.cancel()
+            waiter.cancel_ticker()
             if not line_start:
                 write('\n')
             e = child.wait()
@@ -2912,6 +2871,79 @@ def _macos_fixup_platform_tag(tag):
 
 # Internal helpers.
 #
+
+class _Wait:
+    def __init__(self, fd, ticker, timeout):
+        '''
+        Helper when reading output from child process.
+        fd: child's output.
+        ticker: ticker period, or false for no ticker.
+        timeout: .
+        '''
+        self.fd = fd
+        self.ticker = ticker
+        if ticker:
+            self.ticker_state = _TickerState()
+        self.endtime = time.time() + timeout if timeout else None
+        self.ticker_start = None
+        self.selector = selectors.DefaultSelector()
+        self.selector.register(fd, selectors.EVENT_READ)
+    
+    def wait(self):
+        '''
+        Waits for output or timeout or ticker-related timeout. Updates ticker
+        as required.
+
+        Returns true if original timeout exceeded, else None.
+
+        After we return, the caller should call .cancel_ticker() if it reads
+        non-empty output.
+        '''
+        if not self.endtime and not self.ticker:
+            return
+        while 1:
+            # We need to use a timeout.
+            t = time.time()
+            if self.ticker:
+                if self.ticker_start is None:
+                    self.ticker_start = t
+                assert t >= self.ticker_start
+                endtime_ticker = self.ticker_start + ((t - self.ticker_start) // self.ticker + 1) * self.ticker
+                assert endtime_ticker > self.ticker_start
+                assert endtime_ticker > t
+                assert endtime_ticker <= t + self.ticker
+
+            if self.ticker and self.endtime:
+                endtime2 = min(self.endtime, endtime_ticker) # pylint: disable=possibly-used-before-assignment
+            elif self.ticker:
+                endtime2 = endtime_ticker
+            else:
+                endtime2 = endtime
+
+            assert endtime2 > t, f'{t=} {endtime2=}'
+            events = self.selector.select(endtime2 - t)
+
+            if events:
+                # Data is available.
+                return
+            else:
+                # timeout
+                t2 = time.time()
+                if self.endtime and t2 >= self.endtime:
+                    return True
+                if self.ticker and t2 >= endtime_ticker:
+                    self.ticker_state.increment(self.ticker_start, endtime_ticker)
+                continue
+    
+    def cancel_ticker(self):
+        self.ticker_start = None
+        if self.ticker:
+            self.ticker_state.cancel()
+    
+    def close(self):
+        self.cancel_ticker()
+        self.selector.close()
+    
 
 class _TickerState:
     '''
