@@ -183,7 +183,7 @@ Args:
         
         --mupdf <location>
         -m <location>
-            Aliases for `-i mupdf <location>
+            Aliases for `-i mupdf <location>`.
         
         -o <os_names>
             Control which OS's we run on. If current OS is not in
@@ -192,21 +192,21 @@ Args:
         
         --pymupdf <location>
         -p <location>
-            Aliases for `-i pymupdf <location>
+            Aliases for `-i pymupdf <location>`.
         
         --pymupdfpro <location>
         --pro <location>
         -P <location>
-            Aliases for `-i pymupdfpro <location>
+            Aliases for `-i pymupdfpro <location>`.
         
         --pymupdf4llm <location>
         --4llm <location>
-            Aliases for `-i pymupdf4llm <location>
+            Aliases for `-i pymupdf4llm <location>`.
         
         --pymupdf_layout <location>
         --layout <location>
         -l <location>
-            Aliases for `-i pymupdf_layout <location>
+            Aliases for `-i pymupdf_layout <location>`.
         
         --pytest <pytest-flags>
             Specify pytest flags, for example `--pytest '-k test_123'`.
@@ -234,9 +234,12 @@ Args:
                   by -i, -m, -p etc) to branches called `aptest-$USER`in the
                   equivalent repositories in github.com/ArtifexSoftware/.
                 
-                * Warning: if local checkouts have uncommited changes, they are
-                  pushed as temporary commits; unfortuntaely this will forget
-                  about newly added files.
+                * Warning: this will make git forget about any new files that
+                  have been added but not yet commited.
+
+                  This is because we currently push any uncommited changes as a
+                  temporary commit, then use `git reset HEAD~1` to restore git
+                  state.
 
                 * We rerun the aptest.py command on Github machines, changing
                   -i, -m etc args to use git: to refer to the above
@@ -500,6 +503,7 @@ import traceback
 import backtrace
 
 
+# Get improved display of exceptions and stacktraces.
 backtrace.exception_hook_install()
 
 g_root_abs = os.path.abspath( f'{__file__}/..')
@@ -528,7 +532,7 @@ def cibw_cp(*version_minors):
     return ' '.join(ret)
 
 
-def git_push(path, repository, remote_branch, tmpcommit=True, doit=True):
+def git_push(path, repository, remote_branch, state, *, tmpcommit=True, doit=True):
     '''
     Pushes <path> to <repository> (or 'origin' if None).
     
@@ -548,10 +552,10 @@ def git_push(path, repository, remote_branch, tmpcommit=True, doit=True):
                 pipcl.log(f'Temporary commit failed. {diff=}.')
                 raise
     try:
-        #pipcl.run(f'cd {path} && GIT_SSH_COMMAND="ssh -i ~/.ssh/id_rsa2" git push -fv {repository} HEAD:{remote_branch}')
         pipcl.run(
-                f'cd {path} && GIT_SSH_COMMAND="ssh -i ~/.ssh/id_rsa2" git push -fv {repository or "origin"} HEAD:{remote_branch}',
+                f'cd {path} && git push -fv {repository or "origin"} HEAD:{remote_branch}',
                 prefix='git push: ',
+                env_extra=state.env_extra,
                 )
     finally:
         if tmpcommit and diff:
@@ -1412,7 +1416,7 @@ def main(argv):
                 info = name_info(remote_github_workflow_package)
             else:
                 # Push ourselves to Git.
-                git_push(g_root, 'git@github.com:ArtifexSoftware/aptest.git', branch)
+                git_push(g_root, 'git@github.com:ArtifexSoftware/aptest.git', branch, state)
 
                 # Push specified local package repository to Github and update args to
                 # point to new location.
@@ -1423,7 +1427,7 @@ def main(argv):
                         info = name_info(package_name)
                         pipcl.log(f'{package_name=}.')
                         pipcl.log(f'{info["git_remote"]=}.')
-                        git_push(package_location, info["git_remote"], branch)
+                        git_push(package_location, info["git_remote"], branch, state)
                         argv[args_pos] = f'git:-b {branch} {info["git_remote"]}'
 
                 if state.remote_github_yml:
@@ -1622,8 +1626,6 @@ def main(argv):
             GIT_SSH_COMMAND = f'ssh -i {ssh_key_path_abs} -o StrictHostKeyChecking=no'
             state.env_extra['GIT_SSH_COMMAND'] = GIT_SSH_COMMAND
             #pipcl.log(f'Using {GIT_SSH_COMMAND=}.')
-            #APTEST_SSH_KEY = os.path.abspath(key_path)
-            #state.env_extra['APTEST_SSH_KEY'] = APTEST_SSH_KEY
 
     if 'pymupdfpro' in state.packages_build:
         # The SmartOffice build requires remote git access.
@@ -2117,10 +2119,10 @@ def _get_local(package, state, test=False):
     if test:
         # Use second location of <package> if specified.
         location, _ = state.packages2.get(package, (None, None))
-    if location is None:
-        location, _ = state.packages[package]
         if location:
             pipcl.log(f'Using second specified location for {package=}: {location}')
+    if location is None:
+        location, _ = state.packages[package]
     
     if location is None or location.startswith('pip:'):
         return None
