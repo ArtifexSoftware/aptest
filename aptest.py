@@ -422,8 +422,6 @@ Args:
             If CIBW_ARCHS is unset we set $CIBW_ARCHS_WINDOWS, $CIBW_ARCHS_MACOS
             and $CIBW_ARCHS_LINUX to auto64 if they are unset.
 
-        gnn
-            Train pymupdf_layout GNN model.
         run
             Runs commands specified by `--run` within checkouts.
         
@@ -1232,7 +1230,7 @@ def main(argv):
             elif arg.startswith('-'):
                 assert 0, f'Unrecognised option: {arg=}.'
 
-            elif arg in ('build', 'cibw', 'gnn', 'run', 'test'):
+            elif arg in ('build', 'cibw', 'run', 'test'):
                 state.commands.append(arg)
 
             else:
@@ -1846,7 +1844,10 @@ def main(argv):
                 # Build wheels for each package with cibuildwheel, adding to wheelhouse,
                 # and using piprepo to update a local pypi-style tree.
                 
-                pipcl.run(f'pip install --upgrade --force-reinstall {state.cibw_name}', prefix=f'pip install {state.cibw_name}: ')
+                pipcl.run(
+                        f'pip install --upgrade --force-reinstall {state.cibw_name}',
+                        prefix=f'pip install {state.cibw_name}: ',
+                        )
 
                 # Some general flags.
                 if 'CIBW_BUILD_VERBOSITY' not in state.env_extra:
@@ -1980,7 +1981,8 @@ def main(argv):
                         
                         PYMUPDFPRO_SETUP_SOT_KEY_PATH = env_extra.get('PYMUPDFPRO_SETUP_SOT_KEY_PATH')
                         if PYMUPDFPRO_SETUP_SOT_KEY_PATH:
-                            env_extra['PYMUPDFPRO_SETUP_SOT_KEY_PATH'] = f'{prefix}{os.path.abspath(PYMUPDFPRO_SETUP_SOT_KEY_PATH)}'
+                            env_extra['PYMUPDFPRO_SETUP_SOT_KEY_PATH'] = \
+                                    f'{prefix}{os.path.abspath(PYMUPDFPRO_SETUP_SOT_KEY_PATH)}'
                     else:
                         prefix = ''
                     
@@ -2001,7 +2003,8 @@ def main(argv):
                     # install prerequisite packages, it also looks in
                     # state.wheelhouse. PIP_EXTRA_INDEX_URL is equivalent to
                     # pip's `--extra-index-url`.
-                    env_extra['PIP_EXTRA_INDEX_URL'] = f'file://{prefix}{os.path.abspath(state.wheelhouse)}/simple'.replace('\\', '/')
+                    env_extra['PIP_EXTRA_INDEX_URL'] = \
+                            f'file://{prefix}{os.path.abspath(state.wheelhouse)}/simple'.replace('\\', '/')
                     
                     env_extra['CIBW_BUILD'] = CIBW_BUILD
                     
@@ -2016,7 +2019,8 @@ def main(argv):
                     env_extra['CIBW_ENVIRONMENT_PASS_LINUX'] = CIBW_ENVIRONMENT_PASS_LINUX
 
                     pipcl.run(
-                            f'cd {directory} && cibuildwheel{cibw_pyodide_args} --output-dir {os.path.abspath(state.wheelhouse)}',
+                            f'cd {directory} && cibuildwheel{cibw_pyodide_args}'
+                                f' --output-dir {os.path.abspath(state.wheelhouse)}',
                             env_extra=env_extra,
                             prefix=f'cibw {package}: ',
                             )
