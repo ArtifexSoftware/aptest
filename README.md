@@ -114,8 +114,8 @@ stdout.
 
 * Or write into relevant files with:
 
-  ` aptest/aptest.py completion >/etc/bash_completion.d/aptest.py.bash_completion`
-  `aptest/aptest.py completion >> ~/.bash_completion
+  * `./aptest/aptest.py completion > /etc/bash_completion.d/aptest.py.bash_completion`
+  * `./aptest/aptest.py completion >> ~/.bash_completion`.
   
   See Bash's `help complete` for more information.
 
