@@ -422,6 +422,8 @@ Args:
             If CIBW_ARCHS is unset we set $CIBW_ARCHS_WINDOWS, $CIBW_ARCHS_MACOS
             and $CIBW_ARCHS_LINUX to auto64 if they are unset.
 
+        gnn
+            Train pymupdf_layout GNN model.
         run
             Runs commands specified by `--run` within checkouts.
         
@@ -1230,7 +1232,7 @@ def main(argv):
             elif arg.startswith('-'):
                 assert 0, f'Unrecognised option: {arg=}.'
 
-            elif arg in ('build', 'cibw', 'run', 'test'):
+            elif arg in ('build', 'cibw', 'gnn', 'run', 'test'):
                 state.commands.append(arg)
 
             else:
@@ -1524,30 +1526,53 @@ def main(argv):
             if remote_do:
                 git_paths = list()
                 sync_artifex_software_ssh_key = False
-                for package_name, (package_location, args_pos) in list(state.packages.items()) + list(state.packages2.items()):
+                
+                def sync2(path):
+                    return sync(
+                            remote,
+                            remote_dir,
+                            path,
+                            ssh_command=ssh_command,
+                            verbose=verbose,
+                            state=state,
+                            )
+                
+                # Sync each package.
+                all_packages = list(state.packages.items()) + list(state.packages2.items())
+                for package_name, (package_location, args_pos) in all_packages:
                     if not package_location.startswith(('git:', 'pip:')):
                         pipcl.log(f'{remote=} {remote_dir=} {package_location=} {ssh_command=}')
-                        if sync(remote, remote_dir, package_location, ssh_command=ssh_command, verbose=verbose, state=state):
+                        if sync2(package_location):
                             git_paths.append(package_location)
                     if package_location.startswith('git:'):
                         sync_artifex_software_ssh_key = True
 
-                # Sync aptest/ checkout.
-                if sync(remote, remote_dir, g_root, ssh_command=ssh_command, verbose=verbose, state=state):
+                # Sync aptest itself.
+                if sync2(g_root):
                     git_paths.append(g_root)
 
+                # Sync Artifex github key.
                 if sync_artifex_software_ssh_key:
                     if os.path.isfile(path_artifex_key):
-                        sync(remote, remote_dir, path_artifex_key, ssh_command=ssh_command, verbose=verbose, state=state)
+                        sync2(path_artifex_key)
                     else:
-                        pipcl.log(f'## Warning: may not be able to remote clone/update pro or layout checkouts because not a file: {path_artifex_key}')
+                        pipcl.log(
+                                f'## Warning: may not be able to remote'
+                                f' clone/update pro or layout checkouts'
+                                f' because not a file: {path_artifex_key}'
+                                )
 
+                # Sync pymupdfpro build key.
                 if 'pymupdfpro' in state.packages_build:
                     if os.path.isfile(path_pro_key):
-                        sync(remote, remote_dir, path_pro_key, ssh_command=ssh_command, verbose=verbose, state=state)
+                        sync2(path_pro_key)
                     else:
-                        pipcl.log(f'## Warning: may not be able to remote build SmartOffice because not a file: {path_artifex_key}')
-                    sync(remote, remote_dir, path_pro_key, ssh_command=ssh_command, verbose=verbose, state=state)
+                        pipcl.log(
+                                f'## Warning: may not be able to remote build'
+                                f' SmartOffice because not a file:'
+                                f' {path_artifex_key}'
+                                )
+                    sync2(path_pro_key)
 
                 # Run remote command.
                 #
@@ -1631,7 +1656,11 @@ def main(argv):
         elif os.path.isfile(path_artifex_key):
             state.ssh_key_path_abs = os.path.abspath(path_artifex_key)
         else:
-            pipcl.log(f'## May not be able to clone/update/test pymupdfpro/layout because ARTIFEX_SOFTWARE_SSH_KEY unset and file {path_artifex_key!r} does not exist')
+            pipcl.log(
+                    f'## May not be able to clone/update/test pymupdfpro/layout'
+                    f' because ARTIFEX_SOFTWARE_SSH_KEY unset and file'
+                    f' {path_artifex_key!r} does not exist'
+                    )
             state.ssh_key_path_abs = None
         if state.ssh_key_path_abs:
             # We need to use forward slashes on Windows.
@@ -1654,12 +1683,17 @@ def main(argv):
                 state.env_extra['PYMUPDFPRO_SETUP_SOT_KEY_PATH'] = PYMUPDFPRO_SETUP_SOT_KEY_PATH
                 pipcl.log(f'Using {PYMUPDFPRO_SETUP_SOT_KEY_PATH=}.')
             else:
-                pipcl.log(f'## May not be able to build pymupdfpro because PYMUPDFPRO_SETUP_SOT_KEY unset and file {PYMUPDFPRO_SETUP_SOT_KEY_PATH!r} does not exist')
+                pipcl.log(
+                        f'## May not be able to build pymupdfpro because'
+                        f' PYMUPDFPRO_SETUP_SOT_KEY unset and file'
+                        f' {PYMUPDFPRO_SETUP_SOT_KEY_PATH!r} does not exist'
+                        )
     
     def build_sdist(package, directory):
         if package == 'pymupdf':
             pipcl.run(
-                    f'cd {directory} && python setup.py -d {os.path.abspath(state.wheelhouse)} sdist',
+                    f'cd {directory}'
+                        f' && python setup.py -d {os.path.abspath(state.wheelhouse)} sdist',
                     prefix='sdist {package}: ',
                     )
     
