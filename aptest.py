@@ -91,8 +91,9 @@ Args:
                 -b -mupdf,-pymupdf_layout
                     Removes mupdf and layout from list of packages to build.
             
-            If 'mupdf' is removed, we set PYMUPDF_SETUP_MUPDF_REBUILD=0 so
-            pymupdf will not rebuild its mupdf.
+            If 'mupdf' was specified as a package but has been removed here, we
+            set PYMUPDF_SETUP_MUPDF_REBUILD=0 so pymupdf will not rebuild its
+            mupdf.
         
         --build-type debug|memento|release
             Set build type. Default is relese.
@@ -422,6 +423,8 @@ Args:
             If CIBW_ARCHS is unset we set $CIBW_ARCHS_WINDOWS, $CIBW_ARCHS_MACOS
             and $CIBW_ARCHS_LINUX to auto64 if they are unset.
 
+        gnn
+            Train pymupdf_layout GNN model.
         run
             Runs commands specified by `--run` within checkouts.
         
@@ -734,6 +737,7 @@ def package_alias(package):
     for fullname, info in g_package_info.items():
         if package in [fullname] + info['aliases']:
             return fullname
+    #return package
 
 
 def name_info(package):
@@ -1003,24 +1007,33 @@ def main(argv):
         state.packages_build.sort(key=keyfn)
         state.packages_test.sort(key=keyfn)
     
-    def apply_deltas(items, deltas, check=1):
+    def apply_deltas(items, deltas, check=1, aliasfn=lambda name: name):
+        #pipcl.log(f'{items=} {deltas=}')
         if deltas and not deltas[0].startswith(('+', '-')):
             del items[:]
+            #pipcl.log(f'{items=} {deltas=}')
+            
         for delta in deltas:
+            #pipcl.log(f'{delta=}')
             if delta == '-':
                 del items[:]
+                #pipcl.log(f'{items=}')
             elif delta.startswith('-'):
                 try:
-                    items.remove(package_alias(delta[1:]))
+                    items.remove(aliasfn(delta[1:]))
                 except Exception:
-                    pipcl.log(f'Failed to remove {delta[1:]=} from {items=}')
+                    #pipcl.log(f'Failed to remove {delta[1:]=} from {items=}')
                     if check:
                         raise
+                #pipcl.log(f'{items=}')
             else:
                 if delta.startswith('+'):
                     delta = delta[1:]
-                delta = package_alias(delta)
+                    #pipcl.log(f'{delta=}')
+                delta = aliasfn(delta)
+                #pipcl.log(f'{delta=}')
                 items.append(delta)
+                #pipcl.log(f'{items=}')
     
     # Parse args and update the above state. We do this before moving into a
     # venv, partly so we can return errors immediately.
@@ -1074,7 +1087,7 @@ def main(argv):
 
             elif arg == '-b':
                 _names = next(args).as_text().split(',')
-                apply_deltas(state.packages_build, _names)
+                apply_deltas(state.packages_build, _names, aliasfn=package_alias)
 
             elif arg == '--build-type':
                 state.build_type = next(args)
@@ -1118,7 +1131,7 @@ def main(argv):
 
             elif arg == '-o':
                 state.os_names += next(args).as_text().lower().split(',')
-                names = ('linux', 'windows', 'darwin')
+                names = ('linux', 'windows', 'darwin', 'openbsd')
                 for os_name in state.os_names:
                     assert os_name in names, f'{os_name=} should be one of {names!r}.'
 
@@ -1134,7 +1147,7 @@ def main(argv):
 
             elif arg == '-t':
                 _names = next(args).as_text().split(',')
-                apply_deltas(state.packages_test, _names)
+                apply_deltas(state.packages_test, _names, aliasfn=package_alias)
 
             elif arg == '--pybind':
                 state.pybind = next(args).as_bool()
@@ -1230,7 +1243,7 @@ def main(argv):
             elif arg.startswith('-'):
                 assert 0, f'Unrecognised option: {arg=}.'
 
-            elif arg in ('build', 'cibw', 'run', 'test'):
+            elif arg in ('build', 'cibw', 'gnn', 'run', 'test'):
                 state.commands.append(arg)
 
             else:
@@ -1335,11 +1348,11 @@ def main(argv):
         os_self = platform.system().lower()
         oss = [os_self]
         #pipcl.log(f'{oss=}')
-        apply_deltas(oss, state.os_names, check=0)
         #pipcl.log(f'{state.os_names=}')
-        #pipcl.log(f'{os_self=}')
+        apply_deltas(oss, state.os_names, check=0)
+        #pipcl.log(f'{oss=}')
         if os_self not in oss:
-            pipcl.log(f'Not running on {os_self=}: {state.os_names=}')
+            pipcl.log(f'Not running on {os_self=}: {state.os_names=} {oss=}')
             return
     
     # Rerun with different python if `--python` is specified.
@@ -1411,6 +1424,56 @@ def main(argv):
     
     os.makedirs(state.wheelhouse, exist_ok=1)
         
+    # Set environment variables to give access to required git repositories.
+    #
+    paths_to_delete = list()
+    if 1:
+        # Allow access to private github.com/ArtifexSoftware/* repositories.
+        
+        # On Github ARTIFEX_SOFTWARE_SSH_KEY is set from repository secret.
+        ARTIFEX_SOFTWARE_SSH_KEY = os.environ.get('ARTIFEX_SOFTWARE_SSH_KEY')
+        if ARTIFEX_SOFTWARE_SSH_KEY:
+            # Write to temp file.
+            temp_key_path = f'{path_artifex_key}-tmp'
+            paths_to_delete.append(temp_key_path)
+            fs_write_key(temp_key_path, ARTIFEX_SOFTWARE_SSH_KEY)
+            state.ssh_key_path_abs = os.path.abspath(temp_key_path)
+        elif os.path.isfile(path_artifex_key):
+            state.ssh_key_path_abs = os.path.abspath(path_artifex_key)
+        else:
+            pipcl.log(
+                    f'## May not be able to clone/update/test pymupdfpro/layout'
+                    f' because ARTIFEX_SOFTWARE_SSH_KEY unset and file'
+                    f' {path_artifex_key!r} does not exist'
+                    )
+            state.ssh_key_path_abs = None
+        if state.ssh_key_path_abs:
+            # We need to use forward slashes on Windows.
+            ssh_key_path_abs = state.ssh_key_path_abs.replace('\\', '/')
+            GIT_SSH_COMMAND = f'ssh -i {ssh_key_path_abs} -o StrictHostKeyChecking=no'
+            state.env_extra['GIT_SSH_COMMAND'] = GIT_SSH_COMMAND
+            #pipcl.log(f'Using {GIT_SSH_COMMAND=}.')
+
+    if 'pymupdfpro' in state.packages_build:
+        # The SmartOffice build requires remote git access.
+        
+        # On Github PYMUPDFPRO_SETUP_SOT_KEY is set from repository secret.
+        PYMUPDFPRO_SETUP_SOT_KEY = os.environ.get('PYMUPDFPRO_SETUP_SOT_KEY')
+        if PYMUPDFPRO_SETUP_SOT_KEY:
+            pipcl.log(f'PYMUPDFPRO_SETUP_SOT_KEY is set.')
+        else:
+            # With non-github builds we rely on this file existing.
+            PYMUPDFPRO_SETUP_SOT_KEY_PATH = os.path.abspath(path_pro_key)
+            if os.path.isfile(PYMUPDFPRO_SETUP_SOT_KEY_PATH):
+                state.env_extra['PYMUPDFPRO_SETUP_SOT_KEY_PATH'] = PYMUPDFPRO_SETUP_SOT_KEY_PATH
+                pipcl.log(f'Using {PYMUPDFPRO_SETUP_SOT_KEY_PATH=}.')
+            else:
+                pipcl.log(
+                        f'## May not be able to build pymupdfpro because'
+                        f' PYMUPDFPRO_SETUP_SOT_KEY unset and file'
+                        f' {PYMUPDFPRO_SETUP_SOT_KEY_PATH!r} does not exist'
+                        )
+    
     if remote:  # pylint: disable=too-many-nested-blocks
         argv = args.argv[:]
         argv[remote_arg] = ''   # Change `-r github` to `-r ''`. # pylint: disable=used-before-assignment.
@@ -1637,56 +1700,6 @@ def main(argv):
         state.env_extra['PYMUPDFPRO_SETUP_SWIG'] = swig_binary
         state.env_extra['PYMUPDF_LAYOUT_SETUP_SWIG'] = swig_binary
     
-    # Set environment variables to give access to required git repositories.
-    #
-    paths_to_delete = list()
-    if 1:
-        # Allow access to private github.com/ArtifexSoftware/* repositories.
-        
-        # On Github ARTIFEX_SOFTWARE_SSH_KEY is set from repository secret.
-        ARTIFEX_SOFTWARE_SSH_KEY = os.environ.get('ARTIFEX_SOFTWARE_SSH_KEY')
-        if ARTIFEX_SOFTWARE_SSH_KEY:
-            # Write to temp file.
-            temp_key_path = f'{path_artifex_key}-tmp'
-            paths_to_delete.append(temp_key_path)
-            fs_write_key(temp_key_path, ARTIFEX_SOFTWARE_SSH_KEY)
-            state.ssh_key_path_abs = os.path.abspath(temp_key_path)
-        elif os.path.isfile(path_artifex_key):
-            state.ssh_key_path_abs = os.path.abspath(path_artifex_key)
-        else:
-            pipcl.log(
-                    f'## May not be able to clone/update/test pymupdfpro/layout'
-                    f' because ARTIFEX_SOFTWARE_SSH_KEY unset and file'
-                    f' {path_artifex_key!r} does not exist'
-                    )
-            state.ssh_key_path_abs = None
-        if state.ssh_key_path_abs:
-            # We need to use forward slashes on Windows.
-            ssh_key_path_abs = state.ssh_key_path_abs.replace('\\', '/')
-            GIT_SSH_COMMAND = f'ssh -i {ssh_key_path_abs} -o StrictHostKeyChecking=no'
-            state.env_extra['GIT_SSH_COMMAND'] = GIT_SSH_COMMAND
-            #pipcl.log(f'Using {GIT_SSH_COMMAND=}.')
-
-    if 'pymupdfpro' in state.packages_build:
-        # The SmartOffice build requires remote git access.
-        
-        # On Github PYMUPDFPRO_SETUP_SOT_KEY is set from repository secret.
-        PYMUPDFPRO_SETUP_SOT_KEY = os.environ.get('PYMUPDFPRO_SETUP_SOT_KEY')
-        if PYMUPDFPRO_SETUP_SOT_KEY:
-            pipcl.log(f'PYMUPDFPRO_SETUP_SOT_KEY is set.')
-        else:
-            # With non-github builds we rely on this file existing.
-            PYMUPDFPRO_SETUP_SOT_KEY_PATH = os.path.abspath(path_pro_key)
-            if os.path.isfile(PYMUPDFPRO_SETUP_SOT_KEY_PATH):
-                state.env_extra['PYMUPDFPRO_SETUP_SOT_KEY_PATH'] = PYMUPDFPRO_SETUP_SOT_KEY_PATH
-                pipcl.log(f'Using {PYMUPDFPRO_SETUP_SOT_KEY_PATH=}.')
-            else:
-                pipcl.log(
-                        f'## May not be able to build pymupdfpro because'
-                        f' PYMUPDFPRO_SETUP_SOT_KEY unset and file'
-                        f' {PYMUPDFPRO_SETUP_SOT_KEY_PATH!r} does not exist'
-                        )
-    
     def build_sdist(package, directory):
         if package == 'pymupdf':
             pipcl.run(
@@ -1740,7 +1753,7 @@ def main(argv):
                     directory = _get_local('mupdf', state)
                     if directory:
                         state.env_extra['PYMUPDF_SETUP_MUPDF_BUILD'] = os.path.abspath(directory)
-                if 'mupdf' not in state.packages_build:
+                if 'mupdf' in state.packages and 'mupdf' not in state.packages_build:
                     PYMUPDF_SETUP_MUPDF_REBUILD = '0'
                     pipcl.log(f'Setting {PYMUPDF_SETUP_MUPDF_REBUILD=}')
                     state.env_extra['PYMUPDF_SETUP_MUPDF_REBUILD'] = PYMUPDF_SETUP_MUPDF_REBUILD
@@ -2041,6 +2054,69 @@ def main(argv):
                                 st = os.stat(path_dir)
                                 pipcl.log(f'{st=}: {path_dir=}')
 
+            elif command == 'gnn':
+                pipcl.log(f'Install CUDA from; https://developer.nvidia.com/cuda-12-1-0-download-archive')
+                layout_location, _ = state.packages['pymupdf_layout']
+                # We need torch-2.5.1, which supports max python version 3.12 on Windows.
+                #pipcl.run(f'pip install --upgrade cuda-python')
+                #pipcl.run(f'pip install --upgrade datasets')
+                #pipcl.run(f'pip install torch')
+                
+                #pipcl.run(f'pip install torch==2.5.1')
+                #pipcl.run(f'pip install torch-scatter')
+                pipcl.run(f'python -m pip install -U pip')
+                
+                # https://pytorch.org/get-started/previous-versions/
+                # v2.5.1
+                # CUDA 12.1
+                #
+
+                #pipcl.run(f'pip install -v torch-scatter --extra-index-url https://download.pytorch.org/whl/cu121')
+                #pipcl.run(f'pip install -v torch-scatter --index-url https://data.pyg.org/whl/')
+                
+                if 0:
+                    pipcl.run(f'pip install torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cu121', prefix='install torch: ')
+                    # NVCC_PREPEND_FLAGS='-allow-unsupported-compiler' is from
+                    # https://docs.nvidia.com/cuda/cuda-compiler-driver-nvcc/index.html,
+                    # to avoid C:\Program Files\NVIDIA GPU Computing
+                    # Toolkit\CUDA\v12.1\include\crt/host_config.h:153: #if
+                    # _MSC_VER < 1910 || _MSC_VER >= 1940, - VS 2022 can have
+                    # _MSC_VER as high as 1944 for VS 2022 17.14.
+                    #
+                    pipcl.run(f'pip install -v --no-build-isolation torch-scatter', prefix='install torch-scatter: ',
+                            env_extra=dict(NVCC_PREPEND_FLAGS='-allow-unsupported-compiler'),
+                            )
+                    # we end up with:
+                    # C:/Program Files/Microsoft Visual Studio/2022/Professional/VC/Tools/MSVC/14.44.35207/include\yvals_core.h(902):
+                    # error: static assertion failed with "error STL1002: Unexpected compiler version, expected CUDA 12.4 or newer."
+                
+                if 0:
+                    # Using cuda-13.1
+                    pipcl.run(f'pip install -v --no-build-isolation torch-scatter', prefix='install torch-scatter: ')
+                    # error:
+                    # The detected CUDA version (13.1) mismatches the version that was used to compile
+                    # PyTorch (12.1). Please make sure to use the same CUDA versions.
+                
+                if 1:
+                    pipcl.run('pip install -v torch')
+                    pipcl.run('pip install -v --no-build-isolation torch-scatter')
+                
+                pipcl.run(f'pip install -r {layout_location}/train/requirements.txt')
+                
+                pipcl.run(f'pip install datasets')
+                pipcl.run(f'pip install huggingface_hub')
+                import datasets
+                import huggingface_hub
+                
+                pipcl.log(f'huggingface_hub.list_datasets():')
+                for dataset in huggingface_hub.list_datasets():
+                    pipcl.log(f'    {dataset.id=}')
+
+                #doclaynet_core = datasets.load_dataset('doclaynet_core')
+                #doclaynet_core = datasets.load_dataset('doclaynet_extra')
+                
+                
+            
             elif command == 'run':
                 for package, command in state.run_commands:
                     directory = _get_local(package, state)
@@ -2308,6 +2384,7 @@ if __name__ == '__main__':
             # Terminate relatively quietly, failed commands will usually have
             # generated diagnostics.
             pipcl.log(f'{e}')
+            raise
             sys.exit(1)
         # Other exceptions should not happen, and will generate a full Python
         # backtrace etc here.
