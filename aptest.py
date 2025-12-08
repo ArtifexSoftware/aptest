@@ -157,14 +157,19 @@ Args:
             location:
                 `pip:`
                     Install from pypi.org using pip.
-                `pip:==<version>`
-                    Install specified version from pypi.org.
-                    Doesn't really work because if another project needs a
+                `pip:*.whl`
+                `pip:*.tgz`
+                    Install from specified 
+                `pip:<version>|<location>`
+                    Install specified version from pypi.org or from location of
+                    wheel/sdist (ending with .whl or .tar.gz).
+                    Doesn't work generally because if another project needs a
                     newer version, pip will install again from pypi.prg.
                 `'git:[-b <branch>] [-t <tag>] [<remote>]'`
                     Clone/update from git remote into local checkout
                     `aptest-git-<package-name>`, optionally overriding default
                     branch/tag/remote.
+                    
                 <local-dir>
                     Local directory, typically a git checkout.
             
@@ -491,6 +496,7 @@ Environment:
         Filename to use for completion diagnostics.
 '''
 
+import github
 import glob
 import os
 import platform
@@ -944,6 +950,7 @@ def main(argv):
             self.env_extra = dict()
             self.github_upload = None
             self.graal = False
+            self.huggingface_key_path_abs = None
             self.os_names = list()
             self.packages = dict()   # map from name to location.
             self.packages2 = dict()   # map from name to location.
@@ -1371,6 +1378,7 @@ def main(argv):
     # Hard-coded ssh/git key paths.
     path_pro_key = 'thirdparty-so-key'
     path_artifex_key = 'artifex-software-ssh-key'
+    path_huggingface_key = 'huggingface-key'
     
     if (not remote and state.commands) or remote == '@github':
         if venv:
@@ -1453,6 +1461,16 @@ def main(argv):
             GIT_SSH_COMMAND = f'ssh -i {ssh_key_path_abs} -o StrictHostKeyChecking=no'
             state.env_extra['GIT_SSH_COMMAND'] = GIT_SSH_COMMAND
             #pipcl.log(f'Using {GIT_SSH_COMMAND=}.')
+        
+        HUGGINGFACE_KEY = os.environ.get('ARTIFEX_HUGGINGFACE_KEY')
+        if HUGGINGFACE_KEY:
+            # Write to temp file.
+            temp_key_path = f'{path_huggingface_key}-tmp'
+            paths_to_delete.append(temp_key_path)
+            fs_write_key(temp_key_path, HUGGINGFACE_KEY)
+            state.huggingface_keys_path_abs = os.path.abspath(temp_key_path)
+        elif os.path.isfile(path_huggingface_key):
+            state.huggingface_key_path_abs = os.path.abspath(path_huggingface_key)
 
     if 'pymupdfpro' in state.packages_build:
         # The SmartOffice build requires remote git access.
@@ -1623,6 +1641,17 @@ def main(argv):
                                 f' because not a file: {path_artifex_key}'
                                 )
 
+                # Sync Huggingface key.
+                if 'gnn' in state.commands:
+                    if os.path.isfile(path_huggingface_key):
+                        sync2(path_huggingface_key)
+                    else:
+                        pipcl.log(
+                                f'## Warning: may not be able to remote'
+                                f' use Huggingface because not a file:'
+                                f' {path_huggingface_key}'
+                                )
+
                 # Sync pymupdfpro build key.
                 if 'pymupdfpro' in state.packages_build:
                     if os.path.isfile(path_pro_key):
@@ -1764,7 +1793,11 @@ def main(argv):
                         continue
                     if location.startswith('pip:'):
                         assert package != 'mupdf', f'Not a package on pypi.org: {package}'
-                        name = f'{package}{location[4:]}'
+                        name = location[4:]
+                        if name.endswith(('.whl', '.tar.gz')):
+                            pass
+                        else:
+                            name = f'{package}{name}'
                         # Get wheel from pypi.org and put into our wheelhouse
                         # so it is available for later builds. Then install;
                         # pip uses a cache so will not download twice.
@@ -1861,6 +1894,7 @@ def main(argv):
                         f'pip install --upgrade --force-reinstall {state.cibw_name}',
                         prefix=f'pip install {state.cibw_name}: ',
                         )
+                pipcl.run(f'pip install --upgrade pytest')
 
                 # Some general flags.
                 if 'CIBW_BUILD_VERBOSITY' not in state.env_extra:
@@ -1955,17 +1989,24 @@ def main(argv):
 
                     # Tell cibuildwheel how to test <package>.
                     if package in state.packages_test:
-                        CIBW_TEST_COMMAND = f'python {{project}}/scripts/test.py test'
-                        if state.pytest_options:
-                            if package == 'pymupdf':
-                                CIBW_TEST_COMMAND += f' -p {shlex.quote(state.pytest_options)}'
-                            elif package == 'pymupdfpro':
-                                CIBW_TEST_COMMAND += f' -t {shlex.quote(state.pytest_options)}'
-                            elif package == 'pymupdf_layout':
-                                CIBW_TEST_COMMAND += f' -t {shlex.quote(state.pytest_options)}'
-                            else:
-                                pipcl.log(f'Unable to add {state.pytest_options=} to CIBW_TEST_COMMAND.')
-                        state.env_extra['CIBW_TEST_COMMAND'] = CIBW_TEST_COMMAND
+                        if 0:
+                            CIBW_TEST_COMMAND = f'python {{project}}/scripts/test.py test'
+                            if state.pytest_options:
+                                if package == 'pymupdf':
+                                    CIBW_TEST_COMMAND += f' -p {shlex.quote(state.pytest_options)}'
+                                elif package == 'pymupdfpro':
+                                    CIBW_TEST_COMMAND += f' -t {shlex.quote(state.pytest_options)}'
+                                elif package == 'pymupdf_layout':
+                                    CIBW_TEST_COMMAND += f' -t {shlex.quote(state.pytest_options)}'
+                                else:
+                                    pipcl.log(f'Unable to add {state.pytest_options=} to CIBW_TEST_COMMAND.')
+                            state.env_extra['CIBW_TEST_COMMAND'] = CIBW_TEST_COMMAND
+                        else:
+                            CIBW_TEST_COMMAND = f'pip install --upgrade pytest && pytest'
+                            if state.pytest_options:
+                                CIBW_TEST_COMMAND += f' {state.pytest_options}'
+                            CIBW_TEST_COMMAND += f' {{project}}/tests'
+                            state.env_extra['CIBW_TEST_COMMAND'] = CIBW_TEST_COMMAND
                                 
                     else:
                         pipcl.log(f'Not testing because not in state.packages_test: {package=}')
@@ -2057,23 +2098,27 @@ def main(argv):
             elif command == 'gnn':
                 pipcl.log(f'Install CUDA from; https://developer.nvidia.com/cuda-12-1-0-download-archive')
                 layout_location, _ = state.packages['pymupdf_layout']
-                # We need torch-2.5.1, which supports max python version 3.12 on Windows.
-                #pipcl.run(f'pip install --upgrade cuda-python')
-                #pipcl.run(f'pip install --upgrade datasets')
-                #pipcl.run(f'pip install torch')
                 
-                #pipcl.run(f'pip install torch==2.5.1')
-                #pipcl.run(f'pip install torch-scatter')
-                pipcl.run(f'python -m pip install -U pip')
-                
-                # https://pytorch.org/get-started/previous-versions/
-                # v2.5.1
-                # CUDA 12.1
-                #
+                # Old things.
+                if 0:
+                    if 0:
+                        # We need torch-2.5.1, which supports max python version 3.12 on Windows.
+                        #pipcl.run(f'pip install --upgrade cuda-python')
+                        #pipcl.run(f'pip install --upgrade datasets')
+                        #pipcl.run(f'pip install torch')
 
-                #pipcl.run(f'pip install -v torch-scatter --extra-index-url https://download.pytorch.org/whl/cu121')
-                #pipcl.run(f'pip install -v torch-scatter --index-url https://data.pyg.org/whl/')
-                
+                        #pipcl.run(f'pip install torch==2.5.1')
+                        #pipcl.run(f'pip install torch-scatter')
+                        pipcl.run(f'python -m pip install -U pip')
+
+                        # https://pytorch.org/get-started/previous-versions/
+                        # v2.5.1
+                        # CUDA 12.1
+                        #
+
+                        #pipcl.run(f'pip install -v torch-scatter --extra-index-url https://download.pytorch.org/whl/cu121')
+                        #pipcl.run(f'pip install -v torch-scatter --index-url https://data.pyg.org/whl/')
+
                 if 0:
                     pipcl.run(f'pip install torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cu121', prefix='install torch: ')
                     # NVCC_PREPEND_FLAGS='-allow-unsupported-compiler' is from
@@ -2097,23 +2142,140 @@ def main(argv):
                     # The detected CUDA version (13.1) mismatches the version that was used to compile
                     # PyTorch (12.1). Please make sure to use the same CUDA versions.
                 
-                if 1:
-                    pipcl.run('pip install -v torch')
-                    pipcl.run('pip install -v --no-build-isolation torch-scatter')
+                # pytorch-scatter does not specify torch as a build-time prerequisite. This is
+                # deliberate because they say that usually needs to be built with
+                # a specific torch.
+                #
+                # I don't understand this. The only way to make things work
+                # is to install the latest versions on pypi.prg, and build
+                # torch-scatter without isolation so that it can build with
+                # the installed torch.
+                pipcl.run('pip install -v torch')
+                pipcl.run('pip install -v --no-build-isolation torch-scatter')
                 
                 pipcl.run(f'pip install -r {layout_location}/train/requirements.txt')
                 
                 pipcl.run(f'pip install datasets')
-                pipcl.run(f'pip install huggingface_hub')
+                pipcl.run(f'pip install huggingface_hub[hf_xet]')
                 import datasets
                 import huggingface_hub
                 
-                pipcl.log(f'huggingface_hub.list_datasets():')
-                for dataset in huggingface_hub.list_datasets():
-                    pipcl.log(f'    {dataset.id=}')
+                if 0:
+                    # List all huggingface datasets.
+                    pipcl.log(f'huggingface_hub.list_datasets():')
+                    for dataset in huggingface_hub.list_datasets():
+                        pipcl.log(f'    {dataset.id=}')
 
-                #doclaynet_core = datasets.load_dataset('doclaynet_core')
-                #doclaynet_core = datasets.load_dataset('doclaynet_extra')
+                if 1:
+                
+                    # Set up as described in
+                    # https://github.com/ArtifexSoftware/sce/wiki/How-to-train-GNN
+                    
+                    # Download zip files.
+                    pipcl.run('pip install --upgrade requests')
+                    url_doclaynet_core_zip = 'https://codait-cos-dax.s3.us.cloud-object-storage.appdomain.cloud/dax-doclaynet/1.0.0/DocLayNet_core.zip'
+                    url_doclaynet_extra_zip = 'https://codait-cos-dax.s3.us.cloud-object-storage.appdomain.cloud/dax-doclaynet/1.0.0/DocLayNet_extra.zip'
+                    
+                    def download(url):
+                        path = os.path.basename(url)
+                        if os.path.exists(path):
+                            pipcl.log(f'Already exists: {path=}')
+                        else:
+                            github._gh_download(url, path, gh=0)
+                    download(url_doclaynet_core_zip)
+                    download(url_doclaynet_extra_zip)
+                    
+                    def marker_ok(marker, infile=None):
+                        if os.path.exists(marker):
+                            mtime_marker = os.stat(marker).st_mtime
+                            mtime_infile = os.stat(infile).st_mtime if infile else 0
+                            if mtime_marker > mtime_infile:
+                                pipcl.log(f'Already up to date: {marker=}.')
+                                return 1
+                    
+                    def marker_create(maker):
+                        with open(marker, 'w'):
+                            pass
+                        pipcl.log(f'Have created {marker=}.')
+                    
+                    def ensure_unzip(url, directory):
+                        '''
+                        Unzips leafname(url) into <directory> if it has not
+                        already been done.
+
+                        If marker file exists and is newer than zip file,
+                        does nothing. Otherwise unzips leafname(url) into
+                        <directory> and creates marker file.
+                        '''
+                        path_zip = os.path.basename(url)
+                        marker = f'{directory}/_marker_{path_zip}'
+                        if marker_ok(marker, path_zip):
+                            return
+                        #if os.path.exists(marker):
+                        #    mtime_marker = os.stat(marker).st_mtime
+                        #    mtime_zip = os.stat(path_zip).st_mtime
+                        #    if mtime_marker >= mtime_zip:
+                        #        pipcl.log(f'Already up to date: {marker=}.')
+                        #    return
+                        import zipfile
+                        pipcl.log(f'Opening {path_zip=}')
+                        with zipfile.ZipFile(path_zip) as z:
+                            pipcl.log(f'Extacting {path_zip=} into {directory=}.')
+                            os.makedirs(directory, exist_ok=1)
+                            z.extractall(directory)
+                        marker_create(maker)
+                    
+                    if 1:
+                        # Unzip.
+                        ensure_unzip(url_doclaynet_core_zip, 'gnn/datasets/DocLayNet')
+                        ensure_unzip(url_doclaynet_extra_zip, 'gnn/datasets/DocLayNet')
+                    
+                    if 1:
+                        # Generate PKL.
+                        
+                        marker_pkl = 'gnn/_marker_pkl'
+                        if marker_ok(marker_pkl):
+                            pass
+                        else:
+                            pipcl.run(f'{sys.executable}'
+                                    f' {layout_location}/train/tools/make_pkl_data_from_COCO_json.py'
+                                    f' --json gnn/datasets/DocLayNet/COCO/train.json'
+                                    f' --img_dir gnn/datasets/DocLayNet/PNG'
+                                    f' --save_dir gnn/workspace/pkl_data/train'
+                                    )
+                            with open(marker_pkl, 'w'):
+                                pipcl.log(f'Have created {marker_pkl=}.')
+                        
+                        marker_pkl_validation = 'gnn/_marker_pkl_validation'
+                        if marker_ok(marker_pkl_validation):
+                            pass
+                        else:
+                            pipcl.run(f'{sys.executable}'
+                                    f' {layout_location}/train/tools/make_pkl_data_from_COCO_json.py'
+                                    f' --json gnn/datasets/DocLayNet/COCO/val.json'
+                                    f' --img_dir gnn/datasets/DocLayNet/PNG'
+                                    f' --save_dir gnn/workspace/pkl_data/val'
+                                    )
+                            with open(marker_pkl_validation, 'w'):
+                                pipcl.log(f'Have created {marker_pkl_validation=}.')
+                    
+                if 0:
+                
+                    #doclaynet_core = datasets.load_dataset('doclaynet_core')
+                    #doclaynet_core = datasets.load_dataset('doclaynet_extra')
+                    # From https://huggingface.co/datasets/pierreguillou/DocLayNet-large:
+                
+                    # Get data using huggingface_hub.snapshot_download().
+                    # From https://huggingface.co/datasets/pierreguillou/DocLayNet-large.
+                    dataset_id='pierreguillou/DocLayNet-large'
+
+                    huggingface_key = None
+                    if state.huggingface_key_path_abs:
+                        with open(state.huggingface_key_path_abs) as f:
+                            huggingface_key = f.read().strip()
+
+                    pipcl.log(f'huggingface_hub.snapshot_download()')
+                    huggingface_hub.snapshot_download(dataset_id, token=huggingface_key, repo_type='dataset', max_workers=1)
                 
                 
             
