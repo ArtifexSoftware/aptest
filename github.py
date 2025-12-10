@@ -40,7 +40,7 @@ def _gh_headers(headers=None):
     return headers
 
 
-def _gh_download(url, path):
+def _gh_download(url, path, *, gh=True):
     '''
     Downloads from github URL to local file.
     
@@ -49,6 +49,9 @@ def _gh_download(url, path):
             URL from which to download.
         path:
             Local path for downloaded data.
+        gh:
+            If false we do not assume github, instead using requests.get()
+            directly with no special headers.
     
     * We ask user for username/token and retry if we get an error.
     * We do not leave partial downloads in place - we write to `path+'_'` then
@@ -64,16 +67,20 @@ def _gh_download(url, path):
     pipcl.log('Downloading:')
     pipcl.log(f'    from: {url=}')
     pipcl.log(f'    to: {path}')
-    r = _gh_get(url, stream=True, raise_for_status=False)
-    if r.status_code == 403:
-        username = input('username ? ')
-        password = getpass.getpass('password ? ')
-        _gh_get(url, stream=True, raise_for_status=False, auth=(username, password))
-    try:
-        r.raise_for_status()
-    except Exception as e:
-        # r.json() can have useful info about the error.
-        raise Exception(str(r.json())) from e
+    if gh:
+        r = _gh_get(url, stream=True, raise_for_status=False)
+        if r.status_code == 403:
+            username = input('username ? ')
+            password = getpass.getpass('password ? ')
+            _gh_get(url, stream=True, raise_for_status=False, auth=(username, password))
+        try:
+            r.raise_for_status()
+        except Exception as e:
+            # r.json() can have useful info about the error.
+            raise Exception(str(r.json())) from e
+    else:
+        import requests # pylint: disable=import-outside-toplevel
+        r = requests.get(url, stream=True)
     t0 = t1 = time.time()
     bytes_ = 0
     with open(path_, 'wb') as f:
