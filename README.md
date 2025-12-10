@@ -72,7 +72,9 @@ For each package:
     creating an unbounded number of temporary branches.
 
 
-### Ssh keys
+### Keys/tokens
+
+#### Github/ArtifexSoftware ssh key
 
 We allow specification of a custom ssh private key to push to and/or access
 git@github.com:PyMuPDF/PyMuPDF and repositories within git@github.com:Artifex/.
@@ -83,14 +85,21 @@ git@github.com:PyMuPDF/PyMuPDF and repositories within git@github.com:Artifex/.
 * We run ssh with `StrictHostKeyChecking=no`, which may end up writing to
   .ssh/known_hosts.
 
-We also allow specification of a custom ssh private key that allows access to
-the SmartOffice repository; this is required when PyMuPDFPro builds SmartOffice
+#### Smartoffice ssh key
+
+We allow specification of a custom ssh private key that allows access to the
+SmartOffice repository; this is required when PyMuPDFPro builds SmartOffice
 because of how the SmartOffice build system works.
   
 * If required, this key should be provided in file `thirdparty-so-key` in the
   current directory.
 
-Use of keys with remote runs:
+#### Huggingface token
+
+If required, this token should be provided in file `huggingface-key` in the
+current directory.
+
+#### Use of keys with remote runs
 
 * If the `-r` option is used to defer to a remote machine, the key files are
   copied to the remote machine. This obviously has security implications.
