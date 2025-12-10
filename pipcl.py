@@ -2082,7 +2082,7 @@ def fs_remove(path):
     except Exception:
         pass
     shutil.rmtree(path, ignore_errors=1)
-    assert not os.path.exists(path)
+    assert not os.path.exists(path), f'Path still exists after deletion: {path!r}.'
 
 
 def fs_remove_dir_contents(path):
