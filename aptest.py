@@ -429,12 +429,25 @@ Args:
             and $CIBW_ARCHS_LINUX to auto64 if they are unset.
 
         gnn
-            Train pymupdf_layout GNN model.
+            Download and extract dataset for pymupdf_layout GNN model. Does not
+            do unnecessary downloads or extracts.
+        
         run
             Runs commands specified by `--run` within checkouts.
         
         test
             Runs pytest tests.
+        
+        test-gnn
+            [untested]
+            Test GNN model.
+        
+        test-gnn-pymupdf_layout
+            [untested]
+            Test GNN model via pymupdf_layout.
+        
+        test-gnn-pymupdf4llm
+            Test GNN model via pymupdf4llm.
     
     Other:
     
@@ -1250,7 +1263,7 @@ def main(argv):
             elif arg.startswith('-'):
                 assert 0, f'Unrecognised option: {arg=}.'
 
-            elif arg in ('build', 'cibw', 'gnn', 'run', 'test'):
+            elif arg in ('build', 'cibw', 'gnn', 'run', 'test', 'test-gnn', 'test-gnn-pymupdf_layout', 'test-gnn-pymupdf4llm'):
                 state.commands.append(arg)
 
             else:
@@ -2259,6 +2272,39 @@ def main(argv):
                             with open(marker_pkl_validation, 'w'):
                                 pipcl.log(f'Have created {marker_pkl_validation=}.')
                     
+                    if 0:
+                        # Doesn't work - No such file or directory: 'gnn/workspace/checkpoints/model.yaml.
+                        pipcl.run(f'pip install --upgrade torchvision')
+                        pipcl.run(
+                                f'{sys.executable} {layout_location}/train/tools/test_gnn.py {layout_location}/train/cfgs/config.yaml',
+                                env_extra=dict(PYTHONPATH=layout_location),
+                                )
+                    if 1:
+                        pipcl.run(f'pip install --upgrade torchvision')
+                        layout_location_abs = os.path.abspath(layout_location)
+                        pipcl.run(
+                                f'cd gnn && {sys.executable} {layout_location_abs}/train/tools/test_gnn.py {layout_location_abs}/train/cfgs/config.yaml',
+                                env_extra=dict(PYTHONPATH=layout_location_abs),
+                                )
+                
+                if 0:
+                    # Simple timing test.
+                    path = 'gnn/datasets/DocLayNet/PDF/00c3405f0fc4afb2f068640dd840d6300d407a33a988b47465377afc8d438105.pdf'
+                    import pymupdf.layout
+                    import pymupdf4llm
+                    
+                    import importlib.metadata
+                    
+                    layout_version = importlib.metadata.version('pymupdf_layout')
+                    its = 10
+                    t = time.time()
+                    for i in range(its):
+                        pipcl.log(f'{i=}')
+                        with pymupdf.open(path) as document:
+                            md = pymupdf4llm.to_markdown(document)
+                    t = time.time() - t
+                    pipcl.log(f'{layout_version=} {path=} {its=}: {t=:,}')
+                
                 if 0:
                 
                     #doclaynet_core = datasets.load_dataset('doclaynet_core')
@@ -2276,8 +2322,29 @@ def main(argv):
 
                     pipcl.log(f'huggingface_hub.snapshot_download()')
                     huggingface_hub.snapshot_download(dataset_id, token=huggingface_key, repo_type='dataset', max_workers=1)
+            
+            elif command.startswith('test-gnn'):
+                layout_location = _get_local('pymupdf_layout', state)
                 
+                def run(command):
+                    t = time.time()
+                    try:
+                        pipcl.run(command)
+                    finally:
+                        t = time.time() - t
+                        pipcl.log(f'Command took {pipcl._duration(t)}.')
+                    
+                if command == 'test-gnn':
+                    run(f'cd {layout_location} && {sys.executable} eval/eval_gnn.py --pdf_dir ../gnn/datasets/DocLayNet/PDF')
+
+                elif command == 'test-gnn-pymupdf_layout':
+                    run(f'cd {layout_location} && {sys.executable} eval/eval_pymupdf_layout.py --pdf_dir ../gnn/datasets/DocLayNet/PDF')
+
+                elif command == 'test-gnn-pymupdf4llm':
+                    run(f'cd {layout_location} && {sys.executable} eval/eval_pymupdf4llm.py --pdf_dir ../gnn/datasets/DocLayNet/PDF')
                 
+                else:
+                    assert 0, f'Unrecognised command: {command=}'
             
             elif command == 'run':
                 for package, command in state.run_commands:
