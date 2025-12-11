@@ -109,6 +109,21 @@ current directory.
   access.
 
 
+### Using DocLayNet dataset
+
+The 'gnn' command downloads/extracts the DocLayNet dataset as described in
+https://github.com/ArtifexSoftware/sce/wiki/How-to-train-GNN.
+Downloads/extracts only as necessary, so is efficient if run more than once.
+
+The `test-gnn*` commands run pymupdf_layout's test scripts on the DocLayNet
+datset:
+
+* 'test-gnn' command runs `sce:eval/eval_gnn.py`.
+* 'test-gnn-pymupdf_layout' command runs `sce:eval/eval_pymupdf_layout.py`.
+* 'test-gnn-pymupdf4llm' command runs `sce:eval/eval_pymupdf4llm.py`.
+
+
+
 ### Argument completion with Bash
 
 `aptest/aptest.py completion` writes a bash completion script for aptest to
