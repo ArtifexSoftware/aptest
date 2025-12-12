@@ -289,11 +289,14 @@ Args:
             must be the only arg.
             
             aptest/aptest.py --release-1
-                Build wheels for everything except linux-aarch64 and win32.
+                Build wheels for everything except linux-aarch64,
+                linux-x64-musl and win32.
             aptest/aptest.py --release-2
                 Build wheels for linux-aarch64.
             aptest/aptest.py --release-3
                 Build wheels for win32 (pymupdf only).
+            aptest/aptest.py --release-4
+                Build wheels for linux-x64-musl (pymupdf only).
         
         --remote-do 0|1
             [For debugging.]
@@ -387,6 +390,8 @@ Args:
         --test-extra-packages <names>
             Installs specified comma-separated packages from pypi.org before
             running tests.
+        --test-gnn-pymupdf4llm-limit <limit>
+            Set number of files to test. Default is all.
         
         --ticker <delay>
             Use ticker with specified delay. Disabled if delay==0. Default is
@@ -448,6 +453,10 @@ Args:
         
         test-gnn-pymupdf4llm
             Test GNN model via pymupdf4llm.
+        
+        test-gnn-devel
+            Work in progress running gnn pymupdf4llm test, storing output in
+            file with full git info of all packages.
     
     Other:
     
@@ -721,7 +730,7 @@ g_package_info = {
                 'github_name': 'ArtifexSoftware/sce',
                 'git_branch': 'master',
                 'aliases':  ['layout', 'l'],
-                'submodules': False,
+                #'submodules': False,
                 'order': 2,
             },
         'langchain_pymupdf_layout': 
@@ -784,7 +793,7 @@ class Arg:
         self.pos = args_iterator.pos
     def __repr__(self):
         return self.text if isinstance(self.text, str) else 'StopIteration'
-        return f'Arg:{self.text!r}' if isinstance(self.text, str) else 'StopIteration'
+        #return f'Arg:{self.text!r}' if isinstance(self.text, str) else 'Arg:StopIteration'
     def __eq__(self, rhs):
         ret = self.text == rhs
         if not ret:
@@ -985,6 +994,7 @@ def main(argv):
             self.system_packages = True if os.environ.get('GITHUB_ACTIONS') == 'true' else False   # pylint: disable=simplifiable-if-expression
             self.system_site_packages = False
             self.test_extra_packages = list()
+            self.test_gnn_pymupdf4llm_limit = None
             self.valgrind = False
             self.verbose = 0
             self.wheelhouse = 'aptest-wheelhouse'
@@ -1196,6 +1206,8 @@ def main(argv):
                     new_args = '-r @github -u 1 -p git: -P git: -l git: cibw -o linux -e CIBW_ARCHS_LINUX=aarch64 -e "CIBW_BUILD=cp310*"'
                 elif arg == '--release-3':
                     new_args = '-r @github -u 1 -p git: cibw -o windows -e CIBW_ARCHS_WINDOWS=x86 --cibw-skip-add-defaults 0'
+                elif arg == '--release-4':
+                    new_args = '-r @github -u 1 -p git: cibw -o linux -e "CIBW_BUILD=cp310-musllinux_x86_64" --cibw-skip-add-defaults 0'
                 else:
                     assert 0, f'Unrecognised {arg=}, should be one of --release-1, --release-2, --release-3.'
                 new_args = shlex.split(new_args)
@@ -1246,6 +1258,9 @@ def main(argv):
 
             elif arg == '--test-extra-packages':
                 state.test_extra_packages += next(args).as_text().split(',')
+            
+            elif arg == '--test-gnn-pymupdf4llm-limit':
+                state.test_gnn_pymupdf4llm_limit = next(args).as_int()
 
             elif arg == '--ticker':
                 ticker = next(args).as_float()
@@ -1263,7 +1278,7 @@ def main(argv):
             elif arg.startswith('-'):
                 assert 0, f'Unrecognised option: {arg=}.'
 
-            elif arg in ('build', 'cibw', 'gnn', 'run', 'test', 'test-gnn', 'test-gnn-pymupdf_layout', 'test-gnn-pymupdf4llm'):
+            elif arg in ('build', 'cibw', 'gnn', 'run', 'test', 'test-gnn', 'test-gnn-pymupdf_layout', 'test-gnn-pymupdf4llm', 'test-gnn-devel'):
                 state.commands.append(arg)
 
             else:
@@ -2340,8 +2355,90 @@ def main(argv):
                 elif command == 'test-gnn-pymupdf_layout':
                     run(f'cd {layout_location} && {sys.executable} eval/eval_pymupdf_layout.py --pdf_dir ../gnn/datasets/DocLayNet/PDF')
 
+                #elif command == 'test-gnn-pymupdf4llm':
+                #    run(f'cd {layout_location} && {sys.executable} eval/eval_pymupdf4llm.py --pdf_dir ../gnn/datasets/DocLayNet/PDF')
+                
                 elif command == 'test-gnn-pymupdf4llm':
-                    run(f'cd {layout_location} && {sys.executable} eval/eval_pymupdf4llm.py --pdf_dir ../gnn/datasets/DocLayNet/PDF')
+                    pipcl.run(f'pip install tqdm')
+                    sys.path.insert(0, f'{layout_location}/eval')
+                    import json
+                    import importlib.metadata
+                    try:
+                        import eval_util
+                        import eval_pymupdf4llm
+                    finally:
+                        del sys.path[0]
+                    out_dir = 'test-gnn-devel'
+                    pipcl.fs_ensure_empty_dir(out_dir)
+                    vis_pdf_dir = f'{out_dir}/vis'
+                    pipcl.fs_ensure_empty_dir(vis_pdf_dir)
+                    result_csv_path = f'{out_dir}/result.csv'
+                    pdf_dirs = ['gnn/datasets/DocLayNet/PDF']
+                    gt_dir = f'{layout_location}/eval/resources/gt'
+                    det_func = eval_pymupdf4llm.det_func
+                    
+                    ret = dict()
+                    
+                    ret['python'] = dict()
+                    ret['python']['platform.machine()'] = platform.machine()
+                    ret['python']['platform.system()'] = platform.system()
+                    ret['python']['platform.python_implementation()'] = platform.python_implementation()
+                    ret['python']['platform.python_version()'] = platform.python_version()
+                    ret['python']['platform.uname()'] = platform.uname()
+                    ret['python']['platform.system()'] = platform.system()
+                    ret['python']['sys.version'] = sys.version
+                    ret['python']['sys.version_info'] = sys.version_info
+                    
+                    ret['wordsize'] = int.bit_length(sys.maxsize+1)
+                    
+                    ret['state'] = dict()
+                    ret['state']['det_func'] = dict()
+                    ret['state']['det_func']['__name__'] = det_func.__name__
+                    ret['state']['det_func']['__module__'] = det_func.__module__
+                    ret['state']['pdf_dirs'] = pdf_dirs
+                    ret['state']['gt_dir'] = gt_dir
+                    ret['state']['limit']=state.test_gnn_pymupdf4llm_limit
+                    
+                    ret['packages'] = dict()
+                    for package, (location, _) in state.packages.items():
+                        directory = _get_local(package, state)
+                        metadata_version = importlib.metadata.version(package)
+                        ret['packages'][package] = dict()
+                        ret['packages'][package]['location'] = location
+                        ret['packages'][package]['directory'] = directory
+                        ret['packages'][package]['metadata_version'] = metadata_version
+                        if directory:
+                            sha, comment, diff, branch = pipcl.git_info(directory)
+                            ret['packages'][package]['gitinfo'] = dict(
+                                    sha=sha,
+                                    comment=comment,
+                                    diff=diff,
+                                    branch=branch,
+                                    )
+                    
+                    t_start = time.time()
+                    results = eval_util.evaluate_detection(
+                            det_func, 
+                            pdf_dirs = pdf_dirs,
+                            result_csv_path=result_csv_path,
+                            gt_dir=gt_dir,
+                            vis_error_count=0,
+                            vis_pdf_dir=vis_pdf_dir,
+                            limit=state.test_gnn_pymupdf4llm_limit,
+                            )
+                    t_duration = time.time() - t_start
+                    assert len(results) == 1
+                    results = results[0]
+                    
+                    ret['results'] = results
+                    ret['t_start'] = t_start
+                    ret['t_duration'] = t_duration
+                    
+                    pipcl.log(f'{json.dumps(ret, indent="    ")}')
+                    
+                    name_t = time.strftime("%Y-%m-%d-%H-%M-%S", time.gmtime(t_start))
+                    name = f'test-gnn-pymupdf4llm-{name_t}.json'
+                    push_results(ret, name, state.env_extra)
                 
                 else:
                     assert 0, f'Unrecognised command: {command=}'
@@ -2595,6 +2692,60 @@ def fs_write_key(path, data):
             os.write(fd, data.encode('utf8'))
         finally:
             os.close(fd)
+
+
+def push_results(
+        results,
+        name,
+        env_extra,
+        ):
+    '''
+    Pushes new performance data as a JSON file to Github repository
+    ArtifexSoftware/PyMuPDF-performance-results.
+
+    We clone the results repository, and write `results` to a file called
+    `name` using json.dump(). And we create/overwrite a softlink called
+    `name_latest` that points to `name`.
+
+    Then we use `git add`, `git commit` and `git push` to push the new results
+    file and `results-latest` softlink to the results repository.
+
+    Args:
+        results:
+            A dict containing the results.
+        name:
+            Name of results file.
+        name_latest:
+            Name of softlink to create that links to `name`.
+
+    We require environment variable PYMUPDF_PERFORMANCE_RESULTS_RW to be set to
+    github access token. If not present, we return quietly.
+    '''
+    import json
+    
+    # Get results repository.
+    remote = f'git@github.com:ArtifexSoftware/PyMuPDF-performance-results'
+    local = 'aptest-git-pymupdf-performance-results'
+    pipcl.git_get(
+            local,
+            remote='git@github.com:ArtifexSoftware/PyMuPDF-performance-results.git',
+            branch='jules',
+            env_extra=env_extra,
+            )
+
+    pipcl.run(f'cd {local} && git config user.email "julian.smith@artifex.com"')
+    pipcl.run(f'cd {local} && git config user.name "aptest"')
+
+    # Create new results file.
+    with open(f'{local}/{name}', 'w') as f:
+        json.dump(results, f, indent='    ', sort_keys=1)
+
+    # Push to results repository.
+    pipcl.run(f'cd {local} && git add {name}')
+    pipcl.run(f'cd {local} && git commit -m "{name}: new results."')
+    pipcl.run(f'cd {local} && git push -v', env_extra=env_extra)
+
+    pipcl.log(f'Have pushed results to {remote}.')
 
 
 if __name__ == '__main__':
