@@ -2108,24 +2108,35 @@ def git_info( directory):
         Root of git checkout.
     '''
     sha, comment, diff, branch = None, None, None, None
-    e, out = run(
-            f'cd {directory} && (PAGER= git show --pretty=oneline|head -n 1 && git diff)',
-            capture=1,
-            check=0
-            )
+    
+    def run_git(command):
+        return run(command, capture=1, check=0, verbose=0, env_extra=dict(PAGER=''))
+    
+    e, out = run_git(f'cd {directory} && git show --pretty=oneline')
     if not e:
-        sha, _ = out.split(' ', 1)
-        comment, diff = _.split('\n', 1)
-    e, out = run(
-            f'cd {directory} && git rev-parse --abbrev-ref HEAD',
-            capture=1,
-            check=0
-            )
+        line, _ = out.split('\n', 1)
+        sha, comment = line.split(' ', 1)
+    
+    if platform.system() == 'Windows':
+        # Have seen `git diff` sometimes hang when using a rsync'd
+        # checkout. But it seems to work ok if we first diff a single file.
+        #log(f'Doing dummy `git diff` of a single file, to avoid potential hang in later `git diff` on Windows.')
+        e, text = run_git(f'cd {directory} && git ls-files')
+        assert not e, f'git ls-files failed: {e=}'
+        path0 = text.split('\n', 1)[0].strip()
+        run_git(f'cd {directory} && git diff {path0}')
+        
+    e, out = run_git(f'cd {directory} && git diff')
+    if not e:
+        diff = out
+    
+    e, out = run_git(f'cd {directory} && git rev-parse --abbrev-ref HEAD')
     if not e:
         branch = out.strip()
-    log1(f'git_info(): directory={directory!r} returning branch={branch!r} sha={sha!r} comment={comment!r}')
-    return sha, comment, diff, branch
-
+    
+    #log(f'git_info(): {directory=} {branch=} {sha=} {comment=}')
+    return sha, comment, diff, branch    
+        
 
 def git_items( directory, submodules=False):
     '''
@@ -2495,7 +2506,7 @@ def run(
             out = list()
         if log:
             out.append('log')
-        if not out:
+        if not out and not capture:
             out = ['log']
 
         if tee:
@@ -3946,5 +3957,7 @@ if __name__ == '__main__':
         print(includes_)
     elif sys.argv[1:] == ['--graal-legacy-python-config', '--ldflags']:
         print(ldflags)
+    elif sys.argv[1:] == ['--check-git_info']:
+        git_info('aptest')
     else:
         assert 0, f'Expected `--graal-legacy-python-config --includes|--ldflags` but {sys.argv=}'
