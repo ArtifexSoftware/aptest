@@ -730,7 +730,7 @@ g_package_info = {
                 'github_name': 'ArtifexSoftware/sce',
                 'git_branch': 'master',
                 'aliases':  ['layout', 'l'],
-                #'submodules': False,
+                'submodules': False,
                 'order': 2,
             },
         'langchain_pymupdf_layout': 
