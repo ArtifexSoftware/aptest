@@ -298,7 +298,7 @@ def plot_gnn_html(paths, out_html):
         dictpath.setpathdefault(data, graphname, 'lines', 'duration', 'points', list()).append(point)
 
     pipcl.log(f'data:\n{json.dumps(data, indent="    ", sort_keys=1)}')
-    plotly_html(data, 'aptest_test_graph.html')
+    plotly_html(data, out_html)
 
 
 def plot_gnn_html_select(
