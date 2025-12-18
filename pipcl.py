@@ -31,6 +31,7 @@ Graal:
 '''
 
 import base64
+import calendar
 import codecs
 import difflib
 import glob
@@ -2136,7 +2137,23 @@ def git_info( directory):
     
     #log(f'git_info(): {directory=} {branch=} {sha=} {comment=}')
     return sha, comment, diff, branch    
-        
+
+
+def get_time_iso_8601(text):
+    t = time.strptime(text, '%Y-%m-%dT%H:%M:%S%z')
+    t = calendar.timegm(t)
+    return t
+
+
+def git_info_author_date(directory):
+    text = run(f'cd {directory} && git show -s --format=%aI HEAD', capture=1)
+    return get_time_iso_8601(text.strip())
+
+
+def git_info_committer_date(directory):
+    text = run(f'cd {directory} && git show -s --format=%cI HEAD', capture=1)
+    return get_time_iso_8601(text.strip())
+
 
 def git_items( directory, submodules=False):
     '''
