@@ -169,6 +169,8 @@ Args:
                     Clone/update from git remote into local checkout
                     `aptest-git-<package-name>`, optionally overriding default
                     branch/tag/remote.
+                    Note that any changes or commits in the local checkout are
+                    deleted.
                     
                 <local-dir>
                     Local directory, typically a git checkout.
@@ -310,9 +312,9 @@ Args:
             etc. Note that you still need to include `-r @github cibw`.
         
         --remote-github-yml <yml>
-            With @github, run .yml file instead of running aptest.py. If no packages
-            are specified, runs on aptest repository; otherwise exactly one package
-            must be specified.
+            With @github, run .yml file (leafname) instead of running
+            aptest.py. If no packages are specified, runs on aptest repository;
+            otherwise exactly one package must be specified.
             
         --remote-github-yml-inputs <inputs>
             Specify inputs used with --github-yml. <inputs> is comma-separated
@@ -390,6 +392,7 @@ Args:
         --test-extra-packages <names>
             Installs specified comma-separated packages from pypi.org before
             running tests.
+        
         --test-gnn-pymupdf4llm-limit <limit>
             Set number of files to test. Default is all.
         
@@ -402,6 +405,8 @@ Args:
             confirm and then upload wheels to pypi.org.
             
         -v <venv>
+            Changes how we run ourselves in a venv if required.
+            
             0 - do not use a venv.
             1 - Use venv. If it already exists, we assume the existing
                 directory was created by us earlier and is a valid venv
@@ -410,6 +415,9 @@ Args:
             3 - Use venv but delete it first if it already exists.
             
             The default is 2.
+            
+            The venv will be called `venv-aptest-<pthonversion>-<wordsize>`; we
+            also create a convenience link called `venv-aptest`.
         
         -V
             Verbose.
@@ -453,6 +461,8 @@ Args:
         
         test-gnn-pymupdf4llm
             Test GNN model via pymupdf4llm.
+            Writes results to test-gnn-pymupdf4llm-YYYY-MM-DD-HH-MM-SS.json.
+            Pushes results file to PyMuPDF-performance-results.
         
         test-gnn-devel
             Work in progress running gnn pymupdf4llm test, storing output in
@@ -1455,6 +1465,7 @@ def main(argv):
                             venv_name,
                             recreate=(venv>=2),
                             clean=(venv>=3),
+                            makelink='venv-aptest',
                             )
                 sys.exit(e)
     
@@ -2125,50 +2136,8 @@ def main(argv):
 
             elif command == 'gnn':
                 pipcl.log(f'Install CUDA from; https://developer.nvidia.com/cuda-12-1-0-download-archive')
-                layout_location, _ = state.packages['pymupdf_layout']
-                
-                # Old things.
-                if 0:
-                    if 0:
-                        # We need torch-2.5.1, which supports max python version 3.12 on Windows.
-                        #pipcl.run(f'pip install --upgrade cuda-python')
-                        #pipcl.run(f'pip install --upgrade datasets')
-                        #pipcl.run(f'pip install torch')
-
-                        #pipcl.run(f'pip install torch==2.5.1')
-                        #pipcl.run(f'pip install torch-scatter')
-                        pipcl.run(f'python -m pip install -U pip')
-
-                        # https://pytorch.org/get-started/previous-versions/
-                        # v2.5.1
-                        # CUDA 12.1
-                        #
-
-                        #pipcl.run(f'pip install -v torch-scatter --extra-index-url https://download.pytorch.org/whl/cu121')
-                        #pipcl.run(f'pip install -v torch-scatter --index-url https://data.pyg.org/whl/')
-
-                if 0:
-                    pipcl.run(f'pip install torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cu121', prefix='install torch: ')
-                    # NVCC_PREPEND_FLAGS='-allow-unsupported-compiler' is from
-                    # https://docs.nvidia.com/cuda/cuda-compiler-driver-nvcc/index.html,
-                    # to avoid C:\Program Files\NVIDIA GPU Computing
-                    # Toolkit\CUDA\v12.1\include\crt/host_config.h:153: #if
-                    # _MSC_VER < 1910 || _MSC_VER >= 1940, - VS 2022 can have
-                    # _MSC_VER as high as 1944 for VS 2022 17.14.
-                    #
-                    pipcl.run(f'pip install -v --no-build-isolation torch-scatter', prefix='install torch-scatter: ',
-                            env_extra=dict(NVCC_PREPEND_FLAGS='-allow-unsupported-compiler'),
-                            )
-                    # we end up with:
-                    # C:/Program Files/Microsoft Visual Studio/2022/Professional/VC/Tools/MSVC/14.44.35207/include\yvals_core.h(902):
-                    # error: static assertion failed with "error STL1002: Unexpected compiler version, expected CUDA 12.4 or newer."
-                
-                if 0:
-                    # Using cuda-13.1
-                    pipcl.run(f'pip install -v --no-build-isolation torch-scatter', prefix='install torch-scatter: ')
-                    # error:
-                    # The detected CUDA version (13.1) mismatches the version that was used to compile
-                    # PyTorch (12.1). Please make sure to use the same CUDA versions.
+                layout_location = _get_local('pymupdf_layout', state)
+                pipcl.log(f'{layout_location=}')
                 
                 # pytorch-scatter does not specify torch as a build-time prerequisite. This is
                 # deliberate because they say that usually needs to be built with
@@ -2239,12 +2208,6 @@ def main(argv):
                         marker = f'{directory}/_marker_{path_zip}'
                         if marker_ok(marker, path_zip):
                             return
-                        #if os.path.exists(marker):
-                        #    mtime_marker = os.stat(marker).st_mtime
-                        #    mtime_zip = os.stat(path_zip).st_mtime
-                        #    if mtime_marker >= mtime_zip:
-                        #        pipcl.log(f'Already up to date: {marker=}.')
-                        #    return
                         import zipfile
                         pipcl.log(f'Opening {path_zip=}')
                         with zipfile.ZipFile(path_zip) as z:
@@ -2297,6 +2260,7 @@ def main(argv):
                     if 1:
                         pipcl.run(f'pip install --upgrade torchvision')
                         layout_location_abs = os.path.abspath(layout_location)
+                        pipcl.log(f'{layout_location=} {layout_location_abs=}')
                         pipcl.run(
                                 f'cd gnn && {sys.executable} {layout_location_abs}/train/tools/test_gnn.py {layout_location_abs}/train/cfgs/config.yaml',
                                 env_extra=dict(PYTHONPATH=layout_location_abs),
@@ -2391,13 +2355,16 @@ def main(argv):
                     
                     ret['wordsize'] = int.bit_length(sys.maxsize+1)
                     
+                    ret['environ'] = dict()
+                    ret['environ']['USER'] = os.environ.get('USER')
+                    
                     ret['state'] = dict()
                     ret['state']['det_func'] = dict()
                     ret['state']['det_func']['__name__'] = det_func.__name__
                     ret['state']['det_func']['__module__'] = det_func.__module__
                     ret['state']['pdf_dirs'] = pdf_dirs
                     ret['state']['gt_dir'] = gt_dir
-                    ret['state']['limit']=state.test_gnn_pymupdf4llm_limit
+                    ret['state']['limit'] = state.test_gnn_pymupdf4llm_limit
                     
                     ret['packages'] = dict()
                     for package, (location, _) in state.packages.items():
@@ -2409,23 +2376,40 @@ def main(argv):
                         ret['packages'][package]['metadata_version'] = metadata_version
                         if directory:
                             sha, comment, diff, branch = pipcl.git_info(directory)
+                            author_date = pipcl.git_info_author_date(directory)
+                            committer_date  = pipcl.git_info_committer_date(directory)
                             ret['packages'][package]['gitinfo'] = dict(
                                     sha=sha,
                                     comment=comment,
                                     diff=diff,
                                     branch=branch,
+                                    author_date=author_date,
+                                    committer_date=committer_date,
                                     )
                     
+                    # Provide version info for all installed packages. This
+                    # is helpful if for example pymupdf was not specified -
+                    # in this case the latest version on pypi will have been
+                    # installed as a prerequisite by pip.
+                    text = pipcl.run(f'pip list --format json', capture=1)
+                    pip_list_packages = json.loads(text)
+                    ret['pip-list'] = pip_list_packages
+                    
                     t_start = time.time()
-                    results = eval_util.evaluate_detection(
-                            det_func, 
-                            pdf_dirs = pdf_dirs,
+                    # Older pymupdf_layout's eval_util.evaluate_detection()
+                    # does not have <limit> arg, so we are careful to not pass
+                    # in <limit> if not specified.
+                    kwargs = dict(
+                            pdf_dirs=pdf_dirs,
                             result_csv_path=result_csv_path,
                             gt_dir=gt_dir,
                             vis_error_count=0,
                             vis_pdf_dir=vis_pdf_dir,
-                            limit=state.test_gnn_pymupdf4llm_limit,
                             )
+                    if state.test_gnn_pymupdf4llm_limit:
+                        kwargs['limit'] = state.test_gnn_pymupdf4llm_limit
+                        
+                    results = eval_util.evaluate_detection(det_func, **kwargs)
                     t_duration = time.time() - t_start
                     assert len(results) == 1
                     results = results[0]
@@ -2438,7 +2422,11 @@ def main(argv):
                     
                     name_t = time.strftime("%Y-%m-%d-%H-%M-%S", time.gmtime(t_start))
                     name = f'test-gnn-pymupdf4llm-{name_t}.json'
-                    push_results(ret, name, state.env_extra)
+                    with open(name, 'w') as f:
+                        json.dump(ret, f, indent='    ', sort_keys=1)
+                    pipcl.log(f'Have written results to file {name!r}')
+                    
+                    push_results(name, state.env_extra)
                 
                 else:
                     assert 0, f'Unrecognised command: {command=}'
@@ -2624,7 +2612,7 @@ def venv_in(path=None):
         return sys.prefix != sys.base_prefix
 
 
-def venv_run(args, path, recreate=True, clean=False):
+def venv_run(args, path, recreate=True, clean=False, makelink=None):
     '''
     Runs command inside venv and returns termination code.
     
@@ -2640,6 +2628,9 @@ def venv_run(args, path, recreate=True, clean=False):
             a valid venv.
         clean:
             If true we first delete <path>.
+        makelink:
+            If true, we make a softlink from <makelink> to <path>. Ignore on
+            Windows.
     '''
     #pipcl.log(f'{path=} {recreate=} {clean=}')
     if clean:
@@ -2663,6 +2654,12 @@ def venv_run(args, path, recreate=True, clean=False):
                 command += f' "{arg}"'
     else:
         command = f'. {path}/bin/activate && python {shlex.join(args)}'
+    if makelink:
+        pipcl.fs_remove(makelink)
+        try:
+            os.symlink(path, makelink)
+        except Exception as e:
+            pipcl.log(f'Warning: failed to create link from {makelink=} to {path=}.')
     e = pipcl.run(command, check=0, prefix=f'{path}: ')
     return e
 
@@ -2695,8 +2692,7 @@ def fs_write_key(path, data):
 
 
 def push_results(
-        results,
-        name,
+        path,
         env_extra,
         ):
     '''
@@ -2711,9 +2707,7 @@ def push_results(
     file and `results-latest` softlink to the results repository.
 
     Args:
-        results:
-            A dict containing the results.
-        name:
+        path:
             Name of results file.
         name_latest:
             Name of softlink to create that links to `name`.
@@ -2736,13 +2730,13 @@ def push_results(
     pipcl.run(f'cd {local} && git config user.email "julian.smith@artifex.com"')
     pipcl.run(f'cd {local} && git config user.name "aptest"')
 
-    # Create new results file.
-    with open(f'{local}/{name}', 'w') as f:
-        json.dump(results, f, indent='    ', sort_keys=1)
-
+    # Copy into results checkout.
+    leaf = os.path.basename(path)
+    shutil.copy2(path, f'{local}/{leaf}')
+    
     # Push to results repository.
-    pipcl.run(f'cd {local} && git add {name}')
-    pipcl.run(f'cd {local} && git commit -m "{name}: new results."')
+    pipcl.run(f'cd {local} && git add {leaf}')
+    pipcl.run(f'cd {local} && git commit -m "{leaf}: new results."')
     pipcl.run(f'cd {local} && git push -v', env_extra=env_extra)
 
     pipcl.log(f'Have pushed results to {remote}.')
