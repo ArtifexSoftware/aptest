@@ -48,6 +48,8 @@ def plotly_figure(data, graph_height=400):
                 },
             }
     '''
+    pipcl.run(f'pip install numpy')
+    pipcl.run(f'pip install plotly')
     import plotly.subplots
     import plotly.graph_objects
     import numpy
