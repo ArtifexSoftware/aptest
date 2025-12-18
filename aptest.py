@@ -122,6 +122,18 @@ Args:
         -e <name>=<value>
             Set specified environment variable.
         
+        --gnn-doit 0|1
+            If 0 (the default) we never download/extract DocLayNet.
+        
+        --gnn-graph-out <path>
+            Name of gnn-graph out file.
+        
+        --gnn-graph-select <expression>
+            Specify expression to use to select which test-gnn-*.json files to
+            include in graph created by command `gnn-graph`.
+            
+            <expression> should be a Python expression that looks at Python dict `results`.
+        
         --graal 0|1
             If '1' we use Graal environment.
 
@@ -233,7 +245,7 @@ Args:
         
         -r <remote>
         
-            Rerun ourselves on remote machine(s) and on success copy wheels
+            Re-run ourselves on remote machine(s) and on success copy wheels
             back to local machines.
         
             If remote='@github', we run on Github:
@@ -281,8 +293,11 @@ Args:
                 * Local checkouts specified by `-i` are coped to the remote
                   using rsync, then `git clean -f` is run on the remote.
 
-                * On success, wheels are copied back into local directory
-                  aptest-wheelhouse/.
+                * On success:
+                  * Wheels are copied back into local directory
+                    aptest-wheelhouse/.
+                  * Files matching test-gnn-*.json are copied back into the
+                    current directory.
         
         --release-1
         --release-2
@@ -393,8 +408,12 @@ Args:
             Installs specified comma-separated packages from pypi.org before
             running tests.
         
-        --test-gnn-pymupdf4llm-limit <limit>
-            Set number of files to test. Default is all.
+        --test-gnn-limit <limit>
+            Set number of gnn files to test. Default is all.
+        
+        --test-gnn-push 0|1
+            If 1, we push gnn results to
+            github.com/ArtifexSoftware/PyMuPDF-pymupdf-results. Default is 0.
         
         --ticker <delay>
             Use ticker with specified delay. Disabled if delay==0. Default is
@@ -441,9 +460,20 @@ Args:
             If CIBW_ARCHS is unset we set $CIBW_ARCHS_WINDOWS, $CIBW_ARCHS_MACOS
             and $CIBW_ARCHS_LINUX to auto64 if they are unset.
 
-        gnn
+        gnn-download
             Download and extract dataset for pymupdf_layout GNN model. Does not
             do unnecessary downloads or extracts.
+        
+        gnn-graph
+            Generate graph showing results from previous runs of `test-gnn-pymupdf4llm`.
+            Also see:
+                --gnn-graph-out
+                --gnn-graph-select
+            For example:
+                ./aptest/aptest.py gnn-graph --gnn-graph-select "'environ' in results and results['environ']['USER']=='jules' and results['python']['platform.system()']=='Windows' and  results['state'].get('limit')==5"
+        
+        gnn-train
+            Trains pymupdf_layout. Not tested.
         
         run
             Runs commands specified by `--run` within checkouts.
@@ -460,9 +490,22 @@ Args:
             Test GNN model via pymupdf_layout.
         
         test-gnn-pymupdf4llm
-            Test GNN model via pymupdf4llm.
-            Writes results to test-gnn-pymupdf4llm-YYYY-MM-DD-HH-MM-SS.json.
-            Pushes results file to PyMuPDF-performance-results.
+            * Test GNN model via pymupdf4llm.
+            * Writes results to test-gnn-pymupdf4llm-YYYY-MM-DD-HH-MM-SS.json.
+            * Also see `--test-gnn-push`.
+            * Also see `--test-gnn-limit`.
+            * Also see `gnn-graph`.
+            
+            Results are a dict with this structure:
+                results['python']...    Values from python's `platform` and `sys` modules.
+                results['environ'] - selected items from Python's os.environ.
+                results['state'] - description of what values we passed to pymupdf_layout:eval/eval_util.py:evaluate_detection().
+                results['packages'] - information about each package that we built/installed - version, git branch, sha etc.
+                results['pip-list'] - information from `pip list` showing information about all packages.
+                results['results'] - the results from the test, containing 
+                results['t_duration'] - duration of test in seconds.
+                results['t_start'] - Unix start time.
+                
         
         test-gnn-devel
             Work in progress running gnn pymupdf4llm test, storing output in
@@ -530,6 +573,8 @@ Environment:
 
 import github
 import glob
+import importlib.metadata
+import json
 import os
 import platform
 import shlex
@@ -551,6 +596,7 @@ g_root_abs = os.path.abspath( f'{__file__}/..')
 
 try:
     sys.path.insert(0, g_root_abs)
+    import graph
     import github
     import pipcl
 finally:
@@ -613,6 +659,7 @@ def sync_reverse(
         *,
         filters=None,
         verbose=1,
+        doit=1,
         ):
     '''
     Uses rsync to copy from remote machine to local.
@@ -633,17 +680,20 @@ def sync_reverse(
     ssh_command2 = ssh_command
     if remote:
         ssh_command2 += f' {remote}'
-    command = (
-            f'rsync -aizr'
-            f'{" --stats " if verbose else ""}'
-            f'--rsh {shlex.quote(ssh_command2)} '
-            )
+    command = f'rsync -aizr'
+    if not doit:
+        command += ' -n'
+    if verbose:
+        command += ' --stats'
+    command += f' --rsh {shlex.quote(ssh_command2)}'
     if filters:
         if isinstance(filters, str):
-            filters = (filters,)
-        command += f'{shlex.join(filters)} '
+            #filters = (filters,)
+            command += f' {filters}'
+        else:
+            command += f' {shlex.join(filters)} '
     command += (
-            f':{remote_dir}/{path_remote} {path_local}'
+            f' :{remote_dir}/{path_remote} {path_local}'
             )
     pipcl.run(command, prefix=f'reverse sync {path_remote} => {path_local}: ', log=1)
         
@@ -981,6 +1031,10 @@ def main(argv):
             self.devel = False
             self.env_extra = dict()
             self.github_upload = None
+            self.gnn_doit = False
+            self.gnn_graph_out = None
+            self.gnn_graph_select = None
+            self.gnn_graph_select_root = None
             self.graal = False
             self.huggingface_key_path_abs = None
             self.os_names = list()
@@ -1004,7 +1058,8 @@ def main(argv):
             self.system_packages = True if os.environ.get('GITHUB_ACTIONS') == 'true' else False   # pylint: disable=simplifiable-if-expression
             self.system_site_packages = False
             self.test_extra_packages = list()
-            self.test_gnn_pymupdf4llm_limit = None
+            self.test_gnn_limit = None
+            self.test_gnn_push = 0
             self.valgrind = False
             self.verbose = 0
             self.wheelhouse = 'aptest-wheelhouse'
@@ -1153,7 +1208,16 @@ def main(argv):
                 assert '=' in _nv, f'-e <name>=<value> does not contain "=": {_nv!r}'
                 _name, _value = _nv.split('=', 1)
                 state.env_extra[_name] = _value
-
+            
+            elif arg == '--gnn-doit':
+                state.gnn_doit = next(args).as_bool()
+            
+            elif arg == '--gnn-graph-out':
+                state.gnn_graph_out = next(args).as_text()
+            
+            elif arg == '--gnn-graph-select':
+                state.gnn_graph_select = next(args).as_text()
+            
             elif arg == '--graal':
                 state.graal_arg = args.pos
                 state.graal = next(args).as_bool()
@@ -1269,8 +1333,11 @@ def main(argv):
             elif arg == '--test-extra-packages':
                 state.test_extra_packages += next(args).as_text().split(',')
             
-            elif arg == '--test-gnn-pymupdf4llm-limit':
-                state.test_gnn_pymupdf4llm_limit = next(args).as_int()
+            elif arg == '--test-gnn-limit':
+                state.test_gnn_limit = next(args).as_int()
+
+            elif arg == '--test-gnn-push':
+                state.test_gnn_push = next(args).as_bool()
 
             elif arg == '--ticker':
                 ticker = next(args).as_float()
@@ -1288,7 +1355,20 @@ def main(argv):
             elif arg.startswith('-'):
                 assert 0, f'Unrecognised option: {arg=}.'
 
-            elif arg in ('build', 'cibw', 'gnn', 'run', 'test', 'test-gnn', 'test-gnn-pymupdf_layout', 'test-gnn-pymupdf4llm', 'test-gnn-devel'):
+            elif arg in (
+                    'build',
+                    'cibw',
+                    'gnn-download',
+                    'gnn-graph',
+                    'gnn-select-show',
+                    'gnn-train',
+                    'run',
+                    'test',
+                    'test-gnn',
+                    'test-gnn-devel',
+                    'test-gnn-pymupdf4llm',
+                    'test-gnn-pymupdf_layout',
+                    ):
                 state.commands.append(arg)
 
             else:
@@ -1742,11 +1822,22 @@ def main(argv):
                     filters.append(f'--include={package}-*.tar.gz')
                 filters.append('--exclude=*')
                 sync_reverse(
-                        remote, remote_dir,
+                        remote,
+                        remote_dir,
                         f'{state.wheelhouse}/',
                         f'{state.wheelhouse}/',
                         ssh_command=ssh_command,
                         filters=filters,
+                        )
+            if 1:
+                # Copy test-gnn-*.json back to local machine.
+                sync_reverse(
+                        remote,
+                        remote_dir,
+                        './',
+                        './',
+                        ssh_command=ssh_command,
+                        filters = '"--include=test-gnn-*.json" "--exclude=*"',
                         )
 
         return
@@ -2134,7 +2225,7 @@ def main(argv):
                                 st = os.stat(path_dir)
                                 pipcl.log(f'{st=}: {path_dir=}')
 
-            elif command == 'gnn':
+            elif command == 'gnn-download':
                 pipcl.log(f'Install CUDA from; https://developer.nvidia.com/cuda-12-1-0-download-archive')
                 layout_location = _get_local('pymupdf_layout', state)
                 pipcl.log(f'{layout_location=}')
@@ -2174,21 +2265,35 @@ def main(argv):
                     url_doclaynet_extra_zip = 'https://codait-cos-dax.s3.us.cloud-object-storage.appdomain.cloud/dax-doclaynet/1.0.0/DocLayNet_extra.zip'
                     
                     def download(url):
+                        '''
+                        Downloads to basename(url), but does nothing if already
+                        exists. We download to temporary and rename, so this
+                        should never overwrite an existing download.
+                        '''
                         path = os.path.basename(url)
                         if os.path.exists(path):
                             pipcl.log(f'Already exists: {path=}')
                         else:
-                            github._gh_download(url, path, gh=0)
+                            if state.gnn_doit:
+                                github._gh_download(url, path, gh=0)
+                            else:
+                                assert 0, f'Would download but {state.gnn_doit=}: {url} {path=}'
                     download(url_doclaynet_core_zip)
                     download(url_doclaynet_extra_zip)
                     
                     def marker_ok(marker, infile=None):
+                        '''
+                        Returns true if <marker> exists (and is newer than
+                        <infile> if not None).
+                        '''
                         if os.path.exists(marker):
                             mtime_marker = os.stat(marker).st_mtime
                             mtime_infile = os.stat(infile).st_mtime if infile else 0
                             if mtime_marker > mtime_infile:
                                 pipcl.log(f'Already up to date: {marker=}.')
                                 return 1
+                        if not state.gnn_doit:
+                            assert 0, f'Would return false for {marker=}, but {state.gnn_doit=}'
                     
                     def marker_create(maker):
                         with open(marker, 'w'):
@@ -2218,74 +2323,51 @@ def main(argv):
                     
                     if 1:
                         # Unzip.
-                        ensure_unzip(url_doclaynet_core_zip, 'gnn/datasets/DocLayNet')
-                        ensure_unzip(url_doclaynet_extra_zip, 'gnn/datasets/DocLayNet')
+                        ensure_unzip(url_doclaynet_core_zip, 'datasets/DocLayNet')
+                        ensure_unzip(url_doclaynet_extra_zip, 'datasets/DocLayNet')
                     
                     if 1:
                         # Generate PKL.
                         
-                        marker_pkl = 'gnn/_marker_pkl'
+                        marker_pkl = '_marker_pkl'
                         if marker_ok(marker_pkl):
                             pass
                         else:
                             pipcl.run(f'{sys.executable}'
                                     f' {layout_location}/train/tools/make_pkl_data_from_COCO_json.py'
-                                    f' --json gnn/datasets/DocLayNet/COCO/train.json'
-                                    f' --img_dir gnn/datasets/DocLayNet/PNG'
-                                    f' --save_dir gnn/workspace/pkl_data/train'
+                                    f' --json datasets/DocLayNet/COCO/train.json'
+                                    f' --img_dir datasets/DocLayNet/PNG'
+                                    f' --save_dir workspace/pkl_data/train'
                                     )
                             with open(marker_pkl, 'w'):
                                 pipcl.log(f'Have created {marker_pkl=}.')
                         
-                        marker_pkl_validation = 'gnn/_marker_pkl_validation'
+                        marker_pkl_validation = '_marker_pkl_validation'
                         if marker_ok(marker_pkl_validation):
                             pass
                         else:
                             pipcl.run(f'{sys.executable}'
                                     f' {layout_location}/train/tools/make_pkl_data_from_COCO_json.py'
-                                    f' --json gnn/datasets/DocLayNet/COCO/val.json'
-                                    f' --img_dir gnn/datasets/DocLayNet/PNG'
-                                    f' --save_dir gnn/workspace/pkl_data/val'
+                                    f' --json datasets/DocLayNet/COCO/val.json'
+                                    f' --img_dir datasets/DocLayNet/PNG'
+                                    f' --save_dir workspace/pkl_data/val'
                                     )
                             with open(marker_pkl_validation, 'w'):
                                 pipcl.log(f'Have created {marker_pkl_validation=}.')
                     
                     if 0:
-                        # Doesn't work - No such file or directory: 'gnn/workspace/checkpoints/model.yaml.
+                        # Doesn't work - No such file or directory: 'workspace/checkpoints/model.yaml.
                         pipcl.run(f'pip install --upgrade torchvision')
                         pipcl.run(
                                 f'{sys.executable} {layout_location}/train/tools/test_gnn.py {layout_location}/train/cfgs/config.yaml',
                                 env_extra=dict(PYTHONPATH=layout_location),
                                 )
-                    if 1:
-                        pipcl.run(f'pip install --upgrade torchvision')
-                        layout_location_abs = os.path.abspath(layout_location)
-                        pipcl.log(f'{layout_location=} {layout_location_abs=}')
-                        pipcl.run(
-                                f'cd gnn && {sys.executable} {layout_location_abs}/train/tools/test_gnn.py {layout_location_abs}/train/cfgs/config.yaml',
-                                env_extra=dict(PYTHONPATH=layout_location_abs),
-                                )
                 
                 if 0:
-                    # Simple timing test.
-                    path = 'gnn/datasets/DocLayNet/PDF/00c3405f0fc4afb2f068640dd840d6300d407a33a988b47465377afc8d438105.pdf'
-                    import pymupdf.layout
-                    import pymupdf4llm
+                    # Alternative ways of getting data.
                     
-                    import importlib.metadata
+                    # Get data using `datasets` module.
                     
-                    layout_version = importlib.metadata.version('pymupdf_layout')
-                    its = 10
-                    t = time.time()
-                    for i in range(its):
-                        pipcl.log(f'{i=}')
-                        with pymupdf.open(path) as document:
-                            md = pymupdf4llm.to_markdown(document)
-                    t = time.time() - t
-                    pipcl.log(f'{layout_version=} {path=} {its=}: {t=:,}')
-                
-                if 0:
-                
                     #doclaynet_core = datasets.load_dataset('doclaynet_core')
                     #doclaynet_core = datasets.load_dataset('doclaynet_extra')
                     # From https://huggingface.co/datasets/pierreguillou/DocLayNet-large:
@@ -2302,6 +2384,64 @@ def main(argv):
                     pipcl.log(f'huggingface_hub.snapshot_download()')
                     huggingface_hub.snapshot_download(dataset_id, token=huggingface_key, repo_type='dataset', max_workers=1)
             
+            elif command == 'gnn-graph':
+                if state.gnn_graph_select_root:
+                    pattern = f'{state.gnn_graph_select_root}/test-gnn-*.json'
+                else:
+                    pattern = f'test-gnn-*.json'
+                if state.gnn_graph_select:
+                    pipcl.log(f'{state.gnn_graph_select=}')
+                    gnn_select_code = compile(state.gnn_graph_select, '', 'eval')
+                    def selectfn(results):
+                        #r = eval(gnn_select_code, globals=dict(results=results))
+                        r = eval(gnn_select_code)#, globals=dict(results=results))
+                        return r
+                paths = list()
+                pattern_matches = glob.glob(pattern)
+                for path in pattern_matches:
+                    if state.gnn_graph_select:
+                        with open(path) as f:
+                            results = json.load(f)
+                        s = selectfn(results)
+                    else:
+                        s = True
+                    if s:
+                        #pipcl.log(f'{command}: Selecting: {path!r}')
+                        paths.append(path)
+                pipcl.log(f'{command}: Selected gnn paths ({len(paths)}/{len(pattern_matches)}:')
+                for path in paths:
+                    pipcl.log(f'{command}:    {path!r}')
+                
+                if state.gnn_graph_out is None:
+                    out = f'gnn-graph-{time.strftime("%Y-%m-%d-%H-%M-%S")}.html'
+                    out_simple = f'gnn-graph.html'
+                else:
+                    out = state.gnn_graph_out
+                    out_simpe = None
+                    
+                if out:
+                    graph.plot_gnn_html(paths, out)
+                    pipcl.log(f'Have created: {out=}')
+                    if out_simple:
+                        pipcl.fs_remove(out_simple)
+                        try:
+                            os.symlink(out, out_simple)
+                        except Exception as e:
+                            pipcl.log(f'Warning: failed to create link from {out_simple=} to {out=}.')
+                        pipcl.log(f'Have created softlink {out_simple=} => {out=}')
+                else:
+                    pipcl.log(f'Not creating graph output; {state.gnn_graph_out=}.')
+                    
+            
+            elif command == 'gnn-train':
+                pipcl.run(f'pip install --upgrade torchvision')
+                layout_location_abs = os.path.abspath(layout_location)
+                pipcl.log(f'{layout_location=} {layout_location_abs=}')
+                pipcl.run(
+                        f'cd gnn && {sys.executable} {layout_location_abs}/train/tools/test_gnn.py {layout_location_abs}/train/cfgs/config.yaml',
+                        env_extra=dict(PYTHONPATH=layout_location_abs),
+                        )
+            
             elif command.startswith('test-gnn'):
                 layout_location = _get_local('pymupdf_layout', state)
                 
@@ -2314,19 +2454,17 @@ def main(argv):
                         pipcl.log(f'Command took {pipcl._duration(t)}.')
                     
                 if command == 'test-gnn':
-                    run(f'cd {layout_location} && {sys.executable} eval/eval_gnn.py --pdf_dir ../gnn/datasets/DocLayNet/PDF')
+                    run(f'cd {layout_location} && {sys.executable} eval/eval_gnn.py --pdf_dir ../datasets/DocLayNet/PDF')
 
                 elif command == 'test-gnn-pymupdf_layout':
-                    run(f'cd {layout_location} && {sys.executable} eval/eval_pymupdf_layout.py --pdf_dir ../gnn/datasets/DocLayNet/PDF')
+                    run(f'cd {layout_location} && {sys.executable} eval/eval_pymupdf_layout.py --pdf_dir ../datasets/DocLayNet/PDF')
 
                 #elif command == 'test-gnn-pymupdf4llm':
-                #    run(f'cd {layout_location} && {sys.executable} eval/eval_pymupdf4llm.py --pdf_dir ../gnn/datasets/DocLayNet/PDF')
+                #    run(f'cd {layout_location} && {sys.executable} eval/eval_pymupdf4llm.py --pdf_dir ../datasets/DocLayNet/PDF')
                 
                 elif command == 'test-gnn-pymupdf4llm':
                     pipcl.run(f'pip install tqdm')
                     sys.path.insert(0, f'{layout_location}/eval')
-                    import json
-                    import importlib.metadata
                     try:
                         import eval_util
                         import eval_pymupdf4llm
@@ -2337,7 +2475,7 @@ def main(argv):
                     vis_pdf_dir = f'{out_dir}/vis'
                     pipcl.fs_ensure_empty_dir(vis_pdf_dir)
                     result_csv_path = f'{out_dir}/result.csv'
-                    pdf_dirs = ['gnn/datasets/DocLayNet/PDF']
+                    pdf_dirs = ['datasets/DocLayNet/PDF']
                     gt_dir = f'{layout_location}/eval/resources/gt'
                     det_func = eval_pymupdf4llm.det_func
                     
@@ -2364,7 +2502,7 @@ def main(argv):
                     ret['state']['det_func']['__module__'] = det_func.__module__
                     ret['state']['pdf_dirs'] = pdf_dirs
                     ret['state']['gt_dir'] = gt_dir
-                    ret['state']['limit'] = state.test_gnn_pymupdf4llm_limit
+                    ret['state']['limit'] = state.test_gnn_limit
                     
                     ret['packages'] = dict()
                     for package, (location, _) in state.packages.items():
@@ -2406,8 +2544,8 @@ def main(argv):
                             vis_error_count=0,
                             vis_pdf_dir=vis_pdf_dir,
                             )
-                    if state.test_gnn_pymupdf4llm_limit:
-                        kwargs['limit'] = state.test_gnn_pymupdf4llm_limit
+                    if state.test_gnn_limit:
+                        kwargs['limit'] = state.test_gnn_limit
                         
                     results = eval_util.evaluate_detection(det_func, **kwargs)
                     t_duration = time.time() - t_start
@@ -2418,15 +2556,18 @@ def main(argv):
                     ret['t_start'] = t_start
                     ret['t_duration'] = t_duration
                     
-                    pipcl.log(f'{json.dumps(ret, indent="    ")}')
+                    pipcl.log(f'Results are:\n{json.dumps(ret, indent="    ")}')
                     
-                    name_t = time.strftime("%Y-%m-%d-%H-%M-%S", time.gmtime(t_start))
+                    name_t = time.strftime('%Y-%m-%d-%H-%M-%S', time.gmtime(t_start))
                     name = f'test-gnn-pymupdf4llm-{name_t}.json'
                     with open(name, 'w') as f:
                         json.dump(ret, f, indent='    ', sort_keys=1)
-                    pipcl.log(f'Have written results to file {name!r}')
+                    pipcl.log(f'Have written results to file {name!r}.')
                     
-                    push_results(name, state.env_extra)
+                    if state.test_gnn_push:
+                        push_results(name, state.env_extra)
+                    else:
+                        pipcl.log(f'Not pushing results to PyMuPDF-performance-results: {name=}')
                 
                 else:
                     assert 0, f'Unrecognised command: {command=}'
