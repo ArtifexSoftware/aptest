@@ -133,6 +133,12 @@ Args:
             include in graph created by command `gnn-graph`.
             
             <expression> should be a Python expression that looks at Python dict `results`.
+            
+            <results> will actually be a doct.Doct() so dotted notation can
+            also be used for keys that are legal Python identifiers.
+            
+            Example:
+                --gnn-graph-select "'environ' in results and results.environ.USER=='jules' and results.python['platform.system()']=='Windows' and  results.state.get('limit')==5
         
         --graal 0|1
             If '1' we use Graal environment.
@@ -408,6 +414,10 @@ Args:
             Installs specified comma-separated packages from pypi.org before
             running tests.
         
+        --test-gnn-extra <key>=<value>
+            Adds specified key=value pair to the root of the results dict
+            created by test-gnn* commands.
+        
         --test-gnn-limit <limit>
             Set number of gnn files to test. Default is all.
         
@@ -587,21 +597,15 @@ import time
 import traceback
 
 import backtrace
-
+import doct
+import graph
+import github
+import pipcl
 
 # Get improved display of exceptions and stacktraces.
 backtrace.exception_hook_install()
 
 g_root_abs = os.path.abspath( f'{__file__}/..')
-
-try:
-    sys.path.insert(0, g_root_abs)
-    import graph
-    import github
-    import pipcl
-finally:
-    del sys.path[0]
-
 g_root = pipcl.relpath(g_root_abs)
 
 
@@ -729,6 +733,7 @@ def sync(remote, remote_dir, path, ssh_command, verbose, state):
             pipcl.log(f'syncing git directory: {path}')
             filenames = pipcl.git_items(path, submodules=1)
             filenames_path = f'remote-sync-paths-{os.getpid()}-{time.time()}'
+            pipcl.log(f'{filenames_path=}')
             with open(filenames_path, 'w') as f:    # pylint: disable=unspecified-encoding
                 for filename in filenames:
                     filename_path = f'{path}/{filename.strip()}'
@@ -965,7 +970,40 @@ def dummy_completion3():
     0
     '''
 
-def main(argv):
+
+def apply_deltas(items, deltas, check=1, aliasfn=lambda name: name):
+    #pipcl.log(f'{items=} {deltas=}')
+    if deltas and not deltas[0].startswith(('+', '-')):
+        del items[:]
+        #pipcl.log(f'{items=} {deltas=}')
+
+    for delta in deltas:
+        #pipcl.log(f'{delta=}')
+        if delta == '-':
+            del items[:]
+            #pipcl.log(f'{items=}')
+        elif delta.startswith('-'):
+            try:
+                items.remove(aliasfn(delta[1:]))
+            except Exception:
+                #pipcl.log(f'Failed to remove {delta[1:]=} from {items=}')
+                if check:
+                    raise
+            #pipcl.log(f'{items=}')
+        else:
+            if delta.startswith('+'):
+                delta = delta[1:]
+                #pipcl.log(f'{delta=}')
+            delta = aliasfn(delta)
+            #pipcl.log(f'{delta=}')
+            items.append(delta)
+            #pipcl.log(f'{items=}')
+
+    
+def get_args(argv):
+    '''
+    Parses command-line args in <argv> and returns a State instance.
+    '''
     COMP_LINE = os.environ.get('COMP_LINE')
     COMP_POINT = os.environ.get('COMP_POINT')
     COMP_TYPE = os.environ.get('COMP_TYPE')
@@ -1004,72 +1042,79 @@ def main(argv):
     #if COMP_LINE:
     #    pipcl.log(f'COMP_LINE is set')
     
-    if github_workflow_unimportant():
-        return
-    
-    python = None
-    remote = None
-    remote_dir = 'artifex-remote'
-    remote_do = True
-    remote_github_workflow_id = None
-    remote_prefix = None
-    show_help = False
-    venv = 2
-    ticker = 0.5
-    
     class State:
         _frozen = False # So self._frozen exists at start of __init__().
         def __init__(self):
-            self.build_type = None
-            self.cibw_name = 'cibuildwheel'
-            self.cibw_pyodide = None
-            self.cibw_pyodide_version = None
-            self.cibw_skip_add_defaults = True
-            self.cibw_test_project = None
-            self.cibw_test_project_setjmp = False
-            self.commands = list()
-            self.devel = False
-            self.env_extra = dict()
-            self.github_upload = None
-            self.gnn_doit = False
-            self.gnn_graph_out = None
-            self.gnn_graph_select = None
-            self.gnn_graph_select_root = None
-            self.graal = False
-            self.huggingface_key_path_abs = None
-            self.os_names = list()
-            self.packages = dict()   # map from name to location.
-            self.packages2 = dict()   # map from name to location.
-            self.packages_build = list() # Sorted list of names.
-            self.packages_test = list()  # Sorted list of names.
-            self.pybind = False
-            self.pytest_options = ''
-            self.pytest_paths = list()
-            self.pytest_wrap = None
-            self.remote_github_yml = None
-            self.remote_github_yml_inputs = None
-            self.remote_rsync_path = None
-            self.remote_rsync_wsl = False
-            self.run_commands = list()
-            self.sdists = False
-            self.ssh_key_path_abs = None
-            self.swig = None
-            self.swig_quick = None
-            self.system_packages = True if os.environ.get('GITHUB_ACTIONS') == 'true' else False   # pylint: disable=simplifiable-if-expression
-            self.system_site_packages = False
-            self.test_extra_packages = list()
-            self.test_gnn_limit = None
-            self.test_gnn_push = 0
-            self.valgrind = False
-            self.verbose = 0
-            self.wheelhouse = 'aptest-wheelhouse'
+            pass
+        
+        def freeze(self):
             self._frozen = True
+        
         def __setattr__(self, name, value):
             if self._frozen:
                 assert hasattr(self, name), f'Unrecognised state {name=}.'
             super.__setattr__(self, name, value)
     
     state = State()
+    
+    state.build_type = None
+    state.cibw_name = 'cibuildwheel'
+    state.cibw_pyodide = None
+    state.cibw_pyodide_version = None
+    state.cibw_skip_add_defaults = True
+    state.cibw_test_project = None
+    state.cibw_test_project_setjmp = False
+    state.commands = list()
+    state.devel = False
+    state.env_extra = dict()
+    state.github_upload = None
+    state.gnn_doit = False
+    state.gnn_graph_out = None
+    state.gnn_graph_select = None
+    state.gnn_graph_select_root = None
+    state.graal = False
+    state.huggingface_key_path_abs = None
+    state.os_names = list()
+    state.packages2 = dict()   # map from name to location.
+    state.packages_build = list() # Sorted list of names.
+    state.packages = dict()   # map from name to location.
+    state.packages_test = list()  # Sorted list of names.
+    state.pybind = False
+    state.pytest_options = ''
+    state.pytest_paths = list()
+    state.pytest_wrap = None
+    state.python = None
+    state.remote_dir = 'artifex-remote'
+    state.remote_do = True
+    state.remote_github_workflow_id = None
+    state.remote_github_yml_inputs = None
+    state.remote_github_yml = None
+    state.remote = None
+    state.remote_arg = None
+    state.remote_prefix = None
+    state.remote_rsync_path = None
+    state.remote_rsync_wsl = False
+    state.run_commands = list()
+    state.sdists = False
+    state.show_help = False
+    state.ssh_key_path_abs = None
+    state.swig = None
+    state.swig_quick = None
+    state.system_packages = True if os.environ.get('GITHUB_ACTIONS') == 'true' else False   # pylint: disable=simplifiable-if-expression
+    state.system_site_packages = False
+    state.test_extra_packages = list()
+    state.test_gnn_extra = dict()
+    state.test_gnn_limit = None
+    state.test_gnn_push = 0
+    state.ticker = 0.5
+    state.valgrind = False
+    state.venv = 2
+    state.verbose = 0
+    state.wheelhouse = 'aptest-wheelhouse'
+    
+    # Prevent future additions to items in <state>. We can still modify
+    # existing values.
+    state.freeze()
     
     def add_package(name, location, args_pos):
         if isinstance(name, Arg):
@@ -1101,34 +1146,6 @@ def main(argv):
                 return 0
         state.packages_build.sort(key=keyfn)
         state.packages_test.sort(key=keyfn)
-    
-    def apply_deltas(items, deltas, check=1, aliasfn=lambda name: name):
-        #pipcl.log(f'{items=} {deltas=}')
-        if deltas and not deltas[0].startswith(('+', '-')):
-            del items[:]
-            #pipcl.log(f'{items=} {deltas=}')
-            
-        for delta in deltas:
-            #pipcl.log(f'{delta=}')
-            if delta == '-':
-                del items[:]
-                #pipcl.log(f'{items=}')
-            elif delta.startswith('-'):
-                try:
-                    items.remove(aliasfn(delta[1:]))
-                except Exception:
-                    #pipcl.log(f'Failed to remove {delta[1:]=} from {items=}')
-                    if check:
-                        raise
-                #pipcl.log(f'{items=}')
-            else:
-                if delta.startswith('+'):
-                    delta = delta[1:]
-                    #pipcl.log(f'{delta=}')
-                delta = aliasfn(delta)
-                #pipcl.log(f'{delta=}')
-                items.append(delta)
-                #pipcl.log(f'{items=}')
     
     # Parse args and update the above state. We do this before moving into a
     # venv, partly so we can return errors immediately.
@@ -1223,7 +1240,7 @@ def main(argv):
                 state.graal = next(args).as_bool()
 
             elif arg in ('-h', '--help'):
-                show_help = True
+                state.show_help = True
 
             elif arg == '-i':
                 _name = next(args)
@@ -1240,9 +1257,9 @@ def main(argv):
                     assert os_name in names, f'{os_name=} should be one of {names!r}.'
 
             elif arg == '-r':
-                remote_arg = args.pos
-                remote = next(args).as_text()
-                #pipcl.log(f'Found -r: {arg=} {remote=}')
+                state.remote_arg = args.pos
+                state.remote = next(args).as_text()
+                #pipcl.log(f'Found -r: {arg=} {state.remote=}')
 
             elif arg == '--run':
                 package = next(args)
@@ -1268,7 +1285,7 @@ def main(argv):
 
             elif arg == '--python':
                 python_args_pos = args.pos
-                python = next(args).as_text()
+                state.python = next(args).as_text()
 
             elif arg.startswith('--release-'):
                 args.suggestions.clear()
@@ -1291,10 +1308,10 @@ def main(argv):
                 continue
 
             elif arg == '--remote-do':
-                remote_do = next(args).as_bool()
+                state.remote_do = next(args).as_bool()
 
             elif arg == '--remote-github-workflow-id':
-                remote_github_workflow_id = next(args).as_text()
+                state.remote_github_workflow_id = next(args).as_text()
 
             elif arg == '--remote-github-yml':
                 state.remote_github_yml = next(args).as_text()
@@ -1304,7 +1321,7 @@ def main(argv):
                 state.remote_github_yml_inputs = next(args).as_text()
 
             elif arg == '--remote-prefix':
-                remote_prefix = next(args)
+                state.remote_prefix = next(args)
 
             elif arg == '--remote-rsync-path':
                 state.remote_rsync_path = next(args).as_text()
@@ -1333,6 +1350,11 @@ def main(argv):
             elif arg == '--test-extra-packages':
                 state.test_extra_packages += next(args).as_text().split(',')
             
+            elif arg == '--test-gnn-extra':
+                nv = next(args).as_text()
+                n, v = nv.split('=', 1)
+                state.test_gnn_extra[n] = v
+
             elif arg == '--test-gnn-limit':
                 state.test_gnn_limit = next(args).as_int()
 
@@ -1340,14 +1362,14 @@ def main(argv):
                 state.test_gnn_push = next(args).as_bool()
 
             elif arg == '--ticker':
-                ticker = next(args).as_float()
+                state.ticker = next(args).as_float()
 
             elif arg == '-u':
                 state.github_upload = next(args).as_int()
 
             elif arg == '-v':
-                venv = next(args).as_int()
-                assert venv in (0, 1, 2, 3), f'Invalid {venv=} should be 0, 1, 2 or 3.'
+                state.venv = next(args).as_int()
+                assert state.venv in (0, 1, 2, 3), f'Invalid {state.venv=} should be 0, 1, 2 or 3.'
             
             elif arg == '-V':
                 state.verbose += 1
@@ -1412,12 +1434,12 @@ def main(argv):
                             print(suggestion)
                     sys.stdout.flush()
                 pipcl.log(f'Calling sys.exit()')
-                #sys.exit()
-                return 0
+                sys.exit()
+                #return 0
             except Exception as e:
                 pipcl.log(f'completion: error: {traceback.format_exc()}')
-                #sys.exit(1)
-                return 1
+                sys.exit(1)
+                #return 1
         elif arg is not None:
             # Print command line with caret showing where error occurred.
             #pipcl.log(f'{args.current=}')
@@ -1445,9 +1467,11 @@ def main(argv):
             else:
                 print(f'(No suggestions.)')
                 raise
+            sys.exit(1)
             return 1
         else:
             backtrace.show()
+            sys.exit(1)
             return 1
     
     if COMP_LINE:
@@ -1455,7 +1479,1022 @@ def main(argv):
         pipcl.log(f'{sys.argv=}')
         for suggestion in args.suggestions:
             print(suggestion)
+        sys.exit(1)
         return 0
+    
+    return args, state
+
+
+def do_remote_github(state):
+    pipcl.run('pip install requests')
+    branch = f'aptest-{os.environ["USER"]}'    # -{time.strftime("%F-%T")}'
+    pipcl.log(f'{branch=}.')
+
+    if state.remote_github_workflow_id:
+        # Wait for existing workflow istead of creating a new one.
+        workflow_id = state.remote_github_workflow_id
+        remote_github_workflow_package = 'aptest'
+        info = name_info(remote_github_workflow_package)
+    else:
+        # Push ourselves to Git.
+        git_push(g_root, 'git@github.com:ArtifexSoftware/aptest.git', branch, state)
+
+        # Push specified local package repository to Github and update args to
+        # point to new location.
+        for package_name, (package_location, args_pos) in list(state.packages.items()) + list(state.packages2.items()):
+            if not package_location.startswith(('git:', 'pip:')):
+                # Push to a Github branch and update argv[] to refer to this
+                # Github branch.
+                info = name_info(package_name)
+                pipcl.log(f'{package_name=}.')
+                pipcl.log(f'{info["git_remote"]=}.')
+                git_push(package_location, info["git_remote"], branch, state)
+                argv[args_pos] = f'git:-b {branch} {info["git_remote"]}'
+
+        if state.remote_github_yml:
+            # Run .yml directly.
+            pipcl.log(f'Running .yml instead of aptest.py: {state.remote_github_yml}')
+            if not state.packages:
+                # Run on aptest.
+                info = name_info('aptest')
+            elif len(state.packages) == 1:
+                for package_name, (package_location, args_pos) in state.packages.items():
+                    pass
+                info = name_info(package_name)
+            else:
+                assert 0, 'Running yml directly requires exactly zero or one package, but {len(state.packages)=}.'
+            data = dict()
+            data['ref'] = branch
+            if state.remote_github_yml_inputs:
+                inputs = dict()
+                for nv in state.remote_github_yml_inputs.split(','):
+                    try:
+                        n, v = nv.split('=', 1)
+                    except Exception as e:
+                        raise Exception(f'Expected <name>=<value> in {nv!r} from {state.remote_github_yml_inputs=}.') from e
+                    inputs[n] = v
+                data['inputs'] = inputs
+            workflow_id = github.gh_run_workflow(
+                    f'https://api.github.com/repos/{info["github_name"]}',
+                    state.remote_github_yml,
+                    data,
+                    )
+        else:
+            # Run ourselves on Github using test.yml, passing argv.
+            info = name_info('aptest')
+            data = dict(
+                    ref = branch,
+                    inputs = dict(args=shlex.join(argv[1:])),
+                    )
+            workflow_id = github.gh_run_workflow(
+                    f'https://api.github.com/repos/{info["github_name"]}',
+                    'test.yml',
+                    data,
+                    )
+
+    assert isinstance(workflow_id, str)
+    url = f'https://api.github.com/repos/{info["github_name"]}'
+    #pipcl.log(f'Calling github.gh_workflow_download_multiple() with {url=} {workflow_id=}.')
+    github.gh_workflow_download_multiple(
+            url,
+            workflow_id,
+            #extra_wheels=upload_extra_wheels,
+            upload='pypi' if state.github_upload else None,
+            )
+
+def do_remote(state, argv):
+    remote = state.remote
+    remote_dir = state.remote_dir
+    verbose = 1
+    jumps = None
+    if ' ' not in remote:
+        jumps = remote.split('::')
+        jumps, remote = jumps[:-1], jumps[-1]
+    colon = remote.rfind(':')
+    if colon >= 0:
+        remote, remote_dir = remote[:colon], remote[colon+1:]
+        pipcl.log(f'{remote=}')
+    if jumps:
+        pipcl.log(f'{jumps=} {remote=}')
+        ssh_command = 'ssh'
+        for j in jumps:
+            ssh_command += f' -J {j}'
+        ssh_command += f' {remote}'
+        label = remote
+        remote = None
+    elif ' ' in remote:
+        ssh_command = remote
+        remote = None
+        label = ssh_command
+    else:
+        ssh_command = 'ssh'
+        label = remote
+    pipcl.log(f'{ssh_command=}')
+
+    if state.remote_do:
+        git_paths = list()
+        sync_artifex_software_ssh_key = False
+
+        def sync2(path):
+            return sync(
+                    remote,
+                    remote_dir,
+                    path,
+                    ssh_command=ssh_command,
+                    verbose=verbose,
+                    state=state,
+                    )
+
+        # Sync each package.
+        all_packages = list(state.packages.items()) + list(state.packages2.items())
+        for package_name, (package_location, args_pos) in all_packages:
+            if not package_location.startswith(('git:', 'pip:')):
+                pipcl.log(f'{remote=} {remote_dir=} {package_location=} {ssh_command=}')
+                if sync2(package_location):
+                    git_paths.append(package_location)
+            if package_location.startswith('git:'):
+                sync_artifex_software_ssh_key = True
+
+        # Sync aptest itself.
+        if sync2(g_root):
+            git_paths.append(g_root)
+
+        # Sync Artifex github key.
+        if sync_artifex_software_ssh_key:
+            if os.path.isfile(path_artifex_key):
+                sync2(path_artifex_key)
+            else:
+                pipcl.log(
+                        f'## Warning: may not be able to remote'
+                        f' clone/update pro or layout checkouts'
+                        f' because not a file: {path_artifex_key}'
+                        )
+
+        # Sync Huggingface key.
+        if 'gnn' in state.commands:
+            if os.path.isfile(path_huggingface_key):
+                sync2(path_huggingface_key)
+            else:
+                pipcl.log(
+                        f'## Warning: may not be able to remote'
+                        f' use Huggingface because not a file:'
+                        f' {path_huggingface_key}'
+                        )
+
+        # Sync pymupdfpro build key.
+        if 'pymupdfpro' in state.packages_build:
+            if os.path.isfile(path_pro_key):
+                sync2(path_pro_key)
+            else:
+                pipcl.log(
+                        f'## Warning: may not be able to remote build'
+                        f' SmartOffice because not a file:'
+                        f' {path_artifex_key}'
+                        )
+            sync2(path_pro_key)
+
+        # Run remote command.
+        #
+        remote_command = f'cd {remote_dir} && '
+        for git_path in git_paths:
+            # We exclude *.tar.gz to avoid pymupdf re-downloading mupdf .tar.gz file.
+            remote_command += f'(cd {git_path} && git clean -e "*.tar.gz" -f) && '
+        if state.remote_prefix:
+            remote_command += f'{state.remote_prefix} '
+        elif remote and 'windows' in remote:
+            remote_command += f'py '
+        remote_command += f'{os.path.basename(g_root_abs)}/aptest.py {shlex.join(argv[1:])}'
+
+        command = f'{ssh_command} {remote if remote else ""} {shlex.quote(remote_command)}'
+        pipcl.log(f'{command=}')
+        pipcl.log(f'{ssh_command=}')
+
+        tee_simple = f'out-{remote}'
+        tee = f'{tee_simple}-{time.strftime("%F-%H-%M-%S")}'
+        try:
+            pipcl.run(
+                    command,
+                    prefix=f'{label}: ',
+                    out='log',
+                    tee=tee,
+                    ticker=state.ticker,
+                    )
+        finally:
+            # Update softlink after remote command has finished. Avoids
+            # continuoue updates.
+            pipcl.run(f'ln -sf {tee} {tee_simple}')
+
+    if 1:
+        # Copy remote wheels back to local machine.
+        filters = list()
+        for package in state.packages_build:
+            filters.append(f'--include={package}-*.whl')
+            filters.append(f'--include={package}-*.tar.gz')
+        filters.append('--exclude=*')
+        sync_reverse(
+                remote,
+                remote_dir,
+                f'{state.wheelhouse}/',
+                f'{state.wheelhouse}/',
+                ssh_command=ssh_command,
+                filters=filters,
+                )
+    if 1:
+        # Copy test-gnn-*.json back to local machine.
+        sync_reverse(
+                remote,
+                remote_dir,
+                './',
+                './',
+                ssh_command=ssh_command,
+                filters = '"--include=test-gnn-*.json" "--exclude=*"',
+                )
+
+
+def do_build(state):
+    # We use `pip --extra-index-url {pip_index_url}` so that pip
+    # finds prerequisite wheels in state.wheelhouse.
+    pip_index_url = f'file://{os.path.abspath(state.wheelhouse)}/simple'
+    # pip fails if pip_index_url contains back-slashes, with
+    # `ERROR: Could not install packages due to an OSError: [Errno
+    # 13] Permission denied:...`.
+    pip_index_url = pip_index_url.replace('\\', '/')
+    if 'mupdf' in state.packages:
+        directory = _get_local('mupdf', state)
+        if directory:
+            state.env_extra['PYMUPDF_SETUP_MUPDF_BUILD'] = os.path.abspath(directory)
+    if 'mupdf' in state.packages and 'mupdf' not in state.packages_build:
+        PYMUPDF_SETUP_MUPDF_REBUILD = '0'
+        pipcl.log(f'Setting {PYMUPDF_SETUP_MUPDF_REBUILD=}')
+        state.env_extra['PYMUPDF_SETUP_MUPDF_REBUILD'] = PYMUPDF_SETUP_MUPDF_REBUILD
+    for package in state.packages_build:
+        pipcl.log(f'{package=}')
+        location, args_pos = state.packages[package]
+        if not location:
+            continue
+        if location.startswith('pip:'):
+            assert package != 'mupdf', f'Not a package on pypi.org: {package}'
+            name = location[4:]
+            if name.endswith(('.whl', '.tar.gz')):
+                pass
+            else:
+                name = f'{package}{name}'
+            # Get wheel from pypi.org and put into our wheelhouse
+            # so it is available for later builds. Then install;
+            # pip uses a cache so will not download twice.
+            pipcl.run(f'pip wheel -w {state.wheelhouse} {name}')
+            pipcl.run(f'pip install -v {name}')
+        else:
+            directory = _get_local(package, state)
+            if package == 'pymupdf4llm':
+                # setup.py is in subdirectory pymupdf4llm/.
+                directory += '/pymupdf4llm'
+            directory_abs = os.path.abspath(directory)
+            pipcl.log(f'{package=} {directory=}')
+            if package == 'mupdf':
+                state.env_extra['PYMUPDF_SETUP_MUPDF_BUILD'] = directory_abs
+                # fixme: be able to set to '' for system install?
+            else:
+                if package:
+                    pipcl.run(f'pip uninstall -y {package}')
+
+                if state.sdists:
+                    build_sdist(package, directory)
+
+                if (package == 'pymupdf'
+                        and state.graal
+                        and (
+                            'pymupdfpro' in state.packages_build
+                            or 'pymupdf_layout' in state.packages_build
+                            )
+                        ):
+                    # As of 2025-08-07, pipcl does graal builds by
+                    # running a non-graal build with graal python's
+                    # include and library paths.
+                    #
+                    # In the non-graal build, out setup.py will
+                    # still want to do `import pymupdf`, so we
+                    # prepare a non-graal venv containing its own
+                    # build of the specified pymupdf, and tell
+                    # pipcl to use it when it does the non-graal
+                    # build. Thus pymupdfpro's setup.py will be
+                    # able to do `import pymupdf` etc.
+                    #
+                    native_python = os.environ['PIPCL_GRAAL_PYTHON']
+                    assert native_python
+                    venv_native = 'venv-aptest-graal-native'
+                    pipcl.run(f'{native_python} -m venv {venv_native}')
+                    pipcl.run(
+                            f'. {venv_native}/bin/activate && pip install -v {directory_abs}',
+                            env_extra=state.env_extra,
+                            prefix='PyMuPDFPro/scripts/test.py install PyMuPDF graal native python: ',
+                            )
+                    # Tell pipcl to use <venv_native> when it
+                    # builds pymupdfpro/layout later on.
+                    state.env_extra['PIPCL_GRAAL_NATIVE_VENV'] = os.path.abspath(venv_native)
+
+                if state.build_type:
+                    if package == 'pymupdf':
+                        state.env_extra['PYMUPDF_SETUP_MUPDF_BUILD_TYPE'] = state.build_type
+                    if package == 'pymupdfpro':
+                        state.env_extra['PYMUPDFPRO_SETUP_BUILD_TYPE'] = state.build_type
+                    if package == 'pymupdf_layout':
+                        state.env_extra['PYMUPDF_LAYOUT_SETUP_BUILD_TYPE'] = state.build_type
+
+                new_files = pipcl.NewFiles(f'{state.wheelhouse}/{package}*.whl')
+                pipcl.run(
+                        #f'pip wheel -v --extra-index-url {pip_index_url} --no-cache-dir -w {state.wheelhouse} {directory_abs}',
+                        f'pip wheel -v --extra-index-url {pip_index_url} -w {state.wheelhouse} {directory_abs}',
+                        env_extra=state.env_extra,
+                        prefix=f'build {package}: ',
+                        )
+                wheel = new_files.get_one()
+
+                if package == 'pymupdf':
+                    # Set PYMUPDF_SETUP_VERSION so subsequent builds are configured
+                    # for the PyMuPDF we have just built.
+                    PYMUPDF_SETUP_VERSION = os.path.basename(wheel).split('-')[1]
+                    state.env_extra['PYMUPDF_SETUP_VERSION'] = PYMUPDF_SETUP_VERSION
+                    pipcl.log(f'### Have set {PYMUPDF_SETUP_VERSION=}')
+                pipcl.run(
+                        #f'pip install -v --extra-index-url {pip_index_url} --no-cache-dir {wheel}',
+                        f'pip install -v --extra-index-url {pip_index_url} {wheel}',
+                        env_extra=state.env_extra,
+                        prefix=f'install {package}: ',
+                        )
+            pipcl.run(
+                    f'piprepo build {state.wheelhouse}',
+                    prefix='piprepo build: ',
+                    )
+
+
+def do_cibw(state):
+    '''
+    Build wheels for each package with cibuildwheel, adding to wheelhouse,
+    and using piprepo to update a local pypi-style tree.
+    '''
+    pipcl.run(
+            f'pip install --upgrade --force-reinstall {state.cibw_name}',
+            prefix=f'pip install {state.cibw_name}: ',
+            )
+    pipcl.run(f'pip install --upgrade pytest')
+
+    # Some general flags.
+    if 'CIBW_BUILD_VERBOSITY' not in state.env_extra:
+        state.env_extra['CIBW_BUILD_VERBOSITY'] = '1'
+
+    # Add default flags to CIBW_SKIP.
+    # 2025-10-07: `cp3??t-*` excludes free-threading.
+
+    if state.cibw_skip_add_defaults:
+        CIBW_SKIP = state.env_extra.get('CIBW_SKIP', '')
+        CIBW_SKIP += ' *i686 *musllinux* *-win32 *-aarch64 cp3??t-*'
+        CIBW_SKIP = CIBW_SKIP.split()
+        CIBW_SKIP = sorted(list(set(CIBW_SKIP)))
+        CIBW_SKIP = ' '.join(CIBW_SKIP)
+        state.env_extra['CIBW_SKIP'] = CIBW_SKIP
+
+    # Set what wheels to build, if not already specified.
+    if 'CIBW_ARCHS' not in state.env_extra:
+        if 'CIBW_ARCHS_WINDOWS' not in state.env_extra:
+            state.env_extra['CIBW_ARCHS_WINDOWS'] = 'auto64'
+
+        if 'CIBW_ARCHS_MACOS' not in state.env_extra:
+            state.env_extra['CIBW_ARCHS_MACOS'] = 'auto64'
+
+        if 'CIBW_ARCHS_LINUX' not in state.env_extra:
+            state.env_extra['CIBW_ARCHS_LINUX'] = 'auto64'
+
+    # Tell cibuildwheel not to use `auditwheel` on Linux and MacOS,
+    # because it cannot cope with us deliberately having required
+    # libraries in different wheel - specifically in the PyMuPDF wheel.
+    #
+    # We cannot use a subset of auditwheel's functionality
+    # with `auditwheel addtag` because it says `No tags
+    # to be added` and terminates with non-zero. See:
+    # https://github.com/pypa/auditwheel/issues/439.
+    #
+    state.env_extra['CIBW_REPAIR_WHEEL_COMMAND_LINUX'] = ''
+    state.env_extra['CIBW_REPAIR_WHEEL_COMMAND_MACOS'] = ''
+
+    # Specify python versions.
+    CIBW_BUILD = state.env_extra.get('CIBW_BUILD')
+    pipcl.log(f'{CIBW_BUILD=}')
+    if CIBW_BUILD is None:
+        if state.graal:
+            CIBW_BUILD = 'gp*'
+            state.env_extra['CIBW_ENABLE'] = 'graalpy'
+        elif state.cibw_pyodide:
+            # Using python-3.13 fixes problems with MuPDF's setjmp/longjmp.
+            CIBW_BUILD = 'cp313*'
+        elif os.environ.get('GITHUB_ACTIONS') == 'true':
+            # Build/test all supported Python versions.
+            CIBW_BUILD = cibw_cp(*python_versions_minor)
+        else:
+            # Build/test current Python only.
+            v = platform.python_version_tuple()[:2]
+            pipcl.log(f'{v=}')
+            CIBW_BUILD = f'cp{"".join(v)}*'
+        pipcl.log(f'Defaulting to {CIBW_BUILD=}.')
+
+    cibw_pyodide_args = ''
+    if state.cibw_pyodide:
+        cibw_pyodide_args = ' --platform pyodide'
+        state.env_extra['HAVE_LIBCRYPTO'] = 'no'
+        state.env_extra['PYMUPDF_SETUP_MUPDF_TESSERACT'] = '0'
+    if state.cibw_pyodide_version:
+        # 2025-07-21: there is no --pyodide-version option so we set
+        # CIBW_PYODIDE_VERSION.
+        state.env_extra['CIBW_PYODIDE_VERSION'] = state.cibw_pyodide_version
+        state.env_extra['CIBW_ENABLE'] = 'pyodide-prerelease'
+
+    packages = list()
+    for package in state.packages_build:
+        pipcl.log(f'{package=}')
+        directory = _get_local(package, state)
+        if not directory:
+            # location is pip.
+            # cibuildwheel will download from pypi as required.
+            pipcl.log(f'Unable to process with cibuildwheel because location is pip: {package=}')
+            continue
+        directory_abs = os.path.abspath(directory)
+        if package == 'mupdf':
+            if platform.system() == 'Linux' and not state.cibw_pyodide:
+                # Need /host/ prefix so accessible from within manylinux docker.
+                state.env_extra['PYMUPDF_SETUP_MUPDF_BUILD'] = f'/host{directory_abs}'
+            else:
+                state.env_extra['PYMUPDF_SETUP_MUPDF_BUILD'] = directory_abs
+            # fixme: be able to set to '' for system install?
+            continue
+
+        if state.sdists and platform.system() == 'Linux':
+            build_sdist(package, directory)
+
+        # Tell cibuildwheel how to test <package>.
+        if package in state.packages_test:
+            if 0:
+                CIBW_TEST_COMMAND = f'python {{project}}/scripts/test.py test'
+                if state.pytest_options:
+                    if package == 'pymupdf':
+                        CIBW_TEST_COMMAND += f' -p {shlex.quote(state.pytest_options)}'
+                    elif package == 'pymupdfpro':
+                        CIBW_TEST_COMMAND += f' -t {shlex.quote(state.pytest_options)}'
+                    elif package == 'pymupdf_layout':
+                        CIBW_TEST_COMMAND += f' -t {shlex.quote(state.pytest_options)}'
+                    else:
+                        pipcl.log(f'Unable to add {state.pytest_options=} to CIBW_TEST_COMMAND.')
+                state.env_extra['CIBW_TEST_COMMAND'] = CIBW_TEST_COMMAND
+            else:
+                CIBW_TEST_COMMAND = f'pip install --upgrade pytest && pytest'
+                if state.pytest_options:
+                    CIBW_TEST_COMMAND += f' {state.pytest_options}'
+                CIBW_TEST_COMMAND += f' {{project}}/tests'
+                state.env_extra['CIBW_TEST_COMMAND'] = CIBW_TEST_COMMAND
+
+        else:
+            pipcl.log(f'Not testing because not in state.packages_test: {package=}')
+        # fixme: prefer to just run pytest directly. Needs
+        # test/conftest.py to always `pip install` packages
+        # required for testing.
+        #state.env_extra['CIBW_TEST_COMMAND'] = f'pytest {{project}}/tests'
+
+        # Use a copy of state.env_extra because we modify it if
+        # using manylinux docker.
+        #
+        env_extra = state.env_extra.copy()
+
+        if platform.system() == 'Linux':
+            prefix = '/host'
+            # Update GIT_SSH_COMMAND and
+            # PYMUPDFPRO_SETUP_SOT_KEY_PATH if set, to be within
+            # /host in manylinux docker. Otherwise for example
+            # tests that access remote git repositories will not
+            # use the appropriate key.
+            GIT_SSH_COMMAND_0 = env_extra.get('GIT_SSH_COMMAND')
+            if GIT_SSH_COMMAND_0:
+                GIT_SSH_COMMAND = f'ssh -i {prefix}{state.ssh_key_path_abs} -o StrictHostKeyChecking=no'
+                pipcl.log(f'Changing GIT_SSH_COMMAND from {GIT_SSH_COMMAND_0!r} to {GIT_SSH_COMMAND!r}.')
+                env_extra['GIT_SSH_COMMAND'] = GIT_SSH_COMMAND
+
+            PYMUPDFPRO_SETUP_SOT_KEY_PATH = env_extra.get('PYMUPDFPRO_SETUP_SOT_KEY_PATH')
+            if PYMUPDFPRO_SETUP_SOT_KEY_PATH:
+                env_extra['PYMUPDFPRO_SETUP_SOT_KEY_PATH'] = \
+                        f'{prefix}{os.path.abspath(PYMUPDFPRO_SETUP_SOT_KEY_PATH)}'
+        else:
+            prefix = ''
+
+        if platform.system() == 'Linux' and package == 'pymupdfpro':
+            # Build will run inside a CentOS-7 container; we
+            # need to install fontconfig-devel so `#include
+            # <fontconfig/fonctconfig.h>` works. And for SO build
+            # we need ssh to allow its git submodule commands.
+            #
+            env_extra['CIBW_BEFORE_BUILD_LINUX'] = (
+                    'echo "installing fontconfig-devel and ssh"'
+                    ' && yum -y install fontconfig-devel'
+                    ' && yum groupinstall -y fonts'
+                    ' && yum install -y openssh-clients'
+                    )
+
+        # Ensure that when cibuildwheel runs pip to
+        # install prerequisite packages, it also looks in
+        # state.wheelhouse. PIP_EXTRA_INDEX_URL is equivalent to
+        # pip's `--extra-index-url`.
+        env_extra['PIP_EXTRA_INDEX_URL'] = \
+                f'file://{prefix}{os.path.abspath(state.wheelhouse)}/simple'.replace('\\', '/')
+
+        env_extra['CIBW_BUILD'] = CIBW_BUILD
+
+        # Pass all the environment variables we have set in
+        # state.env_extra, to Linux docker. Note that this will
+        # miss any settings in the original environment.
+        CIBW_ENVIRONMENT_PASS_LINUX = env_extra.keys()
+        CIBW_ENVIRONMENT_PASS_LINUX = list(CIBW_ENVIRONMENT_PASS_LINUX)
+        CIBW_ENVIRONMENT_PASS_LINUX.append('PYMUPDFPRO_SETUP_SOT_KEY')  # This can be set in os.environ.
+        CIBW_ENVIRONMENT_PASS_LINUX.sort()
+        CIBW_ENVIRONMENT_PASS_LINUX = ' '.join(CIBW_ENVIRONMENT_PASS_LINUX)
+        env_extra['CIBW_ENVIRONMENT_PASS_LINUX'] = CIBW_ENVIRONMENT_PASS_LINUX
+
+        pipcl.run(
+                f'cd {directory} && cibuildwheel{cibw_pyodide_args}'
+                    f' --output-dir {os.path.abspath(state.wheelhouse)}',
+                env_extra=env_extra,
+                prefix=f'cibw {package}: ',
+                )
+
+        pipcl.run(f'ls -ld {state.wheelhouse}/*')
+        pipcl.run(f'piprepo build {state.wheelhouse}')
+        packages.append(package)
+
+        if 0:
+            pipcl.log(f'Contents of: {state.wheelhouse=} are:')
+            for dirpath, dirnames, filenames in os.walk(state.wheelhouse):
+                for filename in filenames:
+                    path = os.path.join(dirpath, filename)
+                    st = os.stat(path)
+                    pipcl.log(f'{st=}: {path=}')
+                for dirname in dirnames:
+                    path_dir = os.path.join(dirpath, dirname)
+                    st = os.stat(path_dir)
+                    pipcl.log(f'{st=}: {path_dir=}')
+
+
+def do_gnn_download(state):
+    pipcl.log(f'Install CUDA from; https://developer.nvidia.com/cuda-12-1-0-download-archive')
+    layout_location = _get_local('pymupdf_layout', state)
+    pipcl.log(f'{layout_location=}')
+
+    # pytorch-scatter does not specify torch as a build-time prerequisite. This is
+    # deliberate because they say that usually needs to be built with
+    # a specific torch.
+    #
+    # I don't understand this. The only way to make things work
+    # is to install the latest versions on pypi.prg, and build
+    # torch-scatter without isolation so that it can build with
+    # the installed torch.
+    pipcl.run('pip install -v torch')
+    pipcl.run('pip install -v --no-build-isolation torch-scatter')
+
+    pipcl.run(f'pip install -r {layout_location}/train/requirements.txt')
+
+    pipcl.run(f'pip install datasets')
+    pipcl.run(f'pip install huggingface_hub[hf_xet]')
+    import datasets
+    import huggingface_hub
+
+    if 0:
+        # List all huggingface datasets.
+        pipcl.log(f'huggingface_hub.list_datasets():')
+        for dataset in huggingface_hub.list_datasets():
+            pipcl.log(f'    {dataset.id=}')
+
+    if 1:
+
+        # Set up as described in
+        # https://github.com/ArtifexSoftware/sce/wiki/How-to-train-GNN
+
+        # Download zip files.
+        pipcl.run('pip install --upgrade requests')
+        url_doclaynet_core_zip = 'https://codait-cos-dax.s3.us.cloud-object-storage.appdomain.cloud/dax-doclaynet/1.0.0/DocLayNet_core.zip'
+        url_doclaynet_extra_zip = 'https://codait-cos-dax.s3.us.cloud-object-storage.appdomain.cloud/dax-doclaynet/1.0.0/DocLayNet_extra.zip'
+
+        def download(url):
+            '''
+            Downloads to basename(url), but does nothing if already
+            exists. We download to temporary and rename, so this
+            should never overwrite an existing download.
+            '''
+            path = os.path.basename(url)
+            if os.path.exists(path):
+                pipcl.log(f'Already exists: {path=}')
+            else:
+                if state.gnn_doit:
+                    github._gh_download(url, path, gh=0)
+                else:
+                    assert 0, f'Would download but {state.gnn_doit=}: {url} {path=}'
+        download(url_doclaynet_core_zip)
+        download(url_doclaynet_extra_zip)
+
+        def marker_ok(marker, infile=None):
+            '''
+            Returns true if <marker> exists (and is newer than
+            <infile> if not None).
+            '''
+            if os.path.exists(marker):
+                mtime_marker = os.stat(marker).st_mtime
+                mtime_infile = os.stat(infile).st_mtime if infile else 0
+                if mtime_marker > mtime_infile:
+                    pipcl.log(f'Already up to date: {marker=}.')
+                    return 1
+            if not state.gnn_doit:
+                assert 0, f'Would return false for {marker=}, but {state.gnn_doit=}'
+
+        def marker_create(maker):
+            with open(marker, 'w'):
+                pass
+            pipcl.log(f'Have created {marker=}.')
+
+        def ensure_unzip(url, directory):
+            '''
+            Unzips leafname(url) into <directory> if it has not
+            already been done.
+
+            If marker file exists and is newer than zip file,
+            does nothing. Otherwise unzips leafname(url) into
+            <directory> and creates marker file.
+            '''
+            path_zip = os.path.basename(url)
+            marker = f'{directory}/_marker_{path_zip}'
+            if marker_ok(marker, path_zip):
+                return
+            import zipfile
+            pipcl.log(f'Opening {path_zip=}')
+            with zipfile.ZipFile(path_zip) as z:
+                pipcl.log(f'Extacting {path_zip=} into {directory=}.')
+                os.makedirs(directory, exist_ok=1)
+                z.extractall(directory)
+            marker_create(maker)
+
+        if 1:
+            # Unzip.
+            ensure_unzip(url_doclaynet_core_zip, 'datasets/DocLayNet')
+            ensure_unzip(url_doclaynet_extra_zip, 'datasets/DocLayNet')
+
+        if 1:
+            # Generate PKL.
+
+            marker_pkl = '_marker_pkl'
+            if marker_ok(marker_pkl):
+                pass
+            else:
+                pipcl.run(f'{sys.executable}'
+                        f' {layout_location}/train/tools/make_pkl_data_from_COCO_json.py'
+                        f' --json datasets/DocLayNet/COCO/train.json'
+                        f' --img_dir datasets/DocLayNet/PNG'
+                        f' --save_dir workspace/pkl_data/train'
+                        )
+                with open(marker_pkl, 'w'):
+                    pipcl.log(f'Have created {marker_pkl=}.')
+
+            marker_pkl_validation = '_marker_pkl_validation'
+            if marker_ok(marker_pkl_validation):
+                pass
+            else:
+                pipcl.run(f'{sys.executable}'
+                        f' {layout_location}/train/tools/make_pkl_data_from_COCO_json.py'
+                        f' --json datasets/DocLayNet/COCO/val.json'
+                        f' --img_dir datasets/DocLayNet/PNG'
+                        f' --save_dir workspace/pkl_data/val'
+                        )
+                with open(marker_pkl_validation, 'w'):
+                    pipcl.log(f'Have created {marker_pkl_validation=}.')
+
+        if 0:
+            # Doesn't work - No such file or directory: 'workspace/checkpoints/model.yaml.
+            pipcl.run(f'pip install --upgrade torchvision')
+            pipcl.run(
+                    f'{sys.executable} {layout_location}/train/tools/test_gnn.py {layout_location}/train/cfgs/config.yaml',
+                    env_extra=dict(PYTHONPATH=layout_location),
+                    )
+
+    if 0:
+        # Alternative ways of getting data.
+
+        # Get data using `datasets` module.
+
+        #doclaynet_core = datasets.load_dataset('doclaynet_core')
+        #doclaynet_core = datasets.load_dataset('doclaynet_extra')
+        # From https://huggingface.co/datasets/pierreguillou/DocLayNet-large:
+
+        # Get data using huggingface_hub.snapshot_download().
+        # From https://huggingface.co/datasets/pierreguillou/DocLayNet-large.
+        dataset_id='pierreguillou/DocLayNet-large'
+
+        huggingface_key = None
+        if state.huggingface_key_path_abs:
+            with open(state.huggingface_key_path_abs) as f:
+                huggingface_key = f.read().strip()
+
+        pipcl.log(f'huggingface_hub.snapshot_download()')
+        huggingface_hub.snapshot_download(dataset_id, token=huggingface_key, repo_type='dataset', max_workers=1)
+
+
+def do_gnn_graph(state):
+    prefix = 'gnn-graph: '
+    if state.gnn_graph_select_root:
+        pattern = f'{state.gnn_graph_select_root}/test-gnn-*.json'
+    else:
+        pattern = f'test-gnn-*.json'
+    if state.gnn_graph_select:
+        pipcl.log(f'{state.gnn_graph_select=}')
+        gnn_select_code = compile(state.gnn_graph_select, '', 'eval')
+        def selectfn(results):
+            #r = eval(gnn_select_code, globals=dict(results=results))
+            r = eval(gnn_select_code)#, globals=dict(results=results))
+            return r
+    paths = list()
+    pattern_matches = glob.glob(pattern)
+    for path in pattern_matches:
+        if state.gnn_graph_select:
+            with open(path) as f:
+                results = json.load(f)
+            # Convert to a Doct so that selectfn() can use dotted notation.
+            results = doct.Doct(results)
+            s = selectfn(results)
+        else:
+            s = True
+        if s:
+            #pipcl.log(f'{command}: Selecting: {path!r}')
+            paths.append(path)
+    pipcl.log(f'{prefix}Selected gnn paths ({len(paths)}/{len(pattern_matches)}:')
+    for path in paths:
+        pipcl.log(f'{prefix}    {path!r}')
+
+    if state.gnn_graph_out is None:
+        out = f'gnn-graph-{time.strftime("%Y-%m-%d-%H-%M-%S")}.html'
+        out_simple = f'gnn-graph.html'
+    else:
+        out = state.gnn_graph_out
+        out_simpe = None
+
+    if out:
+        graph.plot_gnn_html(paths, out)
+        pipcl.log(f'Have created: {out=}')
+        if out_simple:
+            pipcl.fs_remove(out_simple)
+            try:
+                os.symlink(out, out_simple)
+            except Exception as e:
+                pipcl.log(f'Warning: failed to create link from {out_simple=} to {out=}.')
+            pipcl.log(f'Have created softlink {out_simple=} => {out=}')
+    else:
+        pipcl.log(f'Not creating graph output; {state.gnn_graph_out=}.')
+
+
+def do_test_gnn(state, command):
+    layout_location = _get_local('pymupdf_layout', state)
+
+    def run(command):
+        t = time.time()
+        try:
+            pipcl.run(command)
+        finally:
+            t = time.time() - t
+            pipcl.log(f'Command took {pipcl._duration(t)}.')
+
+    if command == 'test-gnn':
+        run(f'cd {layout_location} && {sys.executable} eval/eval_gnn.py --pdf_dir ../datasets/DocLayNet/PDF')
+
+    elif command == 'test-gnn-pymupdf_layout':
+        run(f'cd {layout_location} && {sys.executable} eval/eval_pymupdf_layout.py --pdf_dir ../datasets/DocLayNet/PDF')
+
+    elif command == 'test-gnn-pymupdf4llm':
+        pipcl.run(f'pip install tqdm')
+        sys.path.insert(0, f'{layout_location}/eval')
+        try:
+            import eval_util
+            import eval_pymupdf4llm
+        finally:
+            del sys.path[0]
+        out_dir = 'test-gnn-devel'
+        pipcl.fs_ensure_empty_dir(out_dir)
+        vis_pdf_dir = f'{out_dir}/vis'
+        pipcl.fs_ensure_empty_dir(vis_pdf_dir)
+        result_csv_path = f'{out_dir}/result.csv'
+        pdf_dirs = ['datasets/DocLayNet/PDF']
+        gt_dir = f'{layout_location}/eval/resources/gt'
+        det_func = eval_pymupdf4llm.det_func
+
+        ret = dict()
+
+        ret['python'] = dict()
+        ret['python']['platform.machine()'] = platform.machine()
+        ret['python']['platform.system()'] = platform.system()
+        ret['python']['platform.python_implementation()'] = platform.python_implementation()
+        ret['python']['platform.python_version()'] = platform.python_version()
+        ret['python']['platform.uname()'] = platform.uname()
+        ret['python']['platform.system()'] = platform.system()
+        ret['python']['sys.version'] = sys.version
+        ret['python']['sys.version_info'] = sys.version_info
+
+        ret['wordsize'] = sys.maxsize.bit_length() + 1
+
+        ret['environ'] = dict()
+        ret['environ']['USER'] = os.environ.get('USER')
+
+        ret['state'] = dict()
+        ret['state']['det_func'] = dict()
+        ret['state']['det_func']['__name__'] = det_func.__name__
+        ret['state']['det_func']['__module__'] = det_func.__module__
+        ret['state']['pdf_dirs'] = pdf_dirs
+        ret['state']['gt_dir'] = gt_dir
+        ret['state']['limit'] = state.test_gnn_limit
+        
+        for n, v in state.test_gnn_extra.items():
+            ret[n] = v
+
+        ret['packages'] = dict()
+        for package, (location, _) in state.packages.items():
+            directory = _get_local(package, state)
+            metadata_version = importlib.metadata.version(package)
+            ret['packages'][package] = dict()
+            ret['packages'][package]['location'] = location
+            ret['packages'][package]['directory'] = directory
+            ret['packages'][package]['metadata_version'] = metadata_version
+            if directory:
+                sha, comment, diff, branch = pipcl.git_info(directory)
+                author_date = pipcl.git_info_author_date(directory)
+                committer_date  = pipcl.git_info_committer_date(directory)
+                ret['packages'][package]['gitinfo'] = dict(
+                        sha=sha,
+                        comment=comment,
+                        diff=diff,
+                        branch=branch,
+                        author_date=author_date,
+                        committer_date=committer_date,
+                        )
+
+        # Provide version info for all installed packages. This
+        # is helpful if for example pymupdf was not specified -
+        # in this case the latest version on pypi will have been
+        # installed as a prerequisite by pip.
+        text = pipcl.run(f'pip list --format json', capture=1)
+        pip_list_packages = json.loads(text)
+        ret['pip-list'] = pip_list_packages
+
+        t_start = time.time()
+        # Older pymupdf_layout's eval_util.evaluate_detection()
+        # does not have <limit> arg, so we are careful to not pass
+        # in <limit> if not specified.
+        kwargs = dict(
+                pdf_dirs=pdf_dirs,
+                result_csv_path=result_csv_path,
+                gt_dir=gt_dir,
+                vis_error_count=0,
+                vis_pdf_dir=vis_pdf_dir,
+                )
+        if state.test_gnn_limit:
+            kwargs['limit'] = state.test_gnn_limit
+
+        results = eval_util.evaluate_detection(det_func, **kwargs)
+        t_duration = time.time() - t_start
+        assert len(results) == 1
+        results = results[0]
+
+        ret['results'] = results
+        ret['t_start'] = t_start
+        ret['t_duration'] = t_duration
+
+        pipcl.log(f'Results are:\n{json.dumps(ret, indent="    ")}')
+
+        name_t = time.strftime('%Y-%m-%d-%H-%M-%S', time.gmtime(t_start))
+        name = f'test-gnn-pymupdf4llm-{name_t}.json'
+        with open(name, 'w') as f:
+            json.dump(ret, f, indent='    ', sort_keys=1)
+        pipcl.log(f'Have written results to file {name!r}.')
+
+        if state.test_gnn_push:
+            push_results(name, state.env_extra)
+        else:
+            pipcl.log(f'Not pushing results to PyMuPDF-performance-results: {name=}')
+
+    else:
+        assert 0, f'Unrecognised command: {command=}'
+
+
+def do_test(state):
+    if state.pytest_wrap in ('valgrind', 'helgrind'):
+        if state.system_packages:
+            pipcl.log('Installing valgrind.')
+            pipcl.run(f'sudo apt update')
+            pipcl.run(f'sudo apt install --upgrade valgrind')
+        pipcl.run(f'valgrind --version')
+
+    pipcl.run(f'pip install --upgrade pytest')
+    pipcl.log(f'packages_test:')
+    for i in state.packages_test:
+        pipcl.log(f'    {i!r}')
+
+    failed_packages = list()
+
+    if state.test_extra_packages:
+        pipcl.run(f'pip install {" ".join(state.test_extra_packages)}')
+
+    for package in state.packages_test:
+        location, _ = state.packages[package]
+        if not location:
+            continue
+        if package == 'mupdf':
+            continue
+        directory = _get_local(package, state, test=1)
+        if not directory:
+            continue
+        if package == 'langchain_pymupdf_layout':
+            command = f'{sys.executable} {directory}/simple_test.py'
+            e = pipcl.run(
+                    command,
+                    env_extra=state.env_extra,
+                    prefix=f'langchain_pymupdf_layout simple_test.py: ',
+                    check=0,
+                    )
+            pipcl.log(f'langchain_pymupdf_layout command returned {e=}.')
+        else:
+            command = f'pytest'
+            if state.pytest_options:
+                command += f' {state.pytest_options}'
+            if state.pytest_paths:
+                for path in state.pytest_paths:
+                    command += f' {directory}/{path}'
+            else:
+                # We need to somehow limit things to {package}/tests/
+                # because otherwise pytest can recurse into other
+                # directories (e.g. mupdf checkout in pympdf) and get
+                # hopelessly confused.
+                #
+                # Would like to do `pytest {directory}` and let
+                # pytest.ini identify `tests/` as the directory look
+                # in for tests. But unfortunately pytest configuration
+                # doesn't seem to allow this sort of thing, for example
+                # `testpaths = tests` only effects `cd {package} &&
+                # pytest` - i.e. running pytest on current directory
+                # without specifying any location.
+                #
+                command += f' {directory}/tests'
+            if state.pytest_wrap in ('valgrind', 'helgrind'):
+                if not state.pytest_options:
+                    command += ' -sv'
+            if state.pytest_wrap:
+                command = f'python -m {command}'
+                if state.pytest_wrap == 'gdb':
+                    command = f'gdb --args {command}'
+                elif state.pytest_wrap == 'valgrind':
+                    state.env_extra['PYMUPDF_RUNNING_ON_VALGRIND'] = '1'
+                    state.env_extra['PYTHONMALLOC'] = 'malloc'
+                    command = (
+                            f' valgrind'
+                            f' --suppressions={g_root_abs}/valgrind.supp'
+                            f' --trace-children=no'
+                            f' --num-callers=20'
+                            f' --error-exitcode=100'
+                            f' --errors-for-leak-kinds=none'
+                            f' --fullpath-after='
+                            f' {command}'
+                            )
+                elif state.pytest_wrap == 'helgrind':
+                    state.env_extra['PYMUPDF_RUNNING_ON_VALGRIND'] = '1'
+                    state.env_extra['PYTHONMALLOC'] = 'malloc'
+                    command = (
+                            f' valgrind'
+                            f' --tool=helgrind'
+                            f' --trace-children=no'
+                            f' --num-callers=20'
+                            f' --error-exitcode=100'
+                            f' --fullpath-after='
+                            f' {command}'
+                            )
+                else:
+                    assert 0, f'Unrecognised {state.pytest_wrap=}.'
+            e = pipcl.run(
+                    command,
+                    env_extra=state.env_extra,
+                    prefix=f'pytest {package}: ',
+                    check=0,
+                    )
+        if e:
+            failed_packages.append(package)
+    if failed_packages:
+        pipcl.log(f'Tests failed for these packages:')
+        for package in failed_packages:
+            pipcl.log(f'    {package}')
+        raise Exception(f'Packages failed tests: {failed_packages}')
+
+
+def main(argv):
+    
+    if github_workflow_unimportant():
+        return
+    
+    args, state = get_args(argv)
     
     if not state.devel:
         # Don't output file:line etc, just output elapsed time.
@@ -1464,12 +2503,12 @@ def main(argv):
     if state.verbose:
         pipcl.show_system()
         
-    if show_help:
+    if state.show_help:
         print(__doc__)
         return
     
     # Check whether we should run with `-o <osname>`.
-    if not remote:
+    if not state.remote:
         os_self = platform.system().lower()
         oss = [os_self]
         #pipcl.log(f'{oss=}')
@@ -1481,36 +2520,32 @@ def main(argv):
             return
     
     # Rerun with different python if `--python` is specified.
-    if not remote and python:
-        python_version = pipcl.run(f'{python} -c "import platform; print(platform.python_version())"', capture=1)
+    if not state.remote and state.python:
+        python_version = pipcl.run(f'{state.python} -c "import platform; print(platform.python_version())"', capture=1)
         python_version_tuple = tuple(python_version.split('.'))
         if platform.python_version_tuple()[:2] == python_version_tuple[:2]:
             pipcl.log(f'Already running on required python. {platform.python_version_tuple()=} {python_version_tuple=}')
         else:
-            pipcl.log(f'{python=}: rerunning because {platform.python_version_tuple()[:2]=} != {python_version_tuple[:2]=}')
+            pipcl.log(f'{state.python=}: rerunning because {platform.python_version_tuple()[:2]=} != {python_version_tuple[:2]=}')
             argv = args.argv[:]
             argv[python_args_pos] = ''  # pylint: disable=used-before-assignment
-            e = pipcl.run(f'{python} {shlex.join(argv[1:])}', check=0)
+            e = pipcl.run(f'{state.python} {shlex.join(argv[1:])}', check=0)
             sys.exit(e)
             
-    # Hard-coded ssh/git key paths.
-    path_pro_key = 'thirdparty-so-key'
-    path_artifex_key = 'artifex-software-ssh-key'
-    path_huggingface_key = 'huggingface-key'
-    
-    if (not remote and state.commands) or remote == '@github':
-        if venv:
+    # Rerun ourselves in a venv if necessary.
+    if (not state.remote and state.commands) or state.remote == '@github':
+        if state.venv:
             # Rerun ourselves inside a venv if not already in a venv.
             if venv_in():
                 pipcl.log(f'Already in venv')
             else:
             
-                if not remote and state.graal:
+                if not state.remote and state.graal:
                     if 'cibw' in state.commands:
                         # We don't create graal/pyenv so wheel/build commands
                         # will not work.
                         assert 'build' not in state.commands
-                if not remote and state.graal and 'cibw' not in state.commands:
+                if not state.remote and state.graal and 'cibw' not in state.commands:
                     # Re-run ourselves in a pyenv/Graal venv.
                     # 2025-07-24: We need the latest pyenv.
                     graalpy = 'graalpy-24.2.1'
@@ -1520,9 +2555,9 @@ def main(argv):
                     os.environ['PATH'] = f'{pyenv_dir}/bin:{os.environ["PATH"]}'
                     os.environ['PIPCL_GRAAL_PYTHON'] = sys.executable
                     
-                    if venv >= 3:
+                    if state.venv >= 3:
                         shutil.rmtree(venv_name, ignore_errors=1)
-                    if venv == 1 and os.path.exists(pyenv_dir) and os.path.exists(venv_name):
+                    if state.venv == 1 and os.path.exists(pyenv_dir) and os.path.exists(venv_name):
                         pipcl.log(f'{venv=} and {venv_name=} already exists so not building pyenv or creating venv.')
                     else:
                         pipcl.git_get(pyenv_dir, remote='https://github.com/pyenv/pyenv.git', branch='master')
@@ -1536,22 +2571,28 @@ def main(argv):
                             )
                 else:
                     # Re-run ourselves in a Python venv.
-                    pipcl.log(f'{venv=}')
+                    pipcl.log(f'{state.venv=}')
                     Py_GIL_DISABLED = sysconfig.get_config_var('Py_GIL_DISABLED')
                     t = '-t' if Py_GIL_DISABLED else ''
                     venv_name = f'venv-aptest-{platform.python_version()}{t}-{int.bit_length(sys.maxsize+1)}'
                     e = venv_run(
                             sys.argv,
                             venv_name,
-                            recreate=(venv>=2),
-                            clean=(venv>=3),
+                            recreate=(state.venv>=2),
+                            clean=(state.venv>=3),
                             makelink='venv-aptest',
                             )
                 sys.exit(e)
     
+    # Hard-coded ssh/git key paths.
+    path_pro_key = 'thirdparty-so-key'
+    path_artifex_key = 'artifex-software-ssh-key'
+    path_huggingface_key = 'huggingface-key'
+    
     os.makedirs(state.wheelhouse, exist_ok=1)
         
-    # Set environment variables to give access to required git repositories.
+    # Set environment variable values in <state.env_extra> to give access to
+    # required git repositories.
     #
     paths_to_delete = list()
     if 1:
@@ -1611,239 +2652,18 @@ def main(argv):
                         f' {PYMUPDFPRO_SETUP_SOT_KEY_PATH!r} does not exist'
                         )
     
-    if remote:  # pylint: disable=too-many-nested-blocks
+    if state.remote:  # pylint: disable=too-many-nested-blocks
         argv = args.argv[:]
-        argv[remote_arg] = ''   # Change `-r github` to `-r ''`. # pylint: disable=used-before-assignment.
+        argv[state.remote_arg] = ''   # Change `-r github` to `-r ''`. # pylint: disable=used-before-assignment.
         
-        if remote == '@github':
-            # Run on Github.
-            pipcl.run('pip install requests')
-            branch = f'aptest-{os.environ["USER"]}'    # -{time.strftime("%F-%T")}'
-            pipcl.log(f'{branch=}.')
-
-            if remote_github_workflow_id:
-                # Wait for existing workflow istead of creating a new one.
-                workflow_id = remote_github_workflow_id
-                remote_github_workflow_package = 'aptest'
-                info = name_info(remote_github_workflow_package)
-            else:
-                # Push ourselves to Git.
-                git_push(g_root, 'git@github.com:ArtifexSoftware/aptest.git', branch, state)
-
-                # Push specified local package repository to Github and update args to
-                # point to new location.
-                for package_name, (package_location, args_pos) in list(state.packages.items()) + list(state.packages2.items()):
-                    if not package_location.startswith(('git:', 'pip:')):
-                        # Push to a Github branch and update argv[] to refer to this
-                        # Github branch.
-                        info = name_info(package_name)
-                        pipcl.log(f'{package_name=}.')
-                        pipcl.log(f'{info["git_remote"]=}.')
-                        git_push(package_location, info["git_remote"], branch, state)
-                        argv[args_pos] = f'git:-b {branch} {info["git_remote"]}'
-
-                if state.remote_github_yml:
-                    # Run .yml directly.
-                    pipcl.log(f'Running .yml instead of aptest.py: {state.remote_github_yml}')
-                    if not state.packages:
-                        # Run on aptest.
-                        info = name_info('aptest')
-                    elif len(state.packages) == 1:
-                        for package_name, (package_location, args_pos) in state.packages.items():
-                            pass
-                        info = name_info(package_name)
-                    else:
-                        assert 0, 'Running yml directly requires exactly zero or one package, but {len(state.packages)=}.'
-                    data = dict()
-                    data['ref'] = branch
-                    if state.remote_github_yml_inputs:
-                        inputs = dict()
-                        for nv in state.remote_github_yml_inputs.split(','):
-                            try:
-                                n, v = nv.split('=', 1)
-                            except Exception as e:
-                                raise Exception(f'Expected <name>=<value> in {nv!r} from {state.remote_github_yml_inputs=}.') from e
-                            inputs[n] = v
-                        data['inputs'] = inputs
-                    workflow_id = github.gh_run_workflow(
-                            f'https://api.github.com/repos/{info["github_name"]}',
-                            state.remote_github_yml,
-                            data,
-                            )
-                else:
-                    # Run ourselves on Github using test.yml, passing argv.
-                    info = name_info('aptest')
-                    data = dict(
-                            ref = branch,
-                            inputs = dict(args=shlex.join(argv[1:])),
-                            )
-                    workflow_id = github.gh_run_workflow(
-                            f'https://api.github.com/repos/{info["github_name"]}',
-                            'test.yml',
-                            data,
-                            )
-            
-            assert isinstance(workflow_id, str)
-            url = f'https://api.github.com/repos/{info["github_name"]}'
-            #pipcl.log(f'Calling github.gh_workflow_download_multiple() with {url=} {workflow_id=}.')
-            github.gh_workflow_download_multiple(
-                    url,
-                    workflow_id,
-                    #extra_wheels=upload_extra_wheels,
-                    upload='pypi' if state.github_upload else None,
-                    )
-        
+        if state.remote == '@github':
+            return do_remote_github(state, argv)
         else:
             # Use rsync/ssh to sync to/run on remote machine.
-            verbose = 1
-            jumps = None
-            if ' ' not in remote:
-                jumps = remote.split('::')
-                jumps, remote = jumps[:-1], jumps[-1]
-            colon = remote.rfind(':')
-            if colon >= 0:
-                remote, remote_dir = remote[:colon], remote[colon+1:]
-                pipcl.log(f'{remote=}')
-            if jumps:
-                pipcl.log(f'{jumps=} {remote=}')
-                ssh_command = 'ssh'
-                for j in jumps:
-                    ssh_command += f' -J {j}'
-                ssh_command += f' {remote}'
-                label = remote
-                remote = None
-            elif ' ' in remote:
-                ssh_command = remote
-                remote = None
-                label = ssh_command
-            else:
-                ssh_command = 'ssh'
-                label = remote
-            pipcl.log(f'{ssh_command=}')
-
-            if remote_do:
-                git_paths = list()
-                sync_artifex_software_ssh_key = False
-                
-                def sync2(path):
-                    return sync(
-                            remote,
-                            remote_dir,
-                            path,
-                            ssh_command=ssh_command,
-                            verbose=verbose,
-                            state=state,
-                            )
-                
-                # Sync each package.
-                all_packages = list(state.packages.items()) + list(state.packages2.items())
-                for package_name, (package_location, args_pos) in all_packages:
-                    if not package_location.startswith(('git:', 'pip:')):
-                        pipcl.log(f'{remote=} {remote_dir=} {package_location=} {ssh_command=}')
-                        if sync2(package_location):
-                            git_paths.append(package_location)
-                    if package_location.startswith('git:'):
-                        sync_artifex_software_ssh_key = True
-
-                # Sync aptest itself.
-                if sync2(g_root):
-                    git_paths.append(g_root)
-
-                # Sync Artifex github key.
-                if sync_artifex_software_ssh_key:
-                    if os.path.isfile(path_artifex_key):
-                        sync2(path_artifex_key)
-                    else:
-                        pipcl.log(
-                                f'## Warning: may not be able to remote'
-                                f' clone/update pro or layout checkouts'
-                                f' because not a file: {path_artifex_key}'
-                                )
-
-                # Sync Huggingface key.
-                if 'gnn' in state.commands:
-                    if os.path.isfile(path_huggingface_key):
-                        sync2(path_huggingface_key)
-                    else:
-                        pipcl.log(
-                                f'## Warning: may not be able to remote'
-                                f' use Huggingface because not a file:'
-                                f' {path_huggingface_key}'
-                                )
-
-                # Sync pymupdfpro build key.
-                if 'pymupdfpro' in state.packages_build:
-                    if os.path.isfile(path_pro_key):
-                        sync2(path_pro_key)
-                    else:
-                        pipcl.log(
-                                f'## Warning: may not be able to remote build'
-                                f' SmartOffice because not a file:'
-                                f' {path_artifex_key}'
-                                )
-                    sync2(path_pro_key)
-
-                # Run remote command.
-                #
-                remote_command = f'cd {remote_dir} && '
-                for git_path in git_paths:
-                    # We exclude *.tar.gz to avoid pymupdf re-downloading mupdf .tar.gz file.
-                    remote_command += f'(cd {git_path} && git clean -e "*.tar.gz" -f) && '
-                if remote_prefix:
-                    remote_command += f'{remote_prefix} '
-                elif remote and 'windows' in remote:
-                    remote_command += f'py '
-                remote_command += f'{os.path.basename(g_root_abs)}/aptest.py {shlex.join(argv[1:])}'
-
-                command = f'{ssh_command} {remote if remote else ""} {shlex.quote(remote_command)}'
-                pipcl.log(f'{command=}')
-                pipcl.log(f'{ssh_command=}')
-
-                tee_simple = f'out-{remote}'
-                tee = f'{tee_simple}-{time.strftime("%F-%H-%M-%S")}'
-                try:
-                    pipcl.run(
-                            command,
-                            prefix=f'{label}: ',
-                            out='log',
-                            tee=tee,
-                            ticker=ticker,
-                            )
-                finally:
-                    # Update softlink after remote command has finished. Avoids
-                    # continuoue updates.
-                    pipcl.run(f'ln -sf {tee} {tee_simple}')
-
-            if 1:
-                # Copy remote wheels back to local machine.
-                filters = list()
-                for package in state.packages_build:
-                    filters.append(f'--include={package}-*.whl')
-                    filters.append(f'--include={package}-*.tar.gz')
-                filters.append('--exclude=*')
-                sync_reverse(
-                        remote,
-                        remote_dir,
-                        f'{state.wheelhouse}/',
-                        f'{state.wheelhouse}/',
-                        ssh_command=ssh_command,
-                        filters=filters,
-                        )
-            if 1:
-                # Copy test-gnn-*.json back to local machine.
-                sync_reverse(
-                        remote,
-                        remote_dir,
-                        './',
-                        './',
-                        ssh_command=ssh_command,
-                        filters = '"--include=test-gnn-*.json" "--exclude=*"',
-                        )
-
-        return
+            return do_remote(state, argv)
         
-    if not state.commands and not remote_github_workflow_id:
-        pipcl.log(f'##Warning, no commands specified so nothing to do.')
+    if not state.commands and not state.remote_github_workflow_id:
+        pipcl.log(f'## Warning, no commands specified so nothing to do.')
     
     if state.run_commands and 'run' not in state.commands:
         pipcl.log(f'## Warning, --run was specified but no `run` command.')
@@ -1900,538 +2720,16 @@ def main(argv):
                 pass
 
             elif command == 'build':
+                do_build(state)
             
-                # We use `pip --extra-index-url {pip_index_url}` so that pip
-                # finds prerequisite wheels in state.wheelhouse.
-                pip_index_url = f'file://{os.path.abspath(state.wheelhouse)}/simple'
-                # pip fails if pip_index_url contains back-slashes, with
-                # `ERROR: Could not install packages due to an OSError: [Errno
-                # 13] Permission denied:...`.
-                pip_index_url = pip_index_url.replace('\\', '/')
-                if 'mupdf' in state.packages:
-                    directory = _get_local('mupdf', state)
-                    if directory:
-                        state.env_extra['PYMUPDF_SETUP_MUPDF_BUILD'] = os.path.abspath(directory)
-                if 'mupdf' in state.packages and 'mupdf' not in state.packages_build:
-                    PYMUPDF_SETUP_MUPDF_REBUILD = '0'
-                    pipcl.log(f'Setting {PYMUPDF_SETUP_MUPDF_REBUILD=}')
-                    state.env_extra['PYMUPDF_SETUP_MUPDF_REBUILD'] = PYMUPDF_SETUP_MUPDF_REBUILD
-                for package in state.packages_build:
-                    pipcl.log(f'{package=}')
-                    location, args_pos = state.packages[package]
-                    if not location:
-                        continue
-                    if location.startswith('pip:'):
-                        assert package != 'mupdf', f'Not a package on pypi.org: {package}'
-                        name = location[4:]
-                        if name.endswith(('.whl', '.tar.gz')):
-                            pass
-                        else:
-                            name = f'{package}{name}'
-                        # Get wheel from pypi.org and put into our wheelhouse
-                        # so it is available for later builds. Then install;
-                        # pip uses a cache so will not download twice.
-                        pipcl.run(f'pip wheel -w {state.wheelhouse} {name}')
-                        pipcl.run(f'pip install -v {name}')
-                    else:
-                        directory = _get_local(package, state)
-                        if package == 'pymupdf4llm':
-                            # setup.py is in subdirectory pymupdf4llm/.
-                            directory += '/pymupdf4llm'
-                        directory_abs = os.path.abspath(directory)
-                        pipcl.log(f'{package=} {directory=}')
-                        if package == 'mupdf':
-                            state.env_extra['PYMUPDF_SETUP_MUPDF_BUILD'] = directory_abs
-                            # fixme: be able to set to '' for system install?
-                        else:
-                            if package:
-                                pipcl.run(f'pip uninstall -y {package}')
-                            
-                            if state.sdists:
-                                build_sdist(package, directory)
-
-                            if (package == 'pymupdf'
-                                    and state.graal
-                                    and (
-                                        'pymupdfpro' in state.packages_build
-                                        or 'pymupdf_layout' in state.packages_build
-                                        )
-                                    ):
-                                # As of 2025-08-07, pipcl does graal builds by
-                                # running a non-graal build with graal python's
-                                # include and library paths.
-                                #
-                                # In the non-graal build, out setup.py will
-                                # still want to do `import pymupdf`, so we
-                                # prepare a non-graal venv containing its own
-                                # build of the specified pymupdf, and tell
-                                # pipcl to use it when it does the non-graal
-                                # build. Thus pymupdfpro's setup.py will be
-                                # able to do `import pymupdf` etc.
-                                #
-                                native_python = os.environ['PIPCL_GRAAL_PYTHON']
-                                assert native_python
-                                venv_native = 'venv-aptest-graal-native'
-                                pipcl.run(f'{native_python} -m venv {venv_native}')
-                                pipcl.run(
-                                        f'. {venv_native}/bin/activate && pip install -v {directory_abs}',
-                                        env_extra=state.env_extra,
-                                        prefix='PyMuPDFPro/scripts/test.py install PyMuPDF graal native python: ',
-                                        )
-                                # Tell pipcl to use <venv_native> when it
-                                # builds pymupdfpro/layout later on.
-                                state.env_extra['PIPCL_GRAAL_NATIVE_VENV'] = os.path.abspath(venv_native)
-
-                            if state.build_type:
-                                if package == 'pymupdf':
-                                    state.env_extra['PYMUPDF_SETUP_MUPDF_BUILD_TYPE'] = state.build_type
-                                if package == 'pymupdfpro':
-                                    state.env_extra['PYMUPDFPRO_SETUP_BUILD_TYPE'] = state.build_type
-                                if package == 'pymupdf_layout':
-                                    state.env_extra['PYMUPDF_LAYOUT_SETUP_BUILD_TYPE'] = state.build_type
-                                    
-                            new_files = pipcl.NewFiles(f'{state.wheelhouse}/{package}*.whl')
-                            pipcl.run(
-                                    #f'pip wheel -v --extra-index-url {pip_index_url} --no-cache-dir -w {state.wheelhouse} {directory_abs}',
-                                    f'pip wheel -v --extra-index-url {pip_index_url} -w {state.wheelhouse} {directory_abs}',
-                                    env_extra=state.env_extra,
-                                    prefix=f'build {package}: ',
-                                    )
-                            wheel = new_files.get_one()
-                            
-                            if package == 'pymupdf':
-                                # Set PYMUPDF_SETUP_VERSION so subsequent builds are configured
-                                # for the PyMuPDF we have just built.
-                                PYMUPDF_SETUP_VERSION = os.path.basename(wheel).split('-')[1]
-                                state.env_extra['PYMUPDF_SETUP_VERSION'] = PYMUPDF_SETUP_VERSION
-                                pipcl.log(f'### Have set {PYMUPDF_SETUP_VERSION=}')
-                            pipcl.run(
-                                    #f'pip install -v --extra-index-url {pip_index_url} --no-cache-dir {wheel}',
-                                    f'pip install -v --extra-index-url {pip_index_url} {wheel}',
-                                    env_extra=state.env_extra,
-                                    prefix=f'install {package}: ',
-                                    )
-                        pipcl.run(
-                                f'piprepo build {state.wheelhouse}',
-                                prefix='piprepo build: ',
-                                )
-
             elif command == 'cibw':
-                # Build wheels for each package with cibuildwheel, adding to wheelhouse,
-                # and using piprepo to update a local pypi-style tree.
+                do_cibw(state)
                 
-                pipcl.run(
-                        f'pip install --upgrade --force-reinstall {state.cibw_name}',
-                        prefix=f'pip install {state.cibw_name}: ',
-                        )
-                pipcl.run(f'pip install --upgrade pytest')
-
-                # Some general flags.
-                if 'CIBW_BUILD_VERBOSITY' not in state.env_extra:
-                    state.env_extra['CIBW_BUILD_VERBOSITY'] = '1'
-
-                # Add default flags to CIBW_SKIP.
-                # 2025-10-07: `cp3??t-*` excludes free-threading.
-
-                if state.cibw_skip_add_defaults:
-                    CIBW_SKIP = state.env_extra.get('CIBW_SKIP', '')
-                    CIBW_SKIP += ' *i686 *musllinux* *-win32 *-aarch64 cp3??t-*'
-                    CIBW_SKIP = CIBW_SKIP.split()
-                    CIBW_SKIP = sorted(list(set(CIBW_SKIP)))
-                    CIBW_SKIP = ' '.join(CIBW_SKIP)
-                    state.env_extra['CIBW_SKIP'] = CIBW_SKIP
-
-                # Set what wheels to build, if not already specified.
-                if 'CIBW_ARCHS' not in state.env_extra:
-                    if 'CIBW_ARCHS_WINDOWS' not in state.env_extra:
-                        state.env_extra['CIBW_ARCHS_WINDOWS'] = 'auto64'
-
-                    if 'CIBW_ARCHS_MACOS' not in state.env_extra:
-                        state.env_extra['CIBW_ARCHS_MACOS'] = 'auto64'
-
-                    if 'CIBW_ARCHS_LINUX' not in state.env_extra:
-                        state.env_extra['CIBW_ARCHS_LINUX'] = 'auto64'
-
-                # Tell cibuildwheel not to use `auditwheel` on Linux and MacOS,
-                # because it cannot cope with us deliberately having required
-                # libraries in different wheel - specifically in the PyMuPDF wheel.
-                #
-                # We cannot use a subset of auditwheel's functionality
-                # with `auditwheel addtag` because it says `No tags
-                # to be added` and terminates with non-zero. See:
-                # https://github.com/pypa/auditwheel/issues/439.
-                #
-                state.env_extra['CIBW_REPAIR_WHEEL_COMMAND_LINUX'] = ''
-                state.env_extra['CIBW_REPAIR_WHEEL_COMMAND_MACOS'] = ''
-
-                # Specify python versions.
-                CIBW_BUILD = state.env_extra.get('CIBW_BUILD')
-                pipcl.log(f'{CIBW_BUILD=}')
-                if CIBW_BUILD is None:
-                    if state.graal:
-                        CIBW_BUILD = 'gp*'
-                        state.env_extra['CIBW_ENABLE'] = 'graalpy'
-                    elif state.cibw_pyodide:
-                        # Using python-3.13 fixes problems with MuPDF's setjmp/longjmp.
-                        CIBW_BUILD = 'cp313*'
-                    elif os.environ.get('GITHUB_ACTIONS') == 'true':
-                        # Build/test all supported Python versions.
-                        CIBW_BUILD = cibw_cp(*python_versions_minor)
-                    else:
-                        # Build/test current Python only.
-                        v = platform.python_version_tuple()[:2]
-                        pipcl.log(f'{v=}')
-                        CIBW_BUILD = f'cp{"".join(v)}*'
-                    pipcl.log(f'Defaulting to {CIBW_BUILD=}.')
-
-                cibw_pyodide_args = ''
-                if state.cibw_pyodide:
-                    cibw_pyodide_args = ' --platform pyodide'
-                    state.env_extra['HAVE_LIBCRYPTO'] = 'no'
-                    state.env_extra['PYMUPDF_SETUP_MUPDF_TESSERACT'] = '0'
-                if state.cibw_pyodide_version:
-                    # 2025-07-21: there is no --pyodide-version option so we set
-                    # CIBW_PYODIDE_VERSION.
-                    state.env_extra['CIBW_PYODIDE_VERSION'] = state.cibw_pyodide_version
-                    state.env_extra['CIBW_ENABLE'] = 'pyodide-prerelease'
-
-                packages = list()
-                for package in state.packages_build:
-                    pipcl.log(f'{package=}')
-                    directory = _get_local(package, state)
-                    if not directory:
-                        # location is pip.
-                        # cibuildwheel will download from pypi as required.
-                        pipcl.log(f'Unable to process with cibuildwheel because location is pip: {package=}')
-                        continue
-                    directory_abs = os.path.abspath(directory)
-                    if package == 'mupdf':
-                        if platform.system() == 'Linux' and not state.cibw_pyodide:
-                            # Need /host/ prefix so accessible from within manylinux docker.
-                            state.env_extra['PYMUPDF_SETUP_MUPDF_BUILD'] = f'/host{directory_abs}'
-                        else:
-                            state.env_extra['PYMUPDF_SETUP_MUPDF_BUILD'] = directory_abs
-                        # fixme: be able to set to '' for system install?
-                        continue
-                    
-                    if state.sdists and platform.system() == 'Linux':
-                        build_sdist(package, directory)
-
-                    # Tell cibuildwheel how to test <package>.
-                    if package in state.packages_test:
-                        if 0:
-                            CIBW_TEST_COMMAND = f'python {{project}}/scripts/test.py test'
-                            if state.pytest_options:
-                                if package == 'pymupdf':
-                                    CIBW_TEST_COMMAND += f' -p {shlex.quote(state.pytest_options)}'
-                                elif package == 'pymupdfpro':
-                                    CIBW_TEST_COMMAND += f' -t {shlex.quote(state.pytest_options)}'
-                                elif package == 'pymupdf_layout':
-                                    CIBW_TEST_COMMAND += f' -t {shlex.quote(state.pytest_options)}'
-                                else:
-                                    pipcl.log(f'Unable to add {state.pytest_options=} to CIBW_TEST_COMMAND.')
-                            state.env_extra['CIBW_TEST_COMMAND'] = CIBW_TEST_COMMAND
-                        else:
-                            CIBW_TEST_COMMAND = f'pip install --upgrade pytest && pytest'
-                            if state.pytest_options:
-                                CIBW_TEST_COMMAND += f' {state.pytest_options}'
-                            CIBW_TEST_COMMAND += f' {{project}}/tests'
-                            state.env_extra['CIBW_TEST_COMMAND'] = CIBW_TEST_COMMAND
-                                
-                    else:
-                        pipcl.log(f'Not testing because not in state.packages_test: {package=}')
-                    # fixme: prefer to just run pytest directly. Needs
-                    # test/conftest.py to always `pip install` packages
-                    # required for testing.
-                    #state.env_extra['CIBW_TEST_COMMAND'] = f'pytest {{project}}/tests'
-
-                    # Use a copy of state.env_extra because we modify it if
-                    # using manylinux docker.
-                    #
-                    env_extra = state.env_extra.copy()
-                    
-                    if platform.system() == 'Linux':
-                        prefix = '/host'
-                        # Update GIT_SSH_COMMAND and
-                        # PYMUPDFPRO_SETUP_SOT_KEY_PATH if set, to be within
-                        # /host in manylinux docker. Otherwise for example
-                        # tests that access remote git repositories will not
-                        # use the appropriate key.
-                        GIT_SSH_COMMAND_0 = env_extra.get('GIT_SSH_COMMAND')
-                        if GIT_SSH_COMMAND_0:
-                            GIT_SSH_COMMAND = f'ssh -i {prefix}{state.ssh_key_path_abs} -o StrictHostKeyChecking=no'
-                            pipcl.log(f'Changing GIT_SSH_COMMAND from {GIT_SSH_COMMAND_0!r} to {GIT_SSH_COMMAND!r}.')
-                            env_extra['GIT_SSH_COMMAND'] = GIT_SSH_COMMAND
-                        
-                        PYMUPDFPRO_SETUP_SOT_KEY_PATH = env_extra.get('PYMUPDFPRO_SETUP_SOT_KEY_PATH')
-                        if PYMUPDFPRO_SETUP_SOT_KEY_PATH:
-                            env_extra['PYMUPDFPRO_SETUP_SOT_KEY_PATH'] = \
-                                    f'{prefix}{os.path.abspath(PYMUPDFPRO_SETUP_SOT_KEY_PATH)}'
-                    else:
-                        prefix = ''
-                    
-                    if platform.system() == 'Linux' and package == 'pymupdfpro':
-                        # Build will run inside a CentOS-7 container; we
-                        # need to install fontconfig-devel so `#include
-                        # <fontconfig/fonctconfig.h>` works. And for SO build
-                        # we need ssh to allow its git submodule commands.
-                        #
-                        env_extra['CIBW_BEFORE_BUILD_LINUX'] = (
-                                'echo "installing fontconfig-devel and ssh"'
-                                ' && yum -y install fontconfig-devel'
-                                ' && yum groupinstall -y fonts'
-                                ' && yum install -y openssh-clients'
-                                )
-                    
-                    # Ensure that when cibuildwheel runs pip to
-                    # install prerequisite packages, it also looks in
-                    # state.wheelhouse. PIP_EXTRA_INDEX_URL is equivalent to
-                    # pip's `--extra-index-url`.
-                    env_extra['PIP_EXTRA_INDEX_URL'] = \
-                            f'file://{prefix}{os.path.abspath(state.wheelhouse)}/simple'.replace('\\', '/')
-                    
-                    env_extra['CIBW_BUILD'] = CIBW_BUILD
-                    
-                    # Pass all the environment variables we have set in
-                    # state.env_extra, to Linux docker. Note that this will
-                    # miss any settings in the original environment.
-                    CIBW_ENVIRONMENT_PASS_LINUX = env_extra.keys()
-                    CIBW_ENVIRONMENT_PASS_LINUX = list(CIBW_ENVIRONMENT_PASS_LINUX)
-                    CIBW_ENVIRONMENT_PASS_LINUX.append('PYMUPDFPRO_SETUP_SOT_KEY')  # This can be set in os.environ.
-                    CIBW_ENVIRONMENT_PASS_LINUX.sort()
-                    CIBW_ENVIRONMENT_PASS_LINUX = ' '.join(CIBW_ENVIRONMENT_PASS_LINUX)
-                    env_extra['CIBW_ENVIRONMENT_PASS_LINUX'] = CIBW_ENVIRONMENT_PASS_LINUX
-
-                    pipcl.run(
-                            f'cd {directory} && cibuildwheel{cibw_pyodide_args}'
-                                f' --output-dir {os.path.abspath(state.wheelhouse)}',
-                            env_extra=env_extra,
-                            prefix=f'cibw {package}: ',
-                            )
-
-                    pipcl.run(f'ls -ld {state.wheelhouse}/*')
-                    pipcl.run(f'piprepo build {state.wheelhouse}')
-                    packages.append(package)
-                    
-                    if 0:
-                        pipcl.log(f'Contents of: {state.wheelhouse=} are:')
-                        for dirpath, dirnames, filenames in os.walk(state.wheelhouse):
-                            for filename in filenames:
-                                path = os.path.join(dirpath, filename)
-                                st = os.stat(path)
-                                pipcl.log(f'{st=}: {path=}')
-                            for dirname in dirnames:
-                                path_dir = os.path.join(dirpath, dirname)
-                                st = os.stat(path_dir)
-                                pipcl.log(f'{st=}: {path_dir=}')
-
             elif command == 'gnn-download':
-                pipcl.log(f'Install CUDA from; https://developer.nvidia.com/cuda-12-1-0-download-archive')
-                layout_location = _get_local('pymupdf_layout', state)
-                pipcl.log(f'{layout_location=}')
-                
-                # pytorch-scatter does not specify torch as a build-time prerequisite. This is
-                # deliberate because they say that usually needs to be built with
-                # a specific torch.
-                #
-                # I don't understand this. The only way to make things work
-                # is to install the latest versions on pypi.prg, and build
-                # torch-scatter without isolation so that it can build with
-                # the installed torch.
-                pipcl.run('pip install -v torch')
-                pipcl.run('pip install -v --no-build-isolation torch-scatter')
-                
-                pipcl.run(f'pip install -r {layout_location}/train/requirements.txt')
-                
-                pipcl.run(f'pip install datasets')
-                pipcl.run(f'pip install huggingface_hub[hf_xet]')
-                import datasets
-                import huggingface_hub
-                
-                if 0:
-                    # List all huggingface datasets.
-                    pipcl.log(f'huggingface_hub.list_datasets():')
-                    for dataset in huggingface_hub.list_datasets():
-                        pipcl.log(f'    {dataset.id=}')
-
-                if 1:
-                
-                    # Set up as described in
-                    # https://github.com/ArtifexSoftware/sce/wiki/How-to-train-GNN
-                    
-                    # Download zip files.
-                    pipcl.run('pip install --upgrade requests')
-                    url_doclaynet_core_zip = 'https://codait-cos-dax.s3.us.cloud-object-storage.appdomain.cloud/dax-doclaynet/1.0.0/DocLayNet_core.zip'
-                    url_doclaynet_extra_zip = 'https://codait-cos-dax.s3.us.cloud-object-storage.appdomain.cloud/dax-doclaynet/1.0.0/DocLayNet_extra.zip'
-                    
-                    def download(url):
-                        '''
-                        Downloads to basename(url), but does nothing if already
-                        exists. We download to temporary and rename, so this
-                        should never overwrite an existing download.
-                        '''
-                        path = os.path.basename(url)
-                        if os.path.exists(path):
-                            pipcl.log(f'Already exists: {path=}')
-                        else:
-                            if state.gnn_doit:
-                                github._gh_download(url, path, gh=0)
-                            else:
-                                assert 0, f'Would download but {state.gnn_doit=}: {url} {path=}'
-                    download(url_doclaynet_core_zip)
-                    download(url_doclaynet_extra_zip)
-                    
-                    def marker_ok(marker, infile=None):
-                        '''
-                        Returns true if <marker> exists (and is newer than
-                        <infile> if not None).
-                        '''
-                        if os.path.exists(marker):
-                            mtime_marker = os.stat(marker).st_mtime
-                            mtime_infile = os.stat(infile).st_mtime if infile else 0
-                            if mtime_marker > mtime_infile:
-                                pipcl.log(f'Already up to date: {marker=}.')
-                                return 1
-                        if not state.gnn_doit:
-                            assert 0, f'Would return false for {marker=}, but {state.gnn_doit=}'
-                    
-                    def marker_create(maker):
-                        with open(marker, 'w'):
-                            pass
-                        pipcl.log(f'Have created {marker=}.')
-                    
-                    def ensure_unzip(url, directory):
-                        '''
-                        Unzips leafname(url) into <directory> if it has not
-                        already been done.
-
-                        If marker file exists and is newer than zip file,
-                        does nothing. Otherwise unzips leafname(url) into
-                        <directory> and creates marker file.
-                        '''
-                        path_zip = os.path.basename(url)
-                        marker = f'{directory}/_marker_{path_zip}'
-                        if marker_ok(marker, path_zip):
-                            return
-                        import zipfile
-                        pipcl.log(f'Opening {path_zip=}')
-                        with zipfile.ZipFile(path_zip) as z:
-                            pipcl.log(f'Extacting {path_zip=} into {directory=}.')
-                            os.makedirs(directory, exist_ok=1)
-                            z.extractall(directory)
-                        marker_create(maker)
-                    
-                    if 1:
-                        # Unzip.
-                        ensure_unzip(url_doclaynet_core_zip, 'datasets/DocLayNet')
-                        ensure_unzip(url_doclaynet_extra_zip, 'datasets/DocLayNet')
-                    
-                    if 1:
-                        # Generate PKL.
-                        
-                        marker_pkl = '_marker_pkl'
-                        if marker_ok(marker_pkl):
-                            pass
-                        else:
-                            pipcl.run(f'{sys.executable}'
-                                    f' {layout_location}/train/tools/make_pkl_data_from_COCO_json.py'
-                                    f' --json datasets/DocLayNet/COCO/train.json'
-                                    f' --img_dir datasets/DocLayNet/PNG'
-                                    f' --save_dir workspace/pkl_data/train'
-                                    )
-                            with open(marker_pkl, 'w'):
-                                pipcl.log(f'Have created {marker_pkl=}.')
-                        
-                        marker_pkl_validation = '_marker_pkl_validation'
-                        if marker_ok(marker_pkl_validation):
-                            pass
-                        else:
-                            pipcl.run(f'{sys.executable}'
-                                    f' {layout_location}/train/tools/make_pkl_data_from_COCO_json.py'
-                                    f' --json datasets/DocLayNet/COCO/val.json'
-                                    f' --img_dir datasets/DocLayNet/PNG'
-                                    f' --save_dir workspace/pkl_data/val'
-                                    )
-                            with open(marker_pkl_validation, 'w'):
-                                pipcl.log(f'Have created {marker_pkl_validation=}.')
-                    
-                    if 0:
-                        # Doesn't work - No such file or directory: 'workspace/checkpoints/model.yaml.
-                        pipcl.run(f'pip install --upgrade torchvision')
-                        pipcl.run(
-                                f'{sys.executable} {layout_location}/train/tools/test_gnn.py {layout_location}/train/cfgs/config.yaml',
-                                env_extra=dict(PYTHONPATH=layout_location),
-                                )
-                
-                if 0:
-                    # Alternative ways of getting data.
-                    
-                    # Get data using `datasets` module.
-                    
-                    #doclaynet_core = datasets.load_dataset('doclaynet_core')
-                    #doclaynet_core = datasets.load_dataset('doclaynet_extra')
-                    # From https://huggingface.co/datasets/pierreguillou/DocLayNet-large:
-                
-                    # Get data using huggingface_hub.snapshot_download().
-                    # From https://huggingface.co/datasets/pierreguillou/DocLayNet-large.
-                    dataset_id='pierreguillou/DocLayNet-large'
-
-                    huggingface_key = None
-                    if state.huggingface_key_path_abs:
-                        with open(state.huggingface_key_path_abs) as f:
-                            huggingface_key = f.read().strip()
-
-                    pipcl.log(f'huggingface_hub.snapshot_download()')
-                    huggingface_hub.snapshot_download(dataset_id, token=huggingface_key, repo_type='dataset', max_workers=1)
+                do_gnn_download(state)
             
             elif command == 'gnn-graph':
-                if state.gnn_graph_select_root:
-                    pattern = f'{state.gnn_graph_select_root}/test-gnn-*.json'
-                else:
-                    pattern = f'test-gnn-*.json'
-                if state.gnn_graph_select:
-                    pipcl.log(f'{state.gnn_graph_select=}')
-                    gnn_select_code = compile(state.gnn_graph_select, '', 'eval')
-                    def selectfn(results):
-                        #r = eval(gnn_select_code, globals=dict(results=results))
-                        r = eval(gnn_select_code)#, globals=dict(results=results))
-                        return r
-                paths = list()
-                pattern_matches = glob.glob(pattern)
-                for path in pattern_matches:
-                    if state.gnn_graph_select:
-                        with open(path) as f:
-                            results = json.load(f)
-                        s = selectfn(results)
-                    else:
-                        s = True
-                    if s:
-                        #pipcl.log(f'{command}: Selecting: {path!r}')
-                        paths.append(path)
-                pipcl.log(f'{command}: Selected gnn paths ({len(paths)}/{len(pattern_matches)}:')
-                for path in paths:
-                    pipcl.log(f'{command}:    {path!r}')
-                
-                if state.gnn_graph_out is None:
-                    out = f'gnn-graph-{time.strftime("%Y-%m-%d-%H-%M-%S")}.html'
-                    out_simple = f'gnn-graph.html'
-                else:
-                    out = state.gnn_graph_out
-                    out_simpe = None
-                    
-                if out:
-                    graph.plot_gnn_html(paths, out)
-                    pipcl.log(f'Have created: {out=}')
-                    if out_simple:
-                        pipcl.fs_remove(out_simple)
-                        try:
-                            os.symlink(out, out_simple)
-                        except Exception as e:
-                            pipcl.log(f'Warning: failed to create link from {out_simple=} to {out=}.')
-                        pipcl.log(f'Have created softlink {out_simple=} => {out=}')
-                else:
-                    pipcl.log(f'Not creating graph output; {state.gnn_graph_out=}.')
-                    
+                do_gnn_graph(state)
             
             elif command == 'gnn-train':
                 pipcl.run(f'pip install --upgrade torchvision')
@@ -2443,134 +2741,7 @@ def main(argv):
                         )
             
             elif command.startswith('test-gnn'):
-                layout_location = _get_local('pymupdf_layout', state)
-                
-                def run(command):
-                    t = time.time()
-                    try:
-                        pipcl.run(command)
-                    finally:
-                        t = time.time() - t
-                        pipcl.log(f'Command took {pipcl._duration(t)}.')
-                    
-                if command == 'test-gnn':
-                    run(f'cd {layout_location} && {sys.executable} eval/eval_gnn.py --pdf_dir ../datasets/DocLayNet/PDF')
-
-                elif command == 'test-gnn-pymupdf_layout':
-                    run(f'cd {layout_location} && {sys.executable} eval/eval_pymupdf_layout.py --pdf_dir ../datasets/DocLayNet/PDF')
-
-                #elif command == 'test-gnn-pymupdf4llm':
-                #    run(f'cd {layout_location} && {sys.executable} eval/eval_pymupdf4llm.py --pdf_dir ../datasets/DocLayNet/PDF')
-                
-                elif command == 'test-gnn-pymupdf4llm':
-                    pipcl.run(f'pip install tqdm')
-                    sys.path.insert(0, f'{layout_location}/eval')
-                    try:
-                        import eval_util
-                        import eval_pymupdf4llm
-                    finally:
-                        del sys.path[0]
-                    out_dir = 'test-gnn-devel'
-                    pipcl.fs_ensure_empty_dir(out_dir)
-                    vis_pdf_dir = f'{out_dir}/vis'
-                    pipcl.fs_ensure_empty_dir(vis_pdf_dir)
-                    result_csv_path = f'{out_dir}/result.csv'
-                    pdf_dirs = ['datasets/DocLayNet/PDF']
-                    gt_dir = f'{layout_location}/eval/resources/gt'
-                    det_func = eval_pymupdf4llm.det_func
-                    
-                    ret = dict()
-                    
-                    ret['python'] = dict()
-                    ret['python']['platform.machine()'] = platform.machine()
-                    ret['python']['platform.system()'] = platform.system()
-                    ret['python']['platform.python_implementation()'] = platform.python_implementation()
-                    ret['python']['platform.python_version()'] = platform.python_version()
-                    ret['python']['platform.uname()'] = platform.uname()
-                    ret['python']['platform.system()'] = platform.system()
-                    ret['python']['sys.version'] = sys.version
-                    ret['python']['sys.version_info'] = sys.version_info
-                    
-                    ret['wordsize'] = int.bit_length(sys.maxsize+1)
-                    
-                    ret['environ'] = dict()
-                    ret['environ']['USER'] = os.environ.get('USER')
-                    
-                    ret['state'] = dict()
-                    ret['state']['det_func'] = dict()
-                    ret['state']['det_func']['__name__'] = det_func.__name__
-                    ret['state']['det_func']['__module__'] = det_func.__module__
-                    ret['state']['pdf_dirs'] = pdf_dirs
-                    ret['state']['gt_dir'] = gt_dir
-                    ret['state']['limit'] = state.test_gnn_limit
-                    
-                    ret['packages'] = dict()
-                    for package, (location, _) in state.packages.items():
-                        directory = _get_local(package, state)
-                        metadata_version = importlib.metadata.version(package)
-                        ret['packages'][package] = dict()
-                        ret['packages'][package]['location'] = location
-                        ret['packages'][package]['directory'] = directory
-                        ret['packages'][package]['metadata_version'] = metadata_version
-                        if directory:
-                            sha, comment, diff, branch = pipcl.git_info(directory)
-                            author_date = pipcl.git_info_author_date(directory)
-                            committer_date  = pipcl.git_info_committer_date(directory)
-                            ret['packages'][package]['gitinfo'] = dict(
-                                    sha=sha,
-                                    comment=comment,
-                                    diff=diff,
-                                    branch=branch,
-                                    author_date=author_date,
-                                    committer_date=committer_date,
-                                    )
-                    
-                    # Provide version info for all installed packages. This
-                    # is helpful if for example pymupdf was not specified -
-                    # in this case the latest version on pypi will have been
-                    # installed as a prerequisite by pip.
-                    text = pipcl.run(f'pip list --format json', capture=1)
-                    pip_list_packages = json.loads(text)
-                    ret['pip-list'] = pip_list_packages
-                    
-                    t_start = time.time()
-                    # Older pymupdf_layout's eval_util.evaluate_detection()
-                    # does not have <limit> arg, so we are careful to not pass
-                    # in <limit> if not specified.
-                    kwargs = dict(
-                            pdf_dirs=pdf_dirs,
-                            result_csv_path=result_csv_path,
-                            gt_dir=gt_dir,
-                            vis_error_count=0,
-                            vis_pdf_dir=vis_pdf_dir,
-                            )
-                    if state.test_gnn_limit:
-                        kwargs['limit'] = state.test_gnn_limit
-                        
-                    results = eval_util.evaluate_detection(det_func, **kwargs)
-                    t_duration = time.time() - t_start
-                    assert len(results) == 1
-                    results = results[0]
-                    
-                    ret['results'] = results
-                    ret['t_start'] = t_start
-                    ret['t_duration'] = t_duration
-                    
-                    pipcl.log(f'Results are:\n{json.dumps(ret, indent="    ")}')
-                    
-                    name_t = time.strftime('%Y-%m-%d-%H-%M-%S', time.gmtime(t_start))
-                    name = f'test-gnn-pymupdf4llm-{name_t}.json'
-                    with open(name, 'w') as f:
-                        json.dump(ret, f, indent='    ', sort_keys=1)
-                    pipcl.log(f'Have written results to file {name!r}.')
-                    
-                    if state.test_gnn_push:
-                        push_results(name, state.env_extra)
-                    else:
-                        pipcl.log(f'Not pushing results to PyMuPDF-performance-results: {name=}')
-                
-                else:
-                    assert 0, f'Unrecognised command: {command=}'
+                do_test_gnn(state, command)
             
             elif command == 'run':
                 for package, command in state.run_commands:
@@ -2578,111 +2749,8 @@ def main(argv):
                     pipcl.run(f'cd {directory} && {command}')
 
             elif command == 'test':
-                if state.pytest_wrap in ('valgrind', 'helgrind'):
-                    if state.system_packages:
-                        pipcl.log('Installing valgrind.')
-                        pipcl.run(f'sudo apt update')
-                        pipcl.run(f'sudo apt install --upgrade valgrind')
-                    pipcl.run(f'valgrind --version')
-
-                pipcl.run(f'pip install --upgrade pytest')
-                pipcl.log(f'packages_test:')
-                for i in state.packages_test:
-                    pipcl.log(f'    {i!r}')
+                do_test(state)
                 
-                failed_packages = list()
-                
-                if state.test_extra_packages:
-                    pipcl.run(f'pip install {" ".join(state.test_extra_packages)}')
-                
-                for package in state.packages_test:
-                    location, _ = state.packages[package]
-                    if not location:
-                        continue
-                    if package == 'mupdf':
-                        continue
-                    directory = _get_local(package, state, test=1)
-                    if not directory:
-                        continue
-                    if package == 'langchain_pymupdf_layout':
-                        command = f'{sys.executable} {directory}/simple_test.py'
-                        e = pipcl.run(
-                                command,
-                                env_extra=state.env_extra,
-                                prefix=f'langchain_pymupdf_layout simple_test.py: ',
-                                check=0,
-                                )
-                        pipcl.log(f'langchain_pymupdf_layout command returned {e=}.')
-                    else:
-                        command = f'pytest'
-                        if state.pytest_options:
-                            command += f' {state.pytest_options}'
-                        if state.pytest_paths:
-                            for path in state.pytest_paths:
-                                command += f' {directory}/{path}'
-                        else:
-                            # We need to somehow limit things to {package}/tests/
-                            # because otherwise pytest can recurse into other
-                            # directories (e.g. mupdf checkout in pympdf) and get
-                            # hopelessly confused.
-                            #
-                            # Would like to do `pytest {directory}` and let
-                            # pytest.ini identify `tests/` as the directory look
-                            # in for tests. But unfortunately pytest configuration
-                            # doesn't seem to allow this sort of thing, for example
-                            # `testpaths = tests` only effects `cd {package} &&
-                            # pytest` - i.e. running pytest on current directory
-                            # without specifying any location.
-                            #
-                            command += f' {directory}/tests'
-                        if state.pytest_wrap in ('valgrind', 'helgrind'):
-                            if not state.pytest_options:
-                                command += ' -sv'
-                        if state.pytest_wrap:
-                            command = f'python -m {command}'
-                            if state.pytest_wrap == 'gdb':
-                                command = f'gdb --args {command}'
-                            elif state.pytest_wrap == 'valgrind':
-                                state.env_extra['PYMUPDF_RUNNING_ON_VALGRIND'] = '1'
-                                state.env_extra['PYTHONMALLOC'] = 'malloc'
-                                command = (
-                                        f' valgrind'
-                                        f' --suppressions={g_root_abs}/valgrind.supp'
-                                        f' --trace-children=no'
-                                        f' --num-callers=20'
-                                        f' --error-exitcode=100'
-                                        f' --errors-for-leak-kinds=none'
-                                        f' --fullpath-after='
-                                        f' {command}'
-                                        )
-                            elif state.pytest_wrap == 'helgrind':
-                                state.env_extra['PYMUPDF_RUNNING_ON_VALGRIND'] = '1'
-                                state.env_extra['PYTHONMALLOC'] = 'malloc'
-                                command = (
-                                        f' valgrind'
-                                        f' --tool=helgrind'
-                                        f' --trace-children=no'
-                                        f' --num-callers=20'
-                                        f' --error-exitcode=100'
-                                        f' --fullpath-after='
-                                        f' {command}'
-                                        )
-                            else:
-                                assert 0, f'Unrecognised {state.pytest_wrap=}.'
-                        e = pipcl.run(
-                                command,
-                                env_extra=state.env_extra,
-                                prefix=f'pytest {package}: ',
-                                check=0,
-                                )
-                    if e:
-                        failed_packages.append(package)
-                if failed_packages:
-                    pipcl.log(f'Tests failed for these packages:')
-                    for package in failed_packages:
-                        pipcl.log(f'    {package}')
-                    raise Exception(f'Packages failed tests: {failed_packages}')
-
             else:
                 assert 0, f'{command=}'
     finally:
@@ -2770,8 +2838,7 @@ def venv_run(args, path, recreate=True, clean=False, makelink=None):
         clean:
             If true we first delete <path>.
         makelink:
-            If true, we make a softlink from <makelink> to <path>. Ignore on
-            Windows.
+            If true, we make a softlink from <makelink> to <path>.
     '''
     #pipcl.log(f'{path=} {recreate=} {clean=}')
     if clean:
