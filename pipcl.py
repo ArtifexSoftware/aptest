@@ -3898,62 +3898,6 @@ def sysconfig_python_flags():
     return includes_, ldflags_
 
 
-def venv_in(path=None):
-    '''
-    If path is None, returns true if we are in a venv. Otherwise returns true
-    only if we are in venv <path>.
-    '''
-    if path:
-        return os.path.abspath(sys.prefix) == os.path.abspath(path)
-    else:
-        return sys.prefix != sys.base_prefix
-
-
-def venv_run(args, path, recreate=True, clean=False):
-    '''
-    Runs Python command inside venv and returns termination code.
-    
-    Args:
-        args:
-            List of args or string command.
-        path:
-            Path of venv directory.
-        recreate:
-            If false we do not run `<sys.executable> -m venv <path>` if <path>
-            already exists. This avoids a delay in the common case where <path>
-            is already set up, but fails if <path> exists but does not contain
-            a valid venv.
-        clean:
-            If true we first delete <path>.
-    '''
-    if clean:
-        log(f'Removing any existing venv {path}.')
-        assert path.startswith('venv-')
-        shutil.rmtree(path, ignore_errors=1)
-    if recreate or not os.path.isdir(path):
-        run(f'{sys.executable} -m venv {path}')
-    
-    if isinstance(args, str):
-        args_string = args
-    elif platform.system() == 'Windows':
-        # shlex not reliable on Windows so we use Use crude quoting with "...".
-        args_string = ''
-        for i, arg in enumerate(args):
-            assert '"' not in arg
-            if i:
-                args_string += ' '
-            args_string += f'"{arg}"'
-    else:
-        args_string = shlex.join(args)
-    
-    if platform.system() == 'Windows':
-        command = f'{path}\\Scripts\\activate && python {args_string}'
-    else:
-        command = f'. {path}/bin/activate && python {args_string}'
-    e = run(command, check=0)
-    return e
-
-
 if __name__ == '__main__':
     # Internal-only limited command line support, used if
     # graal_legacy_python_config is true.
