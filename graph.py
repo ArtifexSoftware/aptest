@@ -252,7 +252,7 @@ def plotly_html(data, path_out):
                 )
             )
 
-def plot_gnn_html(paths, out_html):
+def plot_gnn_html(paths, out_text, out_html):
     '''
     Generates an .html file containing graphs showing one or more gnn test
     runs.
@@ -301,6 +301,18 @@ def plot_gnn_html(paths, out_html):
 
     pipcl.log(f'data:\n{json.dumps(data, indent="    ", sort_keys=1)}')
     plotly_html(data, out_html)
+    
+    if out_text:
+        with open(out_text, 'w') as f:
+            for tablename, table in _sorted_items(data):
+                f.write(f'{tablename=}\n')
+                for rowname, row in _sorted_items(table['lines']):
+                    for t, value in sorted(row['points']):
+                        f.write(f'| {value=}')
+                    f.write('\n')
+                f.write('----\n')
+                
+        
 
 
 def plot_gnn_html_select(
