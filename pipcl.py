@@ -2239,9 +2239,10 @@ def git_get(
                 The remaining text should be a command-line
                 style string containing some or all of these args:
                     -b|--branch <branch>
-                    --t|-tag <tag>
+                    -t|-tag <tag>
+                    --depth <depth?
                     <remote>
-                These overrides <branch>, <tag> and <remote>.
+                These overrides <branch>, <tag>, <remote> and <depth>.
             Otherwise:
                 <text> is assumed to be a local directory, and we simply return
                 it as an absolute path without doing any git operations.
@@ -2287,6 +2288,8 @@ def git_get(
                     sha = next(args)
                     branch = None
                     tag = None
+                elif arg == '--depth':
+                    depth = int(next(args))
                 elif arg.startswith('-'):
                     assert 0, f'Unrecognised {arg=} in {text=}.'
                 else:
