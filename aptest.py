@@ -125,12 +125,16 @@ Args:
         --gnn-doit 0|1
             If 0 (the default) we never download/extract DocLayNet.
         
-        --gnn-graph-out <path>
-            Name of gnn-graph out file.
+        --gnn-show-graph <path>
+            Override default name of gnn-graph out file.
         
-        --gnn-graph-select <expression>
+        --gnn-show-path <path>
+            Add comma-separated paths of json output file. Can be called
+            multiple times.
+        
+        --gnn-show-select <expression>
             Specify expression to use to select which test-gnn-*.json files to
-            include in graph created by command `gnn-graph`.
+            include in output created by command `gnn-show`.
             
             <expression> should be a Python expression that looks at Python dict `results`.
             
@@ -138,7 +142,7 @@ Args:
             also be used for keys that are legal Python identifiers.
             
             Example:
-                --gnn-graph-select "'environ' in results and results.environ.USER=='jules' and results.python['platform.system()']=='Windows' and  results.state.get('limit')==5
+                --gnn-show-select "'environ' in results and results.environ.USER=='jules' and results.python['platform.system()']=='Windows' and  results.state.get('limit')==5
         
         --graal 0|1
             If '1' we use Graal environment.
@@ -158,6 +162,9 @@ Args:
             [After the first time, suggest `-v 1` to avoid delay from
             updating/building pyenv and recreating the graal venv.]
     
+        --gnn-show-text <path>
+            Override default filename of gnn-show text output.
+        
         --help
         -h
             Show help.
@@ -414,12 +421,18 @@ Args:
             Installs specified comma-separated packages from pypi.org before
             running tests.
         
+        --test-gnn-cache 0|1
+            If 1, 'test-gnn*' commands will do nothing if a previous run
+            matches the current state.
+            
         --test-gnn-extra <key>=<value>
             Adds specified key=value pair to the root of the results dict
             created by test-gnn* commands.
         
         --test-gnn-limit <limit>
             Set number of gnn files to test. Default is all.
+        
+        --test-gnn-out <path>
         
         --test-gnn-push 0|1
             If 1, we push gnn results to
@@ -474,13 +487,14 @@ Args:
             Download and extract dataset for pymupdf_layout GNN model. Does not
             do unnecessary downloads or extracts.
         
-        gnn-graph
+        gnn-show
             Generate graph showing results from previous runs of `test-gnn-pymupdf4llm`.
             Also see:
-                --gnn-graph-out
-                --gnn-graph-select
+                --gnn-show-graph
+                --gnn-show-text
+                --gnn-show-select
             For example:
-                ./aptest/aptest.py gnn-graph --gnn-graph-select "'environ' in results and results['environ']['USER']=='jules' and results['python']['platform.system()']=='Windows' and  results['state'].get('limit')==5"
+                ./aptest/aptest.py gnn-show --gnn-show-select "'environ' in results and results['environ']['USER']=='jules' and results['python']['platform.system()']=='Windows' and  results['state'].get('limit')==5"
         
         gnn-train
             Trains pymupdf_layout. Not tested.
@@ -504,7 +518,7 @@ Args:
             * Writes results to test-gnn-pymupdf4llm-YYYY-MM-DD-HH-MM-SS.json.
             * Also see `--test-gnn-push`.
             * Also see `--test-gnn-limit`.
-            * Also see `gnn-graph`.
+            * Also see `gnn-show`.
             
             Results are a dict with this structure:
                 results['python']...    Values from python's `platform` and `sys` modules.
@@ -1000,6 +1014,38 @@ def apply_deltas(items, deltas, check=1, aliasfn=lambda name: name):
             #pipcl.log(f'{items=}')
 
     
+def add_package(state, name, location, args_pos):
+    if isinstance(name, Arg):
+        name = name.text
+    if isinstance(location, Arg):
+        if not location.text.startswith(('git:', 'pip:')):
+            # Match with local checkouts to help arg completion.
+            for path in glob.glob(f'*/.git/'):
+                #pipcl.log(f'{path=}')
+                d = path[:-6]
+                if location == d:
+                    break
+            #else:
+            #    assert 0, f'Directory does not exist: {location}'
+        location = location.text
+    if name in state.packages:
+        pipcl.log(f'Adding second location for {name=} testing only: {location=}')
+        state.packages2[name] = (location, args_pos)
+        return
+    state.packages[name] = (location, args_pos)
+    state.packages_build.append(name)
+    state.packages_test.append(name)
+
+    def keyfn(name):
+        info = g_package_info.get(name)
+        if info:
+            return info['order']
+        else:
+            return 0
+    state.packages_build.sort(key=keyfn)
+    state.packages_test.sort(key=keyfn)
+
+
 def get_args(argv):
     '''
     Parses command-line args in <argv> and returns a State instance.
@@ -1069,9 +1115,11 @@ def get_args(argv):
     state.env_extra = dict()
     state.github_upload = None
     state.gnn_doit = False
-    state.gnn_graph_out = None
-    state.gnn_graph_select = None
-    state.gnn_graph_select_root = None
+    state.gnn_show_graph = None
+    state.gnn_show_text = None
+    state.gnn_show_paths = list()
+    state.gnn_show_select = None
+    state.gnn_show_select_root = None
     state.graal = False
     state.huggingface_key_path_abs = None
     state.os_names = list()
@@ -1079,18 +1127,21 @@ def get_args(argv):
     state.packages_build = list() # Sorted list of names.
     state.packages = dict()   # map from name to location.
     state.packages_test = list()  # Sorted list of names.
+    state.path_artifex_key = 'artifex-software-ssh-key'
+    state.path_huggingface_key = 'huggingface-key'
+    state.path_pro_key = 'thirdparty-so-key'
     state.pybind = False
     state.pytest_options = ''
     state.pytest_paths = list()
     state.pytest_wrap = None
     state.python = None
+    state.remote_arg = None
     state.remote_dir = 'artifex-remote'
     state.remote_do = True
     state.remote_github_workflow_id = None
     state.remote_github_yml_inputs = None
     state.remote_github_yml = None
     state.remote = None
-    state.remote_arg = None
     state.remote_prefix = None
     state.remote_rsync_path = None
     state.remote_rsync_wsl = False
@@ -1103,8 +1154,10 @@ def get_args(argv):
     state.system_packages = True if os.environ.get('GITHUB_ACTIONS') == 'true' else False   # pylint: disable=simplifiable-if-expression
     state.system_site_packages = False
     state.test_extra_packages = list()
+    state.test_gnn_cache = False
     state.test_gnn_extra = dict()
     state.test_gnn_limit = None
+    state.test_gnn_out = None
     state.test_gnn_push = 0
     state.ticker = 0.5
     state.valgrind = False
@@ -1115,37 +1168,6 @@ def get_args(argv):
     # Prevent future additions to items in <state>. We can still modify
     # existing values.
     state.freeze()
-    
-    def add_package(name, location, args_pos):
-        if isinstance(name, Arg):
-            name = name.text
-        if isinstance(location, Arg):
-            if not location.text.startswith(('git:', 'pip:')):
-                # Match with local checkouts to help arg completion.
-                for path in glob.glob(f'*/.git/'):
-                    #pipcl.log(f'{path=}')
-                    d = path[:-6]
-                    if location == d:
-                        break
-                #else:
-                #    assert 0, f'Directory does not exist: {location}'
-            location = location.text
-        if name in state.packages:
-            pipcl.log(f'Adding second location for {name=} testing only: {location=}')
-            state.packages2[name] = (location, args_pos)
-            return
-        state.packages[name] = (location, args_pos)
-        state.packages_build.append(name)
-        state.packages_test.append(name)
-
-        def keyfn(name):
-            info = g_package_info.get(name)
-            if info:
-                return info['order']
-            else:
-                return 0
-        state.packages_build.sort(key=keyfn)
-        state.packages_test.sort(key=keyfn)
     
     # Parse args and update the above state. We do this before moving into a
     # venv, partly so we can return errors immediately.
@@ -1229,11 +1251,17 @@ def get_args(argv):
             elif arg == '--gnn-doit':
                 state.gnn_doit = next(args).as_bool()
             
-            elif arg == '--gnn-graph-out':
-                state.gnn_graph_out = next(args).as_text()
+            elif arg == '--gnn-show-graph':
+                state.gnn_show_graph = next(args).as_text()
             
-            elif arg == '--gnn-graph-select':
-                state.gnn_graph_select = next(args).as_text()
+            elif arg == '--gnn-show-path':
+                state.gnn_show_paths += next(args).as_text().split(',')
+            
+            elif arg == '--gnn-show-select':
+                state.gnn_show_select = next(args).as_text()
+            
+            elif arg == '--gnn-show-text':
+                state.gnn_show_text = next(args).as_text()
             
             elif arg == '--graal':
                 state.graal_arg = args.pos
@@ -1245,10 +1273,10 @@ def get_args(argv):
             elif arg == '-i':
                 _name = next(args)
                 _location = next(args)
-                add_package(_name, _location, args.pos - 1)
+                add_package(state, _name, _location, args.pos - 1)
             
             elif package := arg_alias(arg):
-                add_package(package, next(args), args.pos - 1)
+                add_package(state, package, next(args), args.pos - 1)
 
             elif arg == '-o':
                 state.os_names += next(args).as_text().lower().split(',')
@@ -1350,6 +1378,9 @@ def get_args(argv):
             elif arg == '--test-extra-packages':
                 state.test_extra_packages += next(args).as_text().split(',')
             
+            elif arg == '--test-gnn-cache':
+                state.test_gnn_cache = next(args).as_bool()
+                
             elif arg == '--test-gnn-extra':
                 nv = next(args).as_text()
                 n, v = nv.split('=', 1)
@@ -1357,6 +1388,9 @@ def get_args(argv):
 
             elif arg == '--test-gnn-limit':
                 state.test_gnn_limit = next(args).as_int()
+
+            elif arg == '--test-gnn-out':
+                state.test_gnn_out = next(args).as_text()
 
             elif arg == '--test-gnn-push':
                 state.test_gnn_push = next(args).as_bool()
@@ -1381,10 +1415,11 @@ def get_args(argv):
                     'build',
                     'cibw',
                     'gnn-download',
-                    'gnn-graph',
+                    'gnn-show',
                     'gnn-select-show',
                     'gnn-train',
                     'run',
+                    'populate',
                     'test',
                     'test-gnn',
                     'test-gnn-devel',
@@ -1621,37 +1656,37 @@ def do_remote(state, argv):
 
         # Sync Artifex github key.
         if sync_artifex_software_ssh_key:
-            if os.path.isfile(path_artifex_key):
-                sync2(path_artifex_key)
+            if os.path.isfile(state.path_artifex_key):
+                sync2(state.path_artifex_key)
             else:
                 pipcl.log(
                         f'## Warning: may not be able to remote'
                         f' clone/update pro or layout checkouts'
-                        f' because not a file: {path_artifex_key}'
+                        f' because not a file: {state.path_artifex_key}'
                         )
 
         # Sync Huggingface key.
         if 'gnn' in state.commands:
-            if os.path.isfile(path_huggingface_key):
-                sync2(path_huggingface_key)
+            if os.path.isfile(state.path_huggingface_key):
+                sync2(state.path_huggingface_key)
             else:
                 pipcl.log(
                         f'## Warning: may not be able to remote'
                         f' use Huggingface because not a file:'
-                        f' {path_huggingface_key}'
+                        f' {state.path_huggingface_key}'
                         )
 
         # Sync pymupdfpro build key.
         if 'pymupdfpro' in state.packages_build:
-            if os.path.isfile(path_pro_key):
-                sync2(path_pro_key)
+            if os.path.isfile(state.path_pro_key):
+                sync2(state.path_pro_key)
             else:
                 pipcl.log(
                         f'## Warning: may not be able to remote build'
                         f' SmartOffice because not a file:'
-                        f' {path_artifex_key}'
+                        f' {state.path_artifex_key}'
                         )
-            sync2(path_pro_key)
+            sync2(state.path_pro_key)
 
         # Run remote command.
         #
@@ -2199,23 +2234,26 @@ def do_gnn_download(state):
         huggingface_hub.snapshot_download(dataset_id, token=huggingface_key, repo_type='dataset', max_workers=1)
 
 
-def do_gnn_graph(state):
-    prefix = 'gnn-graph: '
-    if state.gnn_graph_select_root:
-        pattern = f'{state.gnn_graph_select_root}/test-gnn-*.json'
+def do_gnn_show(state):
+    prefix = 'gnn-show: '
+    if state.gnn_show_select_root:
+        pattern = f'{state.gnn_show_select_root}/test-gnn-*.json'
     else:
         pattern = f'test-gnn-*.json'
-    if state.gnn_graph_select:
-        pipcl.log(f'{state.gnn_graph_select=}')
-        gnn_select_code = compile(state.gnn_graph_select, '', 'eval')
+    if state.gnn_show_select:
+        pipcl.log(f'{state.gnn_show_select=}')
+        gnn_select_code = compile(state.gnn_show_select, '', 'eval')
         def selectfn(results):
             #r = eval(gnn_select_code, globals=dict(results=results))
             r = eval(gnn_select_code)#, globals=dict(results=results))
             return r
     paths = list()
-    pattern_matches = glob.glob(pattern)
+    if state.gnn_show_paths:
+        pattern_matches = state.gnn_show_paths
+    else:
+        pattern_matches = glob.glob(pattern)
     for path in pattern_matches:
-        if state.gnn_graph_select:
+        if state.gnn_show_select:
             with open(path) as f:
                 results = json.load(f)
             # Convert to a Doct so that selectfn() can use dotted notation.
@@ -2227,29 +2265,74 @@ def do_gnn_graph(state):
             #pipcl.log(f'{command}: Selecting: {path!r}')
             paths.append(path)
     pipcl.log(f'{prefix}Selected gnn paths ({len(paths)}/{len(pattern_matches)}:')
+    pipcl.log(f'{paths=}')
     for path in paths:
         pipcl.log(f'{prefix}    {path!r}')
 
-    if state.gnn_graph_out is None:
-        out = f'gnn-graph-{time.strftime("%Y-%m-%d-%H-%M-%S")}.html'
-        out_simple = f'gnn-graph.html'
+    if state.gnn_show_text == '':
+        out_text = None
+    elif state.gnn_show_text is None:
+        out_text = f'gnn-text-{time.strftime("%Y-%m-%d-%H-%M-%S")}.txt'
+        out_text_simple = f'gnn-text.txt'
     else:
-        out = state.gnn_graph_out
-        out_simpe = None
+        out_text = state.gnn_show_text
+        out_text_simple = None
 
-    if out:
-        graph.plot_gnn_html(paths, out)
-        pipcl.log(f'Have created: {out=}')
-        if out_simple:
-            pipcl.fs_remove(out_simple)
+    if state.gnn_show_graph == '':
+        out_graph = None
+    elif state.gnn_show_graph is None:
+        out_graph = f'gnn-graph-{time.strftime("%Y-%m-%d-%H-%M-%S")}.html'
+        out_graph_simple = f'gnn-graph.html'
+    else:
+        out_graph = state.gnn_show_graph
+        out_graph_simple = None
+
+    if 1:
+        graph.plot_gnn_html(paths, out_text, out_graph)
+        pipcl.log(f'Have created: {out_text=} {out_graph=}')
+        if out_graph_simple:
+            pipcl.fs_remove(out_graph_simple)
             try:
-                os.symlink(out, out_simple)
+                os.symlink(out_graph, out_graph_simple)
             except Exception as e:
-                pipcl.log(f'Warning: failed to create link from {out_simple=} to {out=}.')
-            pipcl.log(f'Have created softlink {out_simple=} => {out=}')
+                pipcl.log(f'Warning: failed to create link from {out_graph_simple=} to {out_graph=}.')
+            pipcl.log(f'Have created softlink {out_graph_simple=} => {out=}')
     else:
-        pipcl.log(f'Not creating graph output; {state.gnn_graph_out=}.')
+        pipcl.log(f'Not creating graph output; {state.gnn_show_graph=}.')
 
+
+def dicts_equal(a, b, verbose=0):
+    import difflib
+    ret = a == b
+    if not ret:
+        if verbose:
+            aa =json.dumps(a, indent='    ', sort_keys=1)
+            bb =json.dumps(b, indent='    ', sort_keys=1)
+            lines = difflib.unified_diff(
+                    aa.split('\n'),
+                    bb.split('\n'),
+                    lineterm='',
+                    )
+            # Skip initial lines.
+            #assert next(lines) == '--- '
+            #assert next(lines) == '+++ '
+            lines = list(lines)
+            pipcl.log(f'Diff lines: {len(lines)=}')
+            pipcl.log(textwrap.indent('\n'.join(lines), '    '))
+            if not lines:
+                pipcl.log(f'json identical but a!=b.')
+                pipcl.log(f'{a=}')
+                pipcl.log(f'{b=}')
+    return ret
+
+
+if 0:
+    with open('test-gnn-pymupdf4llm-2025-12-19-17-46-09.json') as f:
+        a = json.load(f)
+    with open('test-gnn-pymupdf4llm-2025-12-19-17-48-56.json') as f:
+        b = json.load(f)
+    pipcl.log(f'{dicts_equal(a, b)=}')
+        
 
 def do_test_gnn(state, command):
     layout_location = _get_local('pymupdf_layout', state)
@@ -2292,10 +2375,10 @@ def do_test_gnn(state, command):
         ret['python']['platform.system()'] = platform.system()
         ret['python']['platform.python_implementation()'] = platform.python_implementation()
         ret['python']['platform.python_version()'] = platform.python_version()
-        ret['python']['platform.uname()'] = platform.uname()
+        ret['python']['platform.uname()'] = list(platform.uname())
         ret['python']['platform.system()'] = platform.system()
         ret['python']['sys.version'] = sys.version
-        ret['python']['sys.version_info'] = sys.version_info
+        ret['python']['sys.version_info'] = list(sys.version_info)
 
         ret['wordsize'] = sys.maxsize.bit_length() + 1
 
@@ -2341,6 +2424,24 @@ def do_test_gnn(state, command):
         text = pipcl.run(f'pip list --format json', capture=1)
         pip_list_packages = json.loads(text)
         ret['pip-list'] = pip_list_packages
+        
+        # Check <ret> only contains simple types. Otherwise comparisons can
+        # show spurious differences.
+        def check(d):
+            if isinstance(d, dict):
+                for k, v in d.items():
+                    assert isinstance(k, str)
+                    check(v)
+            elif isinstance(d, list):
+                for v in d:
+                    check(v)
+            elif d is None:
+                pass
+            elif isinstance(d, (str, int, float)):
+                pass
+            else:
+                assert 0, f'Unrecognised item {type(d)=}: {d=}'
+        check(ret)
 
         t_start = time.time()
         # Older pymupdf_layout's eval_util.evaluate_detection()
@@ -2355,28 +2456,64 @@ def do_test_gnn(state, command):
                 )
         if state.test_gnn_limit:
             kwargs['limit'] = state.test_gnn_limit
+        
+            name_t = time.strftime('%Y-%m-%d-%H-%M-%S', time.gmtime(t_start))
+            name = f'test-gnn-pymupdf4llm-{name_t}.json'
+        
+        out_json = None
+        if state.test_gnn_cache:
+            # See whether an identical run has already been done.
+            match = None
+            import copy
+            ret0 = copy.deepcopy(ret)
+            ignore_keys = ('results', 't_start', 't_duration', 'pip-list')
+            for key in ignore_keys:
+                ret0.pop(key, None)
+            for path in glob.glob(f'test-gnn-*.json'):
+                with open(path) as f:
+                    r = json.load(f)
+                for key in ignore_keys:
+                    r.pop(key, None)
+                pipcl.log(f'Comparing with {path=}.')
+                equal = dicts_equal(r, ret0)
+                if equal:
+                    pipcl.log(f'Found matching previous run: {path=}.')
+                    #os.symlink(path, name)
+                    out_json = path
+                    break
+            if not out_json:
+                pipcl.log(f'Did not find any matching previous run.')
 
-        results = eval_util.evaluate_detection(det_func, **kwargs)
-        t_duration = time.time() - t_start
-        assert len(results) == 1
-        results = results[0]
+        if not out_json:
+            results = eval_util.evaluate_detection(det_func, **kwargs)
+            t_duration = time.time() - t_start
+            assert len(results) == 1
+            results = results[0]
 
-        ret['results'] = results
-        ret['t_start'] = t_start
-        ret['t_duration'] = t_duration
+            ret['results'] = results
+            ret['t_start'] = t_start
+            ret['t_duration'] = t_duration
 
-        pipcl.log(f'Results are:\n{json.dumps(ret, indent="    ")}')
+            pipcl.log(f'Results are:\n{json.dumps(ret, indent="    ")}')
 
-        name_t = time.strftime('%Y-%m-%d-%H-%M-%S', time.gmtime(t_start))
-        name = f'test-gnn-pymupdf4llm-{name_t}.json'
-        with open(name, 'w') as f:
-            json.dump(ret, f, indent='    ', sort_keys=1)
-        pipcl.log(f'Have written results to file {name!r}.')
+            name_t = time.strftime('%Y-%m-%d-%H-%M-%S', time.gmtime(t_start))
+            out_json = f'test-gnn-pymupdf4llm-{name_t}.json'
+            
+            with open(out_json, 'w') as f:
+                json.dump(ret, f, indent='    ', sort_keys=1)
+            pipcl.log(f'Have written results to {out_json=}.')
 
-        if state.test_gnn_push:
-            push_results(name, state.env_extra)
-        else:
-            pipcl.log(f'Not pushing results to PyMuPDF-performance-results: {name=}')
+            if state.test_gnn_push:
+                push_results(name, state.env_extra)
+            else:
+                pipcl.log(f'Not pushing results to PyMuPDF-performance-results: {name=}')
+        
+        out_json_simple = 'test-gnn.json'
+        pipcl.fs_remove(out_json_simple)
+        os.symlink(out_json, out_json_simple)
+        if state.test_gnn_out:
+            pipcl.fs_remove(state.test_gnn_out)
+            os.symlink(out_json, state.test_gnn_out)
 
     else:
         assert 0, f'Unrecognised command: {command=}'
@@ -2584,11 +2721,6 @@ def main(argv):
                             )
                 sys.exit(e)
     
-    # Hard-coded ssh/git key paths.
-    path_pro_key = 'thirdparty-so-key'
-    path_artifex_key = 'artifex-software-ssh-key'
-    path_huggingface_key = 'huggingface-key'
-    
     os.makedirs(state.wheelhouse, exist_ok=1)
         
     # Set environment variable values in <state.env_extra> to give access to
@@ -2602,17 +2734,17 @@ def main(argv):
         ARTIFEX_SOFTWARE_SSH_KEY = os.environ.get('ARTIFEX_SOFTWARE_SSH_KEY')
         if ARTIFEX_SOFTWARE_SSH_KEY:
             # Write to temp file.
-            temp_key_path = f'{path_artifex_key}-tmp'
+            temp_key_path = f'{state.path_artifex_key}-tmp'
             paths_to_delete.append(temp_key_path)
             fs_write_key(temp_key_path, ARTIFEX_SOFTWARE_SSH_KEY)
             state.ssh_key_path_abs = os.path.abspath(temp_key_path)
-        elif os.path.isfile(path_artifex_key):
-            state.ssh_key_path_abs = os.path.abspath(path_artifex_key)
+        elif os.path.isfile(state.path_artifex_key):
+            state.ssh_key_path_abs = os.path.abspath(state.path_artifex_key)
         else:
             pipcl.log(
                     f'## May not be able to clone/update/test pymupdfpro/layout'
                     f' because ARTIFEX_SOFTWARE_SSH_KEY unset and file'
-                    f' {path_artifex_key!r} does not exist'
+                    f' {state.path_artifex_key!r} does not exist'
                     )
             state.ssh_key_path_abs = None
         if state.ssh_key_path_abs:
@@ -2625,12 +2757,12 @@ def main(argv):
         HUGGINGFACE_KEY = os.environ.get('ARTIFEX_HUGGINGFACE_KEY')
         if HUGGINGFACE_KEY:
             # Write to temp file.
-            temp_key_path = f'{path_huggingface_key}-tmp'
+            temp_key_path = f'{state.path_huggingface_key}-tmp'
             paths_to_delete.append(temp_key_path)
             fs_write_key(temp_key_path, HUGGINGFACE_KEY)
             state.huggingface_keys_path_abs = os.path.abspath(temp_key_path)
-        elif os.path.isfile(path_huggingface_key):
-            state.huggingface_key_path_abs = os.path.abspath(path_huggingface_key)
+        elif os.path.isfile(state.path_huggingface_key):
+            state.huggingface_key_path_abs = os.path.abspath(state.path_huggingface_key)
 
     if 'pymupdfpro' in state.packages_build:
         # The SmartOffice build requires remote git access.
@@ -2641,7 +2773,7 @@ def main(argv):
             pipcl.log(f'PYMUPDFPRO_SETUP_SOT_KEY is set.')
         else:
             # With non-github builds we rely on this file existing.
-            PYMUPDFPRO_SETUP_SOT_KEY_PATH = os.path.abspath(path_pro_key)
+            PYMUPDFPRO_SETUP_SOT_KEY_PATH = os.path.abspath(state.path_pro_key)
             if os.path.isfile(PYMUPDFPRO_SETUP_SOT_KEY_PATH):
                 state.env_extra['PYMUPDFPRO_SETUP_SOT_KEY_PATH'] = PYMUPDFPRO_SETUP_SOT_KEY_PATH
                 pipcl.log(f'Using {PYMUPDFPRO_SETUP_SOT_KEY_PATH=}.')
@@ -2728,8 +2860,8 @@ def main(argv):
             elif command == 'gnn-download':
                 do_gnn_download(state)
             
-            elif command == 'gnn-graph':
-                do_gnn_graph(state)
+            elif command == 'gnn-show':
+                do_gnn_show(state)
             
             elif command == 'gnn-train':
                 pipcl.run(f'pip install --upgrade torchvision')
@@ -2739,6 +2871,13 @@ def main(argv):
                         f'cd gnn && {sys.executable} {layout_location_abs}/train/tools/test_gnn.py {layout_location_abs}/train/cfgs/config.yaml',
                         env_extra=dict(PYTHONPATH=layout_location_abs),
                         )
+            
+            elif command == 'populate':
+                for package in state.packages_build:
+                    location, args_pos = state.packages[package]
+                    if location.startswith('git:'):
+                        directory = _get_local(package, state)
+                        pipcl.log(f'Local directory for {package=} is: {directory!r}')
             
             elif command.startswith('test-gnn'):
                 do_test_gnn(state, command)
