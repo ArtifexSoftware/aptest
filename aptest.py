@@ -116,6 +116,10 @@ Args:
             If 1 (the default) we add defaults to CIBW_SKIP such as `pp*` (to
             exclude pypy) and `cp3??t-*` (to exclude free-threading).
         
+        --clean <packages>
+            Add comma-separated list <packages> to list of packages for which
+            we run `git clean -fdx` when populating/building.
+        
         --devel 0|1
             If 1, output extra information, e.g. backtrace on error.
         
@@ -1139,6 +1143,7 @@ def get_args(argv):
     state.cibw_skip_add_defaults = True
     state.cibw_test_project = None
     state.cibw_test_project_setjmp = False
+    state.clean = list()
     state.commands = list()
     state.devel = False
     state.env_extra = dict()
@@ -1267,6 +1272,10 @@ def get_args(argv):
 
             elif arg == '--cibw-skip-add-defaults':
                 state.cibw_skip_add_defaults = next(args).as_bool()
+            
+            elif arg == '--clean':
+                packages = next(args).as_text().split(',')
+                state.clean += packages
             
             elif arg == '--devel':
                 state.devel = next(args).as_bool()
@@ -1810,6 +1819,7 @@ def do_build(state):
             pipcl.run(f'pip install -v {name}')
         else:
             directory = _get_local(package, state)
+            
             if package == 'pymupdf4llm':
                 # setup.py is in subdirectory pymupdf4llm/.
                 directory += '/pymupdf4llm'
@@ -1886,6 +1896,13 @@ def do_build(state):
                         env_extra=state.env_extra,
                         prefix=f'install {package}: ',
                         )
+            
+            if package in state.clean:
+                directory = _get_local(package, state)
+                with pipcl.LogPrefix(f'{package=}: git clean -n: '):
+                    pipcl.log(f'Showing post-build git-clean for {package=}.')
+                    pipcl.run(f'cd {directory} && git clean -ndx')
+                    
             pipcl.run(
                     f'piprepo build {state.wheelhouse}',
                     prefix='piprepo build: ',
@@ -2868,59 +2885,61 @@ def main(argv):
         for command in state.commands:
             pipcl.log(f'### {command=}.')
             
-            if command in ('build', 'cibw'):
-                # 2025-11-14: piprepo seems to also required setuptools.
-                pipcl.run(f'pip install --upgrade piprepo setuptools')
-                #pipcl.fs_ensure_empty_dir(state.wheelhouse)
-                pipcl.run(
-                        f'piprepo build {state.wheelhouse}',
-                        prefix='piprepo build: ',
-                        )
-                
-            if 0:
-                pass
+            with pipcl.LogPrefix(f'{command}: '):
+            
+                if command in ('build', 'cibw'):
+                    # 2025-11-14: piprepo seems to also required setuptools.
+                    pipcl.run(f'pip install --upgrade piprepo setuptools')
+                    #pipcl.fs_ensure_empty_dir(state.wheelhouse)
+                    pipcl.run(
+                            f'piprepo build {state.wheelhouse}',
+                            prefix='piprepo build: ',
+                            )
 
-            elif command == 'build':
-                do_build(state)
-            
-            elif command == 'cibw':
-                do_cibw(state)
-                
-            elif command == 'gnn-download':
-                do_gnn_download(state)
-            
-            elif command == 'gnn-show':
-                do_gnn_show(state)
-            
-            elif command == 'gnn-train':
-                pipcl.run(f'pip install --upgrade torchvision')
-                layout_location_abs = os.path.abspath(layout_location)
-                pipcl.log(f'{layout_location=} {layout_location_abs=}')
-                pipcl.run(
-                        f'cd gnn && {sys.executable} {layout_location_abs}/train/tools/test_gnn.py {layout_location_abs}/train/cfgs/config.yaml',
-                        env_extra=dict(PYTHONPATH=layout_location_abs),
-                        )
-            
-            elif command == 'populate':
-                for package in state.packages_build:
-                    location, args_pos = state.packages[package]
-                    if 1:#location.startswith('git:'):
+                if 0:
+                    pass
+
+                elif command == 'build':
+                    do_build(state)
+
+                elif command == 'cibw':
+                    do_cibw(state)
+
+                elif command == 'gnn-download':
+                    do_gnn_download(state)
+
+                elif command == 'gnn-show':
+                    do_gnn_show(state)
+
+                elif command == 'gnn-train':
+                    pipcl.run(f'pip install --upgrade torchvision')
+                    layout_location_abs = os.path.abspath(layout_location)
+                    pipcl.log(f'{layout_location=} {layout_location_abs=}')
+                    pipcl.run(
+                            f'cd gnn && {sys.executable} {layout_location_abs}/train/tools/test_gnn.py {layout_location_abs}/train/cfgs/config.yaml',
+                            env_extra=dict(PYTHONPATH=layout_location_abs),
+                            )
+
+                elif command == 'populate':
+                    for package in state.packages_build:
+                        location, args_pos = state.packages[package]
+                        if 1:#location.startswith('git:'):
+                            directory = _get_local(package, state)
+                            pipcl.log(f'Local directory for {package=} is: {directory!r}')
+
+                elif command.startswith('test-gnn'):
+                    do_test_gnn(state, command)
+
+                elif command == 'run':
+                    for package, command in state.run_commands:
                         directory = _get_local(package, state)
-                        pipcl.log(f'Local directory for {package=} is: {directory!r}')
-            
-            elif command.startswith('test-gnn'):
-                do_test_gnn(state, command)
-            
-            elif command == 'run':
-                for package, command in state.run_commands:
-                    directory = _get_local(package, state)
-                    pipcl.run(f'cd {directory} && {command}')
+                        pipcl.run(f'cd {directory} && {command}')
 
-            elif command == 'test':
-                do_test(state)
-                
-            else:
-                assert 0, f'{command=}'
+                elif command == 'test':
+                    do_test(state)
+
+                else:
+                    assert 0, f'{command=}'
     finally:
         for path in paths_to_delete:
             pipcl.fs_remove(path)
@@ -2958,6 +2977,10 @@ def _get_local(package, state, test=False):
                     )
     else:
         directory = location
+    
+    if not test:
+        if package in state.clean:
+            pipcl.run(f'cd {directory} && git clean -fdx')
     
     # Show information about the ckeckout, regardless of where it came from.
     sha, comment, diff, branch = pipcl.git_info(directory)
