@@ -4,13 +4,19 @@ import sys
 import time
 
 import backtrace
-import dictpath
+import doct
 import json
 import pipcl
 
 
 # Get improved display of exceptions and stacktraces.
 backtrace.exception_hook_install()
+
+def _json_default(o):
+    if isinstance(o, doct.Doct):
+        return o._dict
+    else:
+        raise TypeError
 
 def _sorted_items( d):
     '''
@@ -271,12 +277,12 @@ def plot_gnn_html(paths, out_text, out_html):
             inputdata[path] = d
     
     # Create graphs showing scores.
-    data = dict()
-    graphs = dict()
-    dictpath.setpath(graphs, '__overall__', ['precision', 'recall', 'f1'])
+    data = doct.Doct()
+    graphs = doct.Doct()
+    graphs.setpath('__overall__', ['precision', 'recall', 'f1'])
     for graphname, lines in _sorted_items(graphs):
-        dictpath.setpath(data, graphname, 'xaxis_name', None)
-        dictpath.setpath(data, graphname, 'yaxis_name', 'Score')
+        data.setpath(graphname, 'xaxis_name', None)
+        data.setpath(graphname, 'yaxis_name', 'Score')
     # Populate <data>.
     for path, d in inputdata.items():
         for graphname, linenames in _sorted_items(graphs):
@@ -287,19 +293,19 @@ def plot_gnn_html(paths, out_text, out_html):
                 if value is not None:
                     t = d['t_start']
                     point = (t, value)
-                    dictpath.setpathdefault(data, graphname, 'lines', linename, 'points', list()).append(point)
+                    data.setpathdefault(graphname, 'lines', linename, 'points', list()).append(point)
 
     # Create graph showing t_duration.
     graphname = 'duration'
     for path, d in _sorted_items(inputdata):
-        dictpath.setpath(data, graphname, 'xaxis_name', None)
-        dictpath.setpath(data, graphname, 'yaxis_name', 'Time')
+        data.setpath(graphname, 'xaxis_name', None)
+        data.setpath(graphname, 'yaxis_name', 'Time')
         t = d['t_start']
         duration = d['t_duration']
         point = (t, duration)
-        dictpath.setpathdefault(data, graphname, 'lines', 'duration', 'points', list()).append(point)
+        data.setpathdefault(graphname, 'lines', 'duration', 'points', list()).append(point)
 
-    pipcl.log(f'data:\n{json.dumps(data, indent="    ", sort_keys=1)}')
+    pipcl.log(f'data:\n{json.dumps(data, indent="    ", sort_keys=1, default=_json_default)}')
     plotly_html(data, out_html)
     
     if out_text:
