@@ -2403,6 +2403,18 @@ def git_get(
             check=False,
             prefix='git show: ',
             )
+    if 0:
+        # Some extra checking that what we're doing is correct.
+        if tag:
+            diff = run(f'cd {local} && git diff {tag}', capture=1)
+        if branch:
+            diff = run(f'cd {local} && git diff {branch}', capture=1)
+        if sha:
+            diff = run(f'cd {local} && git diff {sha}', capture=1)
+        log(f'{diff=}')
+        diff = diff.strip()
+        assert not diff, f'Diff is not empty:\n{textwrap.indent(diff, "    ")}'
+    
     return os.path.abspath(local)
     
 
@@ -3689,9 +3701,15 @@ class NewFiles:
     Detects new/modified/updated files matching a glob pattern. Useful for
     detecting wheels created by pip or cubuildwheel etc.
     '''
-    def __init__(self, glob_pattern):
+    def __init__(self, glob_pattern, recursive=None):
+        '''
+        Sets things up to look for new files matching <glob_pattern>.
+        <recursive> is passed to glob.glob(), so for example set to true if
+        using `**`.
+        '''
         # Find current matches of <glob_pattern>.
         self.glob_pattern = glob_pattern
+        self.recursive = recursive
         self.items0 = self._items()
     
     def get(self):
@@ -3736,7 +3754,7 @@ class NewFiles:
     
     def _items(self):
         ret = dict()
-        for path in glob.glob(self.glob_pattern):
+        for path in glob.glob(self.glob_pattern, recursive=self.recursive):
             if os.path.isfile(path):
                 ret[path] = self._file_id(path)
         return ret
