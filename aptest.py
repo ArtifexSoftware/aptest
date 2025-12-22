@@ -508,16 +508,25 @@ Args:
             do unnecessary downloads or extracts.
         
         gnn-show
-            Generate graph showing results from previous runs of `test-gnn-pymupdf4llm`.
+            Generate graph showing results from previous runs of `test-gnn*`.
             Also see:
                 --gnn-show-graph
                 --gnn-show-text
                 --gnn-show-select
             For example:
-                ./aptest/aptest.py gnn-show --gnn-show-select "'environ' in results and results['environ']['USER']=='jules' and results['python']['platform.system()']=='Windows' and  results['state'].get('limit')==5"
-        
+                ./aptest/aptest.py gnn-show --gnn-show-select \
+                        " \
+                        'environ' in results \
+                        and results['environ']['USER']=='jules' \
+                        and results['python']['platform.system()']=='Windows' \
+                        and  results['state'].get('limit')==5 \
+                        "
         gnn-train
             Trains pymupdf_layout. Not tested.
+        
+        populate
+            For packages specified with `git:...` populate local checkouts like
+            the `build` command, but do not actually build/install anything.
         
         run
             Runs commands specified by `--run` within checkouts.
@@ -2895,7 +2904,7 @@ def main(argv):
             elif command == 'populate':
                 for package in state.packages_build:
                     location, args_pos = state.packages[package]
-                    if location.startswith('git:'):
+                    if 1:#location.startswith('git:'):
                         directory = _get_local(package, state)
                         pipcl.log(f'Local directory for {package=} is: {directory!r}')
             
@@ -2949,6 +2958,18 @@ def _get_local(package, state, test=False):
                     )
     else:
         directory = location
+    
+    # Show information about the ckeckout, regardless of where it came from.
+    sha, comment, diff, branch = pipcl.git_info(directory)
+    with pipcl.LogPrefix(f'Local checkout {directory}: '):
+        pipcl.log(f'{sha=}')
+        pipcl.log(f'{branch=}')
+        pipcl.log(f'comment:\n{textwrap.indent(comment, "    ")}')
+        if diff:
+            pipcl.log(f'diff:\n{textwrap.indent(diff, "    ")}')
+        else:
+            pipcl.log(f'{diff=}')
+    
     return directory
     
 
