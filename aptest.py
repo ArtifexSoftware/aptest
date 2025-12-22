@@ -2937,14 +2937,16 @@ def _get_local(package, state, test=False):
         return None
     if location.startswith('git:'):
         info = name_info(package)
-        directory = pipcl.git_get(
-                local=f'aptest-git-{package}',
-                remote=info['git_remote'],
-                branch=info['git_branch'],
-                text=location,
-                env_extra=state.env_extra,
-                submodules=info['submodules'],
-                )
+        local = f'aptest-git-{package}'
+        with pipcl.LogPrefix(f'{local}: '):
+            directory = pipcl.git_get(
+                    local,
+                    remote=info['git_remote'],
+                    branch=info['git_branch'],
+                    text=location,
+                    env_extra=state.env_extra,
+                    submodules=info['submodules'],
+                    )
     else:
         directory = location
     return directory
