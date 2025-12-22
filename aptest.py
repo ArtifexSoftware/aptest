@@ -422,8 +422,26 @@ Args:
             running tests.
         
         --test-gnn-cache 0|1
-            If 1, 'test-gnn*' commands will do nothing if a previous run
-            matches the current state.
+            If 1, 'test-gnn*' commands look for a matching test-gnn-*.json
+            file. If one is found, we do not run, instead creating softlinks to
+            the matching .json file.
+
+            To match, we require all fields in a .json file match the file
+            that we would create for the current run, except for:
+            
+            * ['results'] - not available for the current run, obviously.
+            * ['t_start']
+            * ['t_duration']
+            * ['pip-list'] - we allow changes to misc other packages, e.g. version numbers may vary.
+            
+            We require the other settings to be identical, such as:
+            
+            * OS, machine name, username etc.
+            * Python version, implementation etc.
+            * How Artifex pckages were specified, e.g. -p git: or -p pypi.org.
+            * git sha's and diffs for Artifex packages specified with git: or local checkout.
+            * pypi.org version numbers for Artifex packages specified with pip:.
+            * Any --test-gnn-limit value.
             
         --test-gnn-extra <key>=<value>
             Adds specified key=value pair to the root of the results dict
@@ -433,6 +451,8 @@ Args:
             Set number of gnn files to test. Default is all.
         
         --test-gnn-out <path>
+            Where to write json data containing test details. Default is a file
+            containing curre time.
         
         --test-gnn-push 0|1
             If 1, we push gnn results to
@@ -1520,7 +1540,7 @@ def get_args(argv):
     return args, state
 
 
-def do_remote_github(state):
+def do_remote_github(state, argv):
     pipcl.run('pip install requests')
     branch = f'aptest-{os.environ["USER"]}'    # -{time.strftime("%F-%T")}'
     pipcl.log(f'{branch=}.')
@@ -2296,7 +2316,7 @@ def do_gnn_show(state):
                 os.symlink(out_graph, out_graph_simple)
             except Exception as e:
                 pipcl.log(f'Warning: failed to create link from {out_graph_simple=} to {out_graph=}.')
-            pipcl.log(f'Have created softlink {out_graph_simple=} => {out=}')
+            pipcl.log(f'Have created softlink {out_graph_simple=} => {out_graph=}')
     else:
         pipcl.log(f'Not creating graph output; {state.gnn_show_graph=}.')
 
