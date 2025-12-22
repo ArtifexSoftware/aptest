@@ -3425,6 +3425,19 @@ def log_prefix(pattern):
     global g_log_format
     g_log_format = pattern
 
+_log_prefix_stack = list()
+
+class LogPrefix:
+    '''
+    A context manager to add a temporary prefix to log output.
+    '''
+    def __init__(self, prefix):
+        self.prefix = prefix
+    def __enter__(self):
+        _log_prefix_stack.append(self.prefix)
+    def __exit__(self, *args):
+        del _log_prefix_stack[-1]
+
 
 def _log_prefix(format_, caller):
     '''
@@ -3473,6 +3486,7 @@ def _log_prefix(format_, caller):
             ret += format_[pos]
             pos += 1
         assert pos > pos0
+    ret += ''.join(_log_prefix_stack)
     return ret
 
 _log_text_line_start = True
