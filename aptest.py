@@ -624,7 +624,7 @@ g_root = pipcl.relpath(g_root_abs)
 
 
 # With cibw we build and test Python 3.x for x in this range.
-python_versions_minor = range(10, 13+1)
+python_versions_minor = range(10, 14+1)
 
 
 def cibw_cp(*version_minors):
