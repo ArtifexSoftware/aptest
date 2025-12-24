@@ -356,6 +356,11 @@ Args:
         --remote-prefix <remote_prefix>
             Run remote using specified Python command. Ignored by `-r @github`.
         
+        --remote-prefix-default <remote> <prefix>
+            Sets default remote prefix for different remotes as specified with
+            `-r <remote>`. For example:
+                --remote-prefix-default jules-asus python312
+        
         --remote-rsync-path <remote_rsync_path>
             Specify `--rsync-path` when running rsync, to identify location of
             rsync on remote. E.g. `--remote-rsync-path 'wsl rsync` if remote is
@@ -631,6 +636,14 @@ Environment:
         Is prepended to command line args.
     APTEST_COMPLETION_DEBUG
         Filename to use for completion diagnostics.
+
+Configuration file:
+
+    If ~/.aptest exists, it is split into separate tokens using Python's shlex
+    and prepended to all command line arguments.
+    
+    For example if .aptest contains:
+        
 '''
 
 import github
@@ -1193,6 +1206,7 @@ def get_args(argv):
     state.remote_github_yml = None
     state.remote = None
     state.remote_prefix = None
+    state.remote_prefix_default = dict()
     state.remote_rsync_path = None
     state.remote_rsync_wsl = False
     state.run_commands = list()
@@ -1222,9 +1236,19 @@ def get_args(argv):
     # Parse args and update the above state. We do this before moving into a
     # venv, partly so we can return errors immediately.
     #
-    options = os.environ.get('APTEST_options', '')
-    options = shlex.split(options)
-    args_list = [argv[0]] + options
+    args_list = list()
+    args_list += [argv[0]]
+    
+    aptest_config_path = os.path.expanduser(f'~/.aptest')
+    if os.path.exists(aptest_config_path):
+        aptest_config = pipcl.fs_read(aptest_config_path)
+        aptest_config = shlex.split(aptest_config)
+        args_list += aptest_config
+    
+    APTEST_options = os.environ.get('APTEST_options', '')
+    APTEST_options = shlex.split(APTEST_options)
+    args_list += APTEST_options
+    
     if COMP_LINE:
         line = COMP_LINE
         if 0 and COMP_POINT:
@@ -1403,7 +1427,12 @@ def get_args(argv):
                 state.remote_github_yml_inputs = next(args).as_text()
 
             elif arg == '--remote-prefix':
-                state.remote_prefix = next(args)
+                state.remote_prefix = next(args).as_text()
+
+            elif arg == '--remote-prefix-default':
+                remote = next(args).as_text()
+                prefix = next(args).as_text()
+                state.remote_prefix_default[remote] = prefix
 
             elif arg == '--remote-rsync-path':
                 state.remote_rsync_path = next(args).as_text()
@@ -1750,6 +1779,9 @@ def do_remote(state, argv):
             remote_command += f'(cd {git_path} && git clean -e "*.tar.gz" -f) && '
         if state.remote_prefix:
             remote_command += f'{state.remote_prefix} '
+        elif (remote_prefix_default := state.remote_prefix_default.get(state.remote)) is not None:
+            #pipcl.log(f'Using {remote_prefix_default=}')
+            remote_command += f'{remote_prefix_default} '
         elif remote and 'windows' in remote:
             remote_command += f'py '
         remote_command += f'{os.path.basename(g_root_abs)}/aptest.py {shlex.join(argv[1:])}'
@@ -2328,8 +2360,8 @@ def do_gnn_show(state):
         if s:
             #pipcl.log(f'{command}: Selecting: {path!r}')
             paths.append(path)
-    pipcl.log(f'{prefix}Selected gnn paths ({len(paths)}/{len(pattern_matches)}:')
-    pipcl.log(f'{paths=}')
+    #pipcl.log(f'{prefix}Selected gnn paths ({len(paths)}/{len(pattern_matches)}:')
+    #pipcl.log(f'{paths=}')
     for path in paths:
         pipcl.log(f'{prefix}    {path!r}')
 
