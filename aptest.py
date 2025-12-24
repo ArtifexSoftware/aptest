@@ -4,7 +4,7 @@
 
 Examples:
 
-    ./aptest/aptest.py -p PyMuPDF -P PyMuPDFPro -m mupdf -l sce build test
+    ./aptest/aptest.py -p PyMuPDF -P PyMuPDFPro -m mupdf -l sce -s smartoffice build test
     
         Build, install and test pymupdf, pymupdfpro and pymupdf_layout using
         local checkouts.
@@ -183,6 +183,7 @@ Args:
                     pymupdf4llm
                     pymupdf_layout
                     pymupdfpro
+                    smartoffice
             location:
                 `pip:`
                     Install from pypi.org using pip.
@@ -367,6 +368,10 @@ Args:
             Make `run` command run specified command within checkout of
             <package>.
         
+        --smartoffice <location>
+        -s <location>
+            Aliases for `-i smartoffice <location>`.
+
         --sdists 0|1
             If 1, the 'build' and 'cibw' commands will also build sdists.
         
@@ -852,12 +857,23 @@ g_package_info = {
                 'aliases':  ['langchain'],
                 'order': 3,
             },
+        'smartoffice':
+            {
+                'gitlab_name': 'smartoffice/sot',
+                'git_branch': 'master',
+                'aliases':  ['sot', 's'],
+                'submodules': False,
+                'order': 1, # Fetch before Layout
+            },
         }
 
 for name, value in g_package_info.items():
     if value.get('submodules') is None:
         value['submodules'] = True
-    value['git_remote'] = f'git@github.com:{value["github_name"]}.git'
+    if "gitlab_name" in value:
+        value['git_remote'] = f'git@gitlab.artifex.com:{value["gitlab_name"]}.git'
+    else:
+        value['git_remote'] = f'git@github.com:{value["github_name"]}.git'
 
 
 def arg_alias(arg):
@@ -1828,6 +1844,8 @@ def do_build(state):
             if package == 'mupdf':
                 state.env_extra['PYMUPDF_SETUP_MUPDF_BUILD'] = directory_abs
                 # fixme: be able to set to '' for system install?
+            elif package == 'smartoffice':
+                state.env_extra['PYMUPDFPRO_SETUP_SOT'] = directory_abs
             else:
                 if package:
                     pipcl.run(f'pip uninstall -y {package}')
@@ -2587,7 +2605,7 @@ def do_test(state):
         location, _ = state.packages[package]
         if not location:
             continue
-        if package == 'mupdf':
+        if package == 'mupdf' or package == 'smartoffice':
             continue
         directory = _get_local(package, state, test=1)
         if not directory:
