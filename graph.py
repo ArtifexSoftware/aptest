@@ -109,7 +109,7 @@ def plotly_figure(data, graph_height=400):
     #
     
     for i, (graphname, graph) in enumerate(_sorted_items(data)):
-        pipcl.log(f'{i=} {graphname=}')
+        #pipcl.log(f'{i=} {graphname=}')
         if graph['xaxis_name'] is None:
             figure.update_xaxes(title_text='Date/time', row=1+i, col=1)
         else:
@@ -119,7 +119,7 @@ def plotly_figure(data, graph_height=400):
         rhs = list()
         
         for linename, line in _sorted_items(graph['lines']):
-            pipcl.log(f'{linename=} {line=}')
+            #pipcl.log(f'{linename=} {line=}')
                 
             # Find points for this line.
             xs = []
@@ -165,9 +165,9 @@ def plotly_figure(data, graph_height=400):
                         col = 1,
                         )
             
-        pipcl.log(f'rhs:')
-        for rhs_item in rhs:
-            pipcl.log(f'    {rhs_item}')
+        #pipcl.log(f'rhs:')
+        #for rhs_item in rhs:
+        #    pipcl.log(f'    {rhs_item}')
         # Add specifications for annotations on the right hand side of each
         # of this subplot's lines.
         #
@@ -180,7 +180,7 @@ def plotly_figure(data, graph_height=400):
         for j, (x, y, linename) in enumerate(rhs):
             pixel_offset_x = 60
             pixel_offset_y = - (j+0.5 - len(rhs)/2) * 12    # Default font is 12 pixels hight?
-            pipcl.log(f'Adding annotation: {x=} {y=} {linename=}')
+            #pipcl.log(f'Adding annotation: {x=} {y=} {linename=}')
             annotations.append(
                     dict(
                         # Identify subplot axes.
@@ -305,7 +305,7 @@ def plot_gnn_html(paths, out_text, out_html):
         point = (t, duration)
         data.setpathdefault(graphname, 'lines', 'duration', 'points', list()).append(point)
 
-    pipcl.log(f'data:\n{json.dumps(data, indent="    ", sort_keys=1, default=_json_default)}')
+    #pipcl.log(f'data:\n{json.dumps(data, indent="    ", sort_keys=1, default=_json_default)}')
     plotly_html(data, out_html)
     
     if out_text:
@@ -420,7 +420,7 @@ if __name__ == '__main__':
             pipcl.run(f'pip install numpy plotly')
             inputdata = dict()
             paths = [path for path in args]
-            plot_gnn_html(paths, 'aptest_test_graph.html')
+            plot_gnn_html(paths, 'aptest_test_graph.txtt', 'aptest_test_graph.html')
             
         else:
             assert 0, f'Unrecognised {arg=}.'
