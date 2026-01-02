@@ -2737,7 +2737,10 @@ def main(argv):
         pipcl.show_system()
         
     if state.show_help:
-        print(__doc__)
+        p = os.path.abspath(f'{__file__}/../README.rst')
+        with open(p) as f:
+            text = f.read()
+        print(text)
         return
     
     # Check whether we should run with `-o <osname>`.
