@@ -3844,6 +3844,49 @@ def swig_get(swig, quick, swig_local='pipcl-swig-git'):
                 macos_add_brew_path('bison', swig_env_extra)
                 run(f'which bison')
                 run(f'which bison', env_extra=swig_env_extra)
+            
+            # Building swig requires bison>=3.5.
+            bison_ok = 0
+            e, text = run(f'bison --version', capture=1, check=0, env_extra=swig_env_extra)
+            if not e:
+                log(textwrap.indent(text, '    '))
+                m = re.search('bison (GNU Bison) ([0-9]+)[.]([0-9]+)', text)
+                if m:
+                    assert m, f'Unexpected output from `bison --version`: {text!r}'
+                    version_tuple = int(m.group(1)), int(m.group2())
+                    if version_tuple >= (3, 5):
+                        bison_ok = 1
+            if not bison_ok:
+                if 0:
+                    # Use git checkout. Fails to find scan-code.c. Presumably
+                    # something wrong with ./bootstrap?
+                    log(f'Cloning/fetching/build/installing bison.')
+                    bison_git = git_get(
+                            'pipcl-bison-git',
+                            remote='https://git.savannah.gnu.org/git/bison.git',
+                            #branch='master',
+                            tag='v3.5.4',
+                            submodules=0, # recursive update fails.
+                            )
+                    run(f'cd {bison_git} && git submodule update --init', prefix='bison git submodule update --init: ')
+                    run(f'cd {bison_git} && ./bootstrap', prefix='bison bootstrap: ')
+                    run(f'cd {bison_git} && ./configure', prefix='bison configure: ')
+                    run(f'cd {bison_git} && make', prefix='bison make: ')
+                    run(f'cd {bison_git} && sudo make install', prefix='bison make install: ')
+                else:
+                    bison_version = 'bison-3.5.4'
+                    if not os.path.exists(f'{bison_version}.tar.gz'):
+                        run(
+                                f'wget -O {bison_version}.tar.gz-0 http://www.mirrorservice.org/sites/ftp.gnu.org/gnu/bison/{bison_version}.tar.gz',
+                                prefix='bison wget: ',
+                                )
+                        os.rename(f'{bison_version}.tar.gz-0', f'{bison_version}.tar.gz')
+                    if not os.path.exists(f'{bison_version}'):
+                        run(f'tar -xzf {bison_version}.tar.gz', prefix='bison extract: ')
+                    run(f'cd {bison_version} && ./configure', prefix='bison configure: ')
+                    run(f'cd {bison_version} && make', prefix='bison make: ')
+                    run(f'cd {bison_version} && sudo make install', prefix='bison make install: ')
+                
             # Build swig.
             run(f'cd {swig_local} && ./autogen.sh',
                     out=log,
