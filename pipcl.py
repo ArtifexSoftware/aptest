@@ -45,6 +45,7 @@ import re
 import selectors
 import shlex
 import shutil
+import stat
 import subprocess
 import sys
 import sysconfig
@@ -3520,13 +3521,13 @@ def _log_prefix(format_, caller):
     return ret
 
 _log_text_line_start = True
-_log_f = sys.stdout
+_log_f = None
 
 def _log(text, level, caller, raw=False, nl=True, format_=None):
     '''
     Logs lines with prefix, if <level> is lower or equal to <g_verbose>.
     '''
-    
+    f = _log_f if _log_f else sys.stdout
     if level > g_verbose:
         return
     if format_ is None:
@@ -3540,19 +3541,19 @@ def _log(text, level, caller, raw=False, nl=True, format_=None):
         if not raw or _log_text_line_start:
             if prefix is None:
                 prefix = _log_prefix(format_, caller+1)
-            _log_f.write(prefix)
+            f.write(prefix)
         nlp = text.find('\n', pos)
         if nlp == -1:
-            _log_f.write(text[pos:])
+            f.write(text[pos:])
             if not raw and nl:
-                _log_f.write('\n')
+                f.write('\n')
             pos = len(text)
         else:
-            _log_f.write(text[pos:nlp+1])
+            f.write(text[pos:nlp+1])
             pos = nlp+1
         if raw:
             _log_text_line_start = (nlp >= 0)
-    _log_f.flush()
+    f.flush()
 
 
 def relpath(path, start=None, allow_up=True):
