@@ -1111,6 +1111,9 @@ def add_package(state, name, location, args_pos):
 def get_args(argv):
     '''
     Parses command-line args in <argv> and returns a State instance.
+
+    If we are being called by bash for command-line completion, we reuturn
+    None.
     '''
     COMP_LINE = os.environ.get('COMP_LINE')
     COMP_POINT = os.environ.get('COMP_POINT')
@@ -1552,12 +1555,15 @@ def get_args(argv):
                             print(suggestion)
                     sys.stdout.flush()
                 pipcl.log(f'Calling sys.exit()')
-                sys.exit()
-                #return 0
+                #sys.exit()
+                return None, None
+                
             except Exception as e:
                 pipcl.log(f'completion: error: {traceback.format_exc()}')
-                sys.exit(1)
+                #sys.exit(1)
                 #return 1
+            sys.exit(1)
+        
         elif arg is not None:
             # Print command line with caret showing where error occurred.
             #pipcl.log(f'{args.current=}')
@@ -2728,7 +2734,10 @@ def main(argv):
         return
     
     args, state = get_args(argv)
-    
+    if args is None:
+        # COMP_LINE.
+        return 0
+        
     if not state.devel:
         # Don't output file:line etc, just output elapsed time.
         pipcl.g_log_format = '[+%d]: '
