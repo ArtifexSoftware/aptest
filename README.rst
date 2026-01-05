@@ -405,6 +405,9 @@ stdout.
 Command-line arguments
 ----------------------
 
+.. contents::
+    :local:
+
 Overview
 ^^^^^^^^
 
@@ -415,10 +418,13 @@ Overview
 * Usually command `test`_ would be specified after commands such as `build`_.
 * Options and commands can be interleaved but it may be clearer to separate
   them on the command line.
+* Command-line arguments are prefixed with contents of `~/.aptest`, if it
+  exists.
 
+  * Arguments are extracted using `shlex.split()`, so are separated by
+    whitespace (e.g. space and newlines characters) unless escaped or inside
+    quotes etc.
 
-.. contents::
-    :local:
 
 Commands
 ^^^^^^^^
@@ -550,7 +556,7 @@ test-gnn-pymupdf4llm
         results['state'] - description of what values we passed to pymupdf_layout:eval/eval_util.py:evaluate_detection().
         results['packages'] - information about each package that we built/installed - version, git branch, sha etc.
         results['pip-list'] - information from `pip list` showing information about all packages.
-        results['results'] - the results from the test, containing
+        results['results'] - the results from the test.
         results['t_duration'] - duration of test in seconds.
         results['t_start'] - Unix start time.
 
