@@ -88,7 +88,7 @@ Running on Github with `-r @github`
 
   * We push the local checkout to a branch in the equivalent Github repository.
   * We change the aptest.py command line to specify a `git:...` location.
-  
+
   For example we would change `-p PyMuPDF` to::
 
         -p 'git:-b <branch> git@github.com:pymupdf/PyMuPDF.git
@@ -101,17 +101,17 @@ Running on Github with `-r @github`
 
 Examples
 --------
-    
+
 Build, install and test pymupdf, pymupdfpro and pymupdf_layout using
 local checkouts::
 
     ./aptest/aptest.py -p PyMuPDF -P PyMuPDFPro -m mupdf -l sce build test
-    
+
 Build, install and test pymupdf, pymupdfpro and pymupdf_layout using
 central git repositories::
-    
+
     ./aptest/aptest.py -p git: -P git: -l git: build test
-    
+
 Make release, building/testing on Github, downloading to local machine,
 and uploading to pypi.org::
 
@@ -136,11 +136,191 @@ Test current pymupdf release with test suite in local checkout::
 Runs specific Github workflow PyMuPDFPlus/.github/workflows/test_multiple.yml::
 
     ./aptest/aptest.py -r @github --remote-github-yml test_multiple.yml -P PyMuPDFPlus --remote-github-yml-inputs 'args=-o windows'
-    
+
 Tests pypi.org's pymupdf, pymupdfpro and pymupdf_layout with the test
 suites on central git::
 
     ./aptest/aptest.py -r @github -p pip: -P pip: -l pip: -p git: -P git: -l git: build test
+
+
+Release procedure
+-----------------
+
+Packages are:
+
+* pymupdf
+* pymupdfpro
+* pymupdf_layout
+
+Things to do:
+
+* Get local checkout of each package.
+
+* Ensure that pymupdf's `setup.py` specifies the correct mupdf version.
+
+  If this is not the case, update, commit, push, and wait for the next
+  overnight tests to pass before making the relase.
+
+* Ensure the version number is correct in all packages.
+
+  * All packages should use the same version number.
+  * Version numbers are always defined in setup.py.
+  * Version numbers may also be defined in other files such as README.
+  * Pymupdf has a test that checks version numbers in changes.txt etc are
+    consistent with setup.py.
+
+* Ensure that PyMuPDF issues and changelog are synchronised.
+
+  * Go to https://github.com/pymupdf/PyMuPDF/issues.
+  * For all issues that are labeled as `Fixed in next release`, ensure that
+    they are labelled as fixed in PyMuPDF's changes.txt.
+  * For all issues mentioned as fixed in PyMuPDF's changes.txt, ensure that
+    the corresponding Github issue is labelled as `Fixed in next release`.
+
+* Test local checkouts of all packages on Github machines.
+
+  Run::
+
+    aptest/aptest.py -r @github -p PyMuPDF --pro PyMuPDFPro --layout sce cibw
+
+* Push each package to github.
+* Optionally lock github branches for each project.
+
+  On each Github repository go to: `Settings/Branches/main/Edit/Lock branch`.
+
+* Build and release main wheels.
+
+  Run::
+
+    aptest/aptest.py --release-1
+
+  * On success this will download wheels/sdist to local machine and ask
+    (twice) whether you want to upload to pypi.org.
+  * At this point one can optionally test the downloaded wheels locally.
+  * Agree to upload to pypi.org.
+
+* Tag the release
+
+  * We use the version number as the tag, e.g. `1.26.7`.
+  * For each repository::
+
+      git tag <version>
+      git push origin <version>
+
+* Start building Linux-aarch64 wheels::
+
+    aptest/aptest.py --release-2
+
+  [This will take a few hours, don't wait for it to finish here.]
+
+* Extra updates to Github's pymupdf respository.
+
+  * Go to: https://github.com/pymupdf/PyMuPDF/releases
+  * Click `Draft a new release`.
+  * In `Choose a tag`, select the tag `<version>`.
+  * In `Release title` enter `PyMuPDF-<version> released`.
+  * Add header text explaining pip install, similar to previous releases.
+    For example::
+
+      Wheels for Windows, Linux and MacOS, and the sdist, are available on
+      pypi.org and can be installed in the usual way, for example:
+
+      ```
+      python -m pip install --upgrade pymupdf
+
+      [Linux-aarch64 wheels will be built and uploaded later.]
+      ```
+
+  * Paste the release's changelog into the text field.
+  * Modify any ReST-style links to work as markdown, e.g.
+    rely on Github interpreting `#1234` as a link to issue
+    1234.
+  * Ensure that `Set as the latest release` is checked.
+  * Ensure that `Create a discussion for this release` is checked,
+    with `Category: Announcements`.
+    
+    Alternatively create an announcement discussion separately.
+  * Click on `Publish release`.
+    
+    This will also create `.zip` and `.tar.gz` archives for download from
+    github.
+  * Go to the `Discussions` page and pin the announcement discussion so that
+    it appears at the top of the page.
+  * Unpin previous release's announcement discussion if present.
+  * For all github issues that are labeled as `fixed in next release`,
+    close the issue with text `Fixed in PyMuPDF-<version>`.
+
+  * Check in the release announcement that all fixed issues are now shown as closed.
+  * If the new release uses a new version of MuPDF, optionally
+    remove all code that is specific to the previous major release
+    of MuPDF. E.g. grep for `FZ_VERSION` or `mupdf_version_tuple`.
+
+  * Update pymupdf.readthedocs.io:
+
+    * Go to: readthedocs.io
+    * Click `Log in`
+    * Click on `Read the Docs Community`.
+    * Select login using email.
+    * Enter email address and shared password.
+    * Go to PyMuPDF.
+    * Click on Builds.
+    * Click on top item's refresh button `Rebuild version`.
+
+  * Post to Discord #pymupdf_tech.
+  * Send email to pymupdf-marketing@artifex.com
+    
+    * Subject: `PyMuPDF-<version> released`
+
+    * Body::
+      
+        PyMuPDF-<version> has just been released.
+      
+        See: https://github.com/pymupdf/PyMuPDF/discussions/<announcement>
+
+* Wait for Linux aarch64 wheels build to finish.
+
+* Update release discussion to say that Linux aarch64 wheels are now
+  available, e.g. with a post saying::
+
+    Linux-aarch64 wheels are now available; install in the usual way with pip.
+
+* Agree to upload linux-aarch64 wheels to pypi.org.
+
+* Build and release Windows-x32 wheel.
+
+  Run::
+  
+    aptest/aptest.py --release-3
+
+  Wait for build to finish, agree to upload.
+
+* Build and release Linux musllinux-x64 wheel.
+
+  Run::
+  
+    aptest/aptest.py --release-4
+
+  Wait for buildd to finish, agree to upload.
+
+* Unlock projects' branches if they were locked above:
+
+    Github settings/Branches/main/Edit/Lock branch - uncheck.
+
+* Post-release changes for all projects:
+  
+  * Increment version in setup.py.
+  * In pymupdf:
+  
+    In changes.txt:
+    
+    * Add date of release that was just made.
+    * Add title for next release `**Changes in version <next-version>**`
+  
+    In .github/ISSUE_TEMPLATE/bug_report.yml:
+  
+    * Add version of next release to drop-down list of versions.
+    
+      (This is required for tests to pass.)
 
 
 Keys/tokens
@@ -370,7 +550,7 @@ test-gnn-pymupdf4llm
         results['state'] - description of what values we passed to pymupdf_layout:eval/eval_util.py:evaluate_detection().
         results['packages'] - information about each package that we built/installed - version, git branch, sha etc.
         results['pip-list'] - information from `pip list` showing information about all packages.
-        results['results'] - the results from the test, containing 
+        results['results'] - the results from the test, containing
         results['t_duration'] - duration of test in seconds.
         results['t_start'] - Unix start time.
 
