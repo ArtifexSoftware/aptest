@@ -300,7 +300,7 @@ Things to do:
   
     aptest/aptest.py --release-4
 
-  Wait for buildd to finish, agree to upload.
+  Wait for build to finish, agree to upload.
 
 * Unlock projects' branches if they were locked above:
 
@@ -984,6 +984,8 @@ Options
 ...........
 --release-3
 ...........
+--release-4
+...........
     Preset args for making releases. Only one may be specified, and it
     must be the only arg.
 
@@ -1193,49 +1195,52 @@ Options
 --test-gnn-out <path>
 .....................
     Where to write json data containing test details. Default is a file
-    containing curre time.
+    containing current time.
 
 .. _--test-gnn-push:
 
 --test-gnn-push 0|1
 ...................
     If 1, we push gnn results to
-    github.com/ArtifexSoftware/PyMuPDF-pymupdf-results. Default is 0.
+    https://github.com/ArtifexSoftware/PyMuPDF-pymupdf-results. Default is 0.
 
 .. _--ticker:
 
 --ticker <delay>
 ................
-    Use ticker with specified delay. Disabled if delay==0. Default is
+    Use ticker with specified delay. Disabled if `delay==0`. Default is
     0.5.
 
 .. _-u:
 
 -u 0|1
 ......
-    If 1, if `-r @github` is used then on success we ask the user to
+    If 1 and `-r @github` is used, then on success we ask the user to
     confirm and then upload wheels to pypi.org.
 
 .. _-v:
 
 -v <venv>
 .........
-    Changes how we run ourselves in a venv if required.
+    Changes how we run ourselves in a venv when required.
 
-    `0` - Do not use a venv.
+    `0` - Never use a venv.
 
-    `1` - Use venv. If it already exists, we assume the existing
-        directory was created by us earlier and is a valid venv
-        containing all necessary packages; this saves a little time.
+    `1` - Use a venv, but without recreating it (with `python -m venv ...`) if
+    the directory already exists; We assume any existing directory was created
+    by us earlier and is a valid venv containing all necessary packages; this
+    saves a little time.
 
-    `2` - Use venv.
+    `2` - Use a venv, always (re)create it with `python -m venv ...`.
 
-    `3` - Use venv but delete it first if it already exists.
+    `3` - Use a clean venv - delete it if it already exists, then run python -m
+    `venv ...`.
 
     The default is `2`.
 
-    The venv will be called `venv-aptest-<pthonversion>-<wordsize>`; we
-    also create a convenience link called `venv-aptest`.
+    The venv will be called `venv-aptest-<pthonversion>-<wordsize>`, for
+    example `venv-aptest-3.13.5-64`; we also create a convenience link called
+    `venv-aptest`.
 
 .. _-V2:
 
