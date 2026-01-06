@@ -1,3 +1,6 @@
+.. section-numbering::
+    :depth: 2
+
 Artifex Packages build/test
 ===========================
 
@@ -146,13 +149,11 @@ suites on central git::
 Release procedure
 -----------------
 
-Packages are:
+* Packages are:
 
-* pymupdf
-* pymupdfpro
-* pymupdf_layout
-
-Things to do:
+  * pymupdf
+  * pymupdfpro
+  * pymupdf_layout
 
 * Get local checkout of each package.
 
@@ -1224,19 +1225,22 @@ Options
 .........
     Changes how we run ourselves in a venv when required.
 
-    `0` - Never use a venv.
+    0 - Never use a venv.
 
-    `1` - Use a venv, but without recreating it (with `python -m venv ...`) if
-    the directory already exists; We assume any existing directory was created
-    by us earlier and is a valid venv containing all necessary packages; this
-    saves a little time.
+    1 - Use a venv but without recreating it if the directory already exists.
+        We assume any existing directory was created
+        by us earlier and is a valid venv containing all necessary packages;
+        this saves a little time.
 
-    `2` - Use a venv, always (re)create it with `python -m venv ...`.
+        Otherwise we create it with `python -m venv ...`.
 
-    `3` - Use a clean venv - delete it if it already exists, then run python -m
-    `venv ...`.
+    2 - Use a venv.
+        Always (re)create it with `python -m venv ...`.
 
-    The default is `2`.
+    3 - Use a clean venv.
+        Delete it if it already exists, then run `python -m venv ...`.
+
+    The default is 2.
 
     The venv will be called `venv-aptest-<pthonversion>-<wordsize>`, for
     example `venv-aptest-3.13.5-64`; we also create a convenience link called
