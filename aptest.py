@@ -878,6 +878,13 @@ g_package_info = {
                 'submodules': False,
                 'order': 1, # Fetch before Layout
             },
+        'pdf_feature_inspector':
+            {
+                'github_name': 'ArtifexSoftware/pdf_feature_inspector',
+                'git_branch': 'main',
+                'aliases':  ['pfi'],
+                'order': 4,
+            },
         }
 
 for name, value in g_package_info.items():

@@ -20,8 +20,11 @@ Supported packages/projects
 
 * mupdf
 * pymupdf
+* pymupdf4llm
 * pymupdfpro
-* pymupdf-layout
+* pymupdf_layout
+* langchain_pymupdf_layout
+* pdf_feature_inspector
 
 
 Package locations
@@ -334,8 +337,10 @@ We allow specification of a custom ssh private key to push to and/or
 access git@github.com:PyMuPDF/PyMuPDF and repositories within
 git@github.com/ArtifexSoftware/.
 
-* If required, this key should be provided in file `artifex-software-ssh-key`
-  in the current directory.
+* This key can be provided in two ways:
+
+  * In file `artifex-software-ssh-key` in the current directory.
+  * In environment variable `ARTIFEX_SOFTWARE_SSH_KEY`.
 
 * We run ssh with `StrictHostKeyChecking=no`, which may end up writing to
   .ssh/known_hosts.
@@ -630,8 +635,8 @@ Options
 
 .. _--build-type:
 
---build-type debug|memento|release
-..................................
+--build-type debug | memento | release
+......................................
     Set build type. Default is `release`.
 
 .. _--cibw-name:
@@ -902,8 +907,8 @@ Options
 
 .. _--pytest-wrap:
 
---pytest-wrap gdb|valgrind|helgrind
-...................................
+--pytest-wrap gdb | valgrind | helgrind
+.......................................
     Makes `test`_ command run tests under specified tool.
 
 .. _--python:
