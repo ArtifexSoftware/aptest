@@ -1861,23 +1861,35 @@ def do_build(state):
         PYMUPDF_SETUP_MUPDF_REBUILD = '0'
         pipcl.log(f'Setting {PYMUPDF_SETUP_MUPDF_REBUILD=}')
         state.env_extra['PYMUPDF_SETUP_MUPDF_REBUILD'] = PYMUPDF_SETUP_MUPDF_REBUILD
-    for package in state.packages_build:
-        pipcl.log(f'{package=}')
+    
+    # First install packages specified with `pip:` in reverse order so that
+    # we override default package prerequisites if necessary.
+    #
+    # This is necessary because packages specified with `pip:` cannot respect
+    # any overrides of prerequisite version numbers.
+    for package in reversed(state.packages_build):
         location, args_pos = state.packages[package]
         if not location:
             continue
         if location.startswith('pip:'):
             assert package != 'mupdf', f'Not a package on pypi.org: {package}'
             name = location[4:]
-            if name.endswith(('.whl', '.tar.gz')):
-                pass
-            else:
+            if not name.endswith(('.whl', '.tar.gz')):
                 name = f'{package}{name}'
             # Get wheel from pypi.org and put into our wheelhouse
             # so it is available for later builds. Then install;
             # pip uses a cache so will not download twice.
             pipcl.run(f'pip wheel -w {state.wheelhouse} {name}')
             pipcl.run(f'pip install -v {name}')
+    
+    # Now install non-pip packages forwards.
+    for package in state.packages_build:
+        pipcl.log(f'{package=}')
+        location, args_pos = state.packages[package]
+        if not location:
+            continue
+        if location.startswith('pip:'):
+            pass
         else:
             directory = _get_local(package, state)
             
@@ -2728,6 +2740,7 @@ def do_test(state):
                     )
         if e:
             failed_packages.append(package)
+    
     if failed_packages:
         pipcl.log(f'Tests failed for these packages:')
         for package in failed_packages:
