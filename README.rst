@@ -27,6 +27,16 @@ Supported packages/projects
 * pdf_feature_inspector
 
 
+Use of Python venv virtual environments
+---------------------------------------
+
+If we are not already running inside a Python venv, we automatically create a
+venv and re-run ourselves inside it (see the `-v`_ option).
+
+* The `build`_ command builds and installs into the current venv.
+* The `test`_ command tests packages that are installed in the current venv.
+
+
 Package locations
 -----------------
 
@@ -75,6 +85,10 @@ Test
   package location to be used for testing, for example a local checkout or
   remote git repository.
 
+* One can generate traces of MuPDF calls by setting environment variables in debug
+  builds. For details see:
+  https://mupdf.readthedocs.io/en/latest/language-bindings.html#environmental-variables
+
 
 Build/test with cibuildwheel
 ----------------------------
@@ -85,6 +99,44 @@ Build/test with cibuildwheel
 * We set PIP_EXTRA_INDEX_URL to point to our internal package repository.
 * cibuildwheel uses pip internally so this ensures that previously-built
   prerequisite wheels will be installed as required.
+
+Cibuildwheel Python version
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Cibuildwheel needs system install of required python version(s).
+
+On Macos:
+
+* Installing python versions with brew does not seem to work - cibuildwheel
+  cannot find it.
+* To install python3.14t:
+  
+  * Run::
+  
+      wget https://www.python.org/ftp/python/3.14.0/python-3.14.0-macos11.pkg
+  
+  * Create a file called `choicechanges.plist` containing::
+  
+      <?xml version="1.0" encoding="UTF-8"?>
+      <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+      <plist version="1.0">
+      <array>
+              <dict>
+                      <key>attributeSetting</key>
+                      <integer>1</integer>
+                      <key>choiceAttribute</key>
+                      <string>selected</string>
+                      <key>choiceIdentifier</key>
+                      <string>org.python.Python.PythonTFramework-3.14</string>
+              </dict>
+      </array>
+      </plist>
+  
+  * Run::
+  
+      sudo installer -pkg python-3.14.0-macos11.pkg -applyChoiceChangesXML choicechanges.plist -target /
+  
+  * Also see: https://docs.python.org/3/using/mac.html.
 
 
 Running on Github with `-r @github`
@@ -124,7 +176,7 @@ and uploading to pypi.org::
     ./aptest/aptest.py --release-1
     ./aptest/aptest.py --release-2
     ./aptest/aptest.py --release-3
-
+    ./aptest/aptest.py --release-4
 
 Build/test pymupdf, pymupdfpro and pymupdf-layout using cibuildwheel,
 getting packages from different locations::
@@ -407,6 +459,8 @@ stdout.
 
   See Bash's `help complete` for more information.
 
+* Also see special command  `completion`_.
+
 
 Command-line arguments
 ----------------------
@@ -424,13 +478,15 @@ Overview
 * Usually command `test`_ would be specified after commands such as `build`_.
 * Options and commands can be interleaved but it may be clearer to separate
   them on the command line.
-* Command-line arguments are prefixed with contents of `~/.aptest`, if it
-  exists.
 
-  * Arguments are extracted using `shlex.split()`, so are separated by
-    whitespace (e.g. space and newlines characters) unless escaped or inside
-    quotes etc.
-
+* Command line arguments are prepended with `<.aptest> <APTEST_options>`, where:
+  
+  * `<.aptest>` is the contents of file `~/.aptest` if it exists.
+  * `<APTEST_options>` is the contents of environment variable `APTEST_options` if set.
+  
+  In both cases, arguments are extracted using `shlex.split()`, so are separated by
+  whitespace (e.g. space and newlines characters) unless escaped or inside
+  quotes etc.
 
 Commands
 ^^^^^^^^
@@ -984,6 +1040,8 @@ Options
 
 .. _--release-3:
 
+.. _--release-4:
+
 --release-1
 ...........
 --release-2
@@ -1256,3 +1314,20 @@ Options
 -V
 ..
     Verbose.
+
+Special arguments
+^^^^^^^^^^^^^^^^^
+
+.. _completion:
+
+completion
+..........
+    Must be the only arg. Prints a bash completion script for
+    aptest.py, to stdout.
+
+    The script works by using aptest.py itself to write valid
+    completions to stdout (which it does if environment variable
+    `COMP_LINE` is defined).
+
+    If `APTEST_COMPLETION_DEBUG` is defined, it is a path to which
+    diagnostics are appended.
