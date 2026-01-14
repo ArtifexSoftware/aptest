@@ -1,5 +1,6 @@
 #! /usr/bin/env python3
 
+import glob
 import sys
 import time
 
@@ -65,22 +66,22 @@ def plotly_figure(data, graph_height=400):
     # We use hard-coded strong colors for pymupdf tools, then
     # plotly.colors.DEFAULT_PLOTLY_COLORS for the rest.
     #
-    if 0:
-        palette = [
-                'rgb(255, 0, 0)',
-                'rgb(0, 0, 255)',
-                'rgb(128, 0, 128)',
-                ] + list(plotly.colors.DEFAULT_PLOTLY_COLORS)
-        tool_colors = dict()
-        def tool_order(tool):
-            if tool != 'pymupdf' and (tool.startswith('pymupdf') or tool.startswith('mupdfpy')):
-                return 'aaaaa' + tool
-            return tool
-        for i, tool in enumerate( sorted(tools, key=tool_order)):
-            tool_colors[ tool] = palette[ i % len(palette)]
-            #jlib.log('{tool}: {tool_colors[ tool]}')
     
-    palette = list(plotly.colors.DEFAULT_PLOTLY_COLORS)
+    #palette = [
+    #        'rgb(255, 0, 0)',
+    #        'rgb(0, 0, 255)',
+    #        'rgb(128, 0, 128)',
+    #        ] + list(plotly.colors.DEFAULT_PLOTLY_COLORS)
+    #tool_colors = dict()
+    #def tool_order(tool):
+    #    if tool != 'pymupdf' and (tool.startswith('pymupdf') or tool.startswith('mupdfpy')):
+    #        return 'aaaaa' + tool
+    #    return tool
+    #for i, tool in enumerate( sorted(tools, key=tool_order)):
+    #    tool_colors[ tool] = palette[ i % len(palette)]
+    #    #jlib.log('{tool}: {tool_colors[ tool]}')
+    
+    #palette = list(plotly.colors.DEFAULT_PLOTLY_COLORS)
     
     # We need to find, in advance, the number of subplots and the subplot
     # titles (e.g. 'copy: DB-Systems.pdf').
@@ -146,7 +147,6 @@ def plotly_figure(data, graph_height=400):
             # Update `rhs` with location of final point.
             if xs and ys:
                 x, y = xs[-1], ys[-1]
-                x0 = xs[0]
                 rhs.append( (x, y, linename))
             
             # Create dummy transparent trace with y=0 so that y axis always
@@ -318,8 +318,6 @@ def plot_gnn_html(paths, out_text, out_html):
                     f.write('\n')
                 f.write('----\n')
                 
-        
-
 
 def plot_gnn_html_select(
         out_html,

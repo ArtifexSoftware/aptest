@@ -45,7 +45,6 @@ import re
 import selectors
 import shlex
 import shutil
-import stat
 import subprocess
 import sys
 import sysconfig
@@ -2155,7 +2154,7 @@ def git_info( directory):
         branch = out.strip()
     
     #log(f'git_info(): {directory=} {branch=} {sha=} {comment=}')
-    return sha, comment, diff, branch    
+    return sha, comment, diff, branch
 
 
 def get_time_iso_8601(text):
@@ -2990,7 +2989,7 @@ class _Wait:
             elif self.ticker:
                 endtime2 = endtime_ticker
             else:
-                endtime2 = endtime
+                endtime2 = self.endtime
 
             assert endtime2 > t, f'{t=} {endtime2=}'
             events = self.selector.select(endtime2 - t)
@@ -3043,6 +3042,7 @@ class _TickerState:
         sys.stdout.write('\b' * self.current_length + dt + tail)
         self.current_length = len(dt)
         sys.stdout.flush()
+    
     def cancel(self):
         if self.rotate_count:
             sys.stdout.write('\b \b' * self.current_length)
@@ -3165,6 +3165,7 @@ def run_if( command, out, *prerequisites, caller=1):
     >>> with open('run_if_test_argv0.sh', 'w') as f:
     ...     print('#! /bin/sh', file=f)
     ...     print('echo hello world > run_if_test_argv0.out', file=f)
+    >>> import stat
     >>> os.chmod('run_if_test_argv0.sh', os.stat('run_if_test_argv0.sh').st_mode | stat.S_IEXEC)
     
     >>> run_if( f'./run_if_test_argv0.sh', f'run_if_test_argv0.out', caller=0)
@@ -3474,8 +3475,10 @@ class LogPrefix:
     '''
     def __init__(self, prefix):
         self.prefix = prefix
+    
     def __enter__(self):
         _log_prefix_stack.append(self.prefix)
+    
     def __exit__(self, *args):
         del _log_prefix_stack[-1]
 

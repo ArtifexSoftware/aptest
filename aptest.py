@@ -5,7 +5,6 @@
 See README.rst for details.
 '''
 
-import github
 import glob
 import importlib.metadata
 import json
@@ -144,7 +143,7 @@ def sync(remote, remote_dir, path, ssh_command, verbose, state):
             f'--rsh {shlex.quote(ssh_command2)} '
             )
     if state.remote_rsync_path:
-        command += f'--rsync-path {shlex.quote(rsync_path)} '
+        command += f'--rsync-path {shlex.quote(state.remote_rsync_path)} '
     if state.remote_rsync_wsl:
         command += f'--no-p --rsync-path "wsl rsync" '
     path = os.path.relpath(path)
@@ -186,35 +185,35 @@ g_package_info = {
                 'git_branch': 'main',
                 'aliases':  [],
             },
-        'mupdf': 
+        'mupdf':
             {
                 'github_name': 'ArtifexSoftware/mupdf',
                 'git_branch': 'master',
                 'aliases':  ['m'],
                 'order': 0,
             },
-        'pymupdf': 
+        'pymupdf':
             {
                 'github_name': 'pymupdf/PyMuPDF',
                 'git_branch': 'main',
                 'aliases':  ['p'],
                 'order': 1,
             },
-        'pymupdf4llm': 
+        'pymupdf4llm':
             {
                 'github_name': 'pymupdf/pymupdf4llm',
                 'git_branch': 'main',
                 'aliases':  ['4llm'],
                 'order': 2,
             },
-        'pymupdfpro': 
+        'pymupdfpro':
             {
                 'github_name': 'ArtifexSoftware/PyMuPDFPro',
                 'git_branch': 'main',
                 'aliases':  ['pro', 'P'],
                 'order': 2,
             },
-        'pymupdf_layout': 
+        'pymupdf_layout':
             {
                 'github_name': 'ArtifexSoftware/sce',
                 'git_branch': 'master',
@@ -222,7 +221,7 @@ g_package_info = {
                 'submodules': False,
                 'order': 2,
             },
-        'langchain_pymupdf_layout': 
+        'langchain_pymupdf_layout':
             {
                 'github_name': 'pymupdf/langchain-pymupdf-layout',
                 'git_branch': 'main',
@@ -298,9 +297,11 @@ class Arg:
         self.text = text
         self.args_iterator = args_iterator
         self.pos = args_iterator.pos
+    
     def __repr__(self):
         return self.text if isinstance(self.text, str) else 'StopIteration'
         #return f'Arg:{self.text!r}' if isinstance(self.text, str) else 'Arg:StopIteration'
+    
     def __eq__(self, rhs):
         ret = self.text == rhs
         if not ret:
@@ -309,14 +310,16 @@ class Arg:
             # 37: % menu completion
             # 63: ? listing completions after successive tabs
             # 64: @ list completions if the word is not unmodified
-            if 1 or COMP_TYPE=='63' or isinstance(self.text, StopIteration) or rhs.startswith(self.text):
+            if 1 or os.environ.get('COMP_TYPE')=='63' or isinstance(self.text, StopIteration) or rhs.startswith(self.text):
                 #pipcl.log(f'Adding suggestion {rhs=}. {COMP_TYPE=} {self.text=}')
                 self.args_iterator._add_suggestion(rhs)
         return ret
+    
     def startswith(self, rhs):
         if self.text is None or isinstance(self.text, StopIteration):
             return False
         return self.text.startswith(rhs)
+    
     def as_bool(self):
         ret = None
         if self in ('1', 'true', 'True'):
@@ -329,18 +332,21 @@ class Arg:
             raise Exception(f'Unrecognised bool value: {self.text!r}')
         else:
             return ret
+    
     def as_float(self):
         try:
             return float(self.text)
         except Exception:
             self.args_iterator._add_suggestion('<FLOAT>')
             raise
+    
     def as_int(self):
         try:
             return int(self.text)
         except Exception:
             self.args_iterator._add_suggestion('<INT>')
             raise
+    
     def as_text(self):
         if isinstance(self.text, str):
             return self.text
@@ -359,6 +365,7 @@ class Args:
         self.pos = pos
         self.suggestions = list()
         self.current = None
+    
     def __next__(self):
         self.suggestions.clear()
         if self.pos == len(self.argv):
@@ -371,6 +378,7 @@ class Args:
         ret = Arg(self, ret)
         self.current = ret
         return ret
+    
     def _add_suggestion(self, suggestion):
         #pipcl.log(f'Adding {suggestion=}', caller=3)
         self.suggestions.append(suggestion)
@@ -500,7 +508,6 @@ def get_args(argv):
                 v = os.environ[n]
                 pipcl.log(f'    {n}: {v!r}')
     
-    
     if sys.argv[1:] == ['completion']:
         # Write bash completion script to stdout and exit.
         print(textwrap.dedent(f'''
@@ -567,6 +574,7 @@ def get_args(argv):
     state.pytest_paths = list()
     state.pytest_wrap = None
     state.python = None
+    state.python_args_pos = None
     state.remote_arg = None
     state.remote_dir = 'artifex-remote'
     state.remote_do = True
@@ -759,7 +767,7 @@ def get_args(argv):
                 assert state.pytest_wrap in ('gdb', 'valgrind', 'helgrind')
 
             elif arg == '--python':
-                python_args_pos = args.pos
+                state.python_args_pos = args.pos
                 state.python = next(args).as_text()
 
             elif arg.startswith('--release-'):
@@ -917,14 +925,14 @@ def get_args(argv):
                     if isinstance(args.current.text, StopIteration):
                         print(suggestion)
                     elif suggestion.startswith(args.current.text):
-                            pipcl.log(f'Writing out {suggestion=}')
-                            print(suggestion)
+                        pipcl.log(f'Writing out {suggestion=}')
+                        print(suggestion)
                     sys.stdout.flush()
                 pipcl.log(f'Calling sys.exit()')
                 #sys.exit()
                 return None, None
                 
-            except Exception as e:
+            except Exception:
                 pipcl.log(f'completion: error: {traceback.format_exc()}')
                 #sys.exit(1)
                 #return 1
@@ -1204,6 +1212,15 @@ def do_remote(state, argv):
                 )
 
 
+def build_sdist(state, package, directory):
+    if package == 'pymupdf':
+        pipcl.run(
+                f'cd {directory}'
+                    f' && python setup.py -d {os.path.abspath(state.wheelhouse)} sdist',
+                prefix='sdist {package}: ',
+                )
+
+
 def do_build(state):
     # We use `pip --extra-index-url {pip_index_url}` so that pip
     # finds prerequisite wheels in state.wheelhouse.
@@ -1267,7 +1284,7 @@ def do_build(state):
                     pipcl.run(f'pip uninstall -y {package}')
 
                 if state.sdists:
-                    build_sdist(package, directory)
+                    build_sdist(state, package, directory)
 
                 if (package == 'pymupdf'
                         and state.graal
@@ -1443,7 +1460,7 @@ def do_cibw(state):
             continue
 
         if state.sdists and platform.system() == 'Linux':
-            build_sdist(package, directory)
+            build_sdist(state, package, directory)
 
         # Tell cibuildwheel how to test <package>.
         if package in state.packages_test:
@@ -1574,7 +1591,7 @@ def do_gnn_download(state):
 
     pipcl.run(f'pip install datasets')
     pipcl.run(f'pip install huggingface_hub[hf_xet]')
-    import datasets
+    #import datasets
     import huggingface_hub
 
     if 0:
@@ -1624,7 +1641,7 @@ def do_gnn_download(state):
             if not state.gnn_doit:
                 assert 0, f'Would return false for {marker=}, but {state.gnn_doit=}'
 
-        def marker_create(maker):
+        def marker_create(marker):
             with open(marker, 'w'):
                 pass
             pipcl.log(f'Have created {marker=}.')
@@ -1648,7 +1665,7 @@ def do_gnn_download(state):
                 pipcl.log(f'Extacting {path_zip=} into {directory=}.')
                 os.makedirs(directory, exist_ok=1)
                 z.extractall(directory)
-            marker_create(maker)
+            marker_create(marker)
 
         if 1:
             # Unzip.
@@ -1725,7 +1742,7 @@ def do_gnn_show(state):
         gnn_select_code = compile(state.gnn_show_select, '', 'eval')
         def selectfn(results):
             #r = eval(gnn_select_code, globals=dict(results=results))
-            r = eval(gnn_select_code)#, globals=dict(results=results))
+            r = eval(gnn_select_code)
             return r
     paths = list()
     if state.gnn_show_paths:
@@ -1753,10 +1770,10 @@ def do_gnn_show(state):
         out_text = None
     elif state.gnn_show_text is None:
         out_text = f'gnn-text-{time.strftime("%Y-%m-%d-%H-%M-%S")}.txt'
-        out_text_simple = f'gnn-text.txt'
+        #out_text_simple = f'gnn-text.txt'
     else:
         out_text = state.gnn_show_text
-        out_text_simple = None
+        #out_text_simple = None
 
     if state.gnn_show_graph == '':
         out_graph = None
@@ -1775,7 +1792,7 @@ def do_gnn_show(state):
             try:
                 os.symlink(out_graph, out_graph_simple)
             except Exception as e:
-                pipcl.log(f'Warning: failed to create link from {out_graph_simple=} to {out_graph=}.')
+                pipcl.log(f'Warning: failed to create link from {out_graph_simple=} to {out_graph=}: {e}')
             pipcl.log(f'Have created softlink {out_graph_simple=} => {out_graph=}')
     else:
         pipcl.log(f'Not creating graph output; {state.gnn_show_graph=}.')
@@ -1887,7 +1904,7 @@ def do_test_gnn(state, command):
             if directory:
                 sha, comment, diff, branch = pipcl.git_info(directory)
                 author_date = pipcl.git_info_author_date(directory)
-                committer_date  = pipcl.git_info_committer_date(directory)
+                committer_date = pipcl.git_info_committer_date(directory)
                 ret['packages'][package]['gitinfo'] = dict(
                         sha=sha,
                         comment=comment,
@@ -1943,7 +1960,6 @@ def do_test_gnn(state, command):
         out_json = None
         if state.test_gnn_cache:
             # See whether an identical run has already been done.
-            match = None
             import copy
             ret0 = copy.deepcopy(ret)
             ignore_keys = ('results', 't_start', 't_duration', 'pip-list')
@@ -2152,7 +2168,7 @@ def main(argv):
         else:
             pipcl.log(f'{state.python=}: rerunning because {platform.python_version_tuple()[:2]=} != {python_version_tuple[:2]=}')
             argv = args.argv[:]
-            argv[python_args_pos] = ''  # pylint: disable=used-before-assignment
+            argv[state.python_args_pos] = ''  # _pylint: disable=used-before-assignment
             e = pipcl.run(f'{state.python} {shlex.join(argv[1:])}', check=0)
             sys.exit(e)
             
@@ -2182,7 +2198,7 @@ def main(argv):
                     if state.venv >= 3:
                         shutil.rmtree(venv_name, ignore_errors=1)
                     if state.venv == 1 and os.path.exists(pyenv_dir) and os.path.exists(venv_name):
-                        pipcl.log(f'{venv=} and {venv_name=} already exists so not building pyenv or creating venv.')
+                        pipcl.log(f'{state.venv=} and {venv_name=} already exists so not building pyenv or creating venv.')
                     else:
                         pipcl.git_get(pyenv_dir, remote='https://github.com/pyenv/pyenv.git', branch='master')
                         pipcl.run(f'cd {pyenv_dir} && src/configure && make -C src')
@@ -2298,14 +2314,6 @@ def main(argv):
         state.env_extra['PYMUPDFPRO_SETUP_SWIG'] = swig_binary
         state.env_extra['PYMUPDF_LAYOUT_SETUP_SWIG'] = swig_binary
     
-    def build_sdist(package, directory):
-        if package == 'pymupdf':
-            pipcl.run(
-                    f'cd {directory}'
-                        f' && python setup.py -d {os.path.abspath(state.wheelhouse)} sdist',
-                    prefix='sdist {package}: ',
-                    )
-    
     if (1
             and os.environ.get('GITHUB_ACTIONS') == 'true'
             and pipcl.darwin()
@@ -2353,6 +2361,7 @@ def main(argv):
                     do_gnn_show(state)
 
                 elif command == 'gnn-train':
+                    layout_location = _get_local('pymupdf_layout', state)
                     pipcl.run(f'pip install --upgrade torchvision')
                     layout_location_abs = os.path.abspath(layout_location)
                     pipcl.log(f'{layout_location=} {layout_location_abs=}')
@@ -2364,7 +2373,7 @@ def main(argv):
                 elif command == 'populate':
                     for package in state.packages_build:
                         location, args_pos = state.packages[package]
-                        if 1:#location.startswith('git:'):
+                        if 1: # location.startswith('git:'):
                             directory = _get_local(package, state)
                             pipcl.log(f'Local directory for {package=} is: {directory!r}')
 
@@ -2513,7 +2522,7 @@ def venv_run(args, path, recreate=True, clean=False, makelink=None):
         try:
             os.symlink(path, makelink)
         except Exception as e:
-            pipcl.log(f'Warning: failed to create link from {makelink=} to {path=}.')
+            pipcl.log(f'Warning: failed to create link from {makelink=} to {path=}: {e}')
     e = pipcl.run(command, check=0, prefix=f'{path}: ')
     return e
 
@@ -2569,8 +2578,6 @@ def push_results(
     We require environment variable PYMUPDF_PERFORMANCE_RESULTS_RW to be set to
     github access token. If not present, we return quietly.
     '''
-    import json
-    
     # Get results repository.
     remote = f'git@github.com:ArtifexSoftware/PyMuPDF-performance-results'
     local = 'aptest-git-pymupdf-performance-results'

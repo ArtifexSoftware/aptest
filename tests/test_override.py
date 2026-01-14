@@ -1,6 +1,5 @@
 import os
 import re
-import subprocess
 import sys
 
 
@@ -42,7 +41,6 @@ def test_override():
         del sys.path[0]
     
     # Get our own copy of pymupdf and overwrite version number in setup.py.
-    remote = 'git@github.com:PyMuPDF/PyMuPDF.git'
     pymupdf_checkout = 'aptest-test-git-pymupdf'
     pipcl.git_get(
             pymupdf_checkout,

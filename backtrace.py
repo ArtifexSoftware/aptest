@@ -411,7 +411,7 @@ def show_frames(tb=None, limit=None, file=None, outer=True, reverse=False, frame
         * We default to showing the inner frames first; set `reverse` to true
           to show inner frames last.
         
-        * Frames are displayed as one line in the form:: 
+        * Frames are displayed as one line in the form::
 
             <file>:<line>:<function>(): <text>
 
