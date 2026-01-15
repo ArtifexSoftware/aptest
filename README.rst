@@ -15,6 +15,16 @@ The `aptest.py` script can build, test and release (to pypi.org) multiple
 Python packages together.
 
 
+History
+-------
+
+2026-1-15
+    Fix potentially incorrect package versions if `pip:` is used.
+    Fix flake8 errors.
+    Fix codespell errors.
+    All docs are now in README.rst.
+
+
 Supported packages/projects
 ---------------------------
 
