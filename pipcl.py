@@ -2284,7 +2284,7 @@ def git_get(
             If true, we clone with `--recursive --shallow-submodules` and run
             `git submodule update --init --recursive` before returning.
     '''
-    log0(f'{os.getcwd()=} {remote=} {local=} {branch=} {tag=} {text=} {env_extra=} {update=} {submodules=}')
+    log0(f'{os.getcwd()=} {remote=} {local=} {branch=} {tag=} {text=} {env_extra=} {update=} {submodules=} {devel=}')
     
     if text:
         if text.startswith('git:'):
@@ -2585,8 +2585,9 @@ def run(
         def flush():
             for _write2, flush2 in out:
                 if flush2:
-                    flush2()
+                    flush2()    # pylint: disable=not-callable
 
+        # pylint: disable=too-many-nested-blocks
         if prefix or ticker or out!=[sys.stdout]:
             # Use explicit read loop from child process.
             if platform.system() == 'Windows':
@@ -2716,7 +2717,7 @@ def show_system():
     
     log(f'{sysconfig.get_config_var("Py_GIL_DISABLED")=}')
     try:
-        log(f'{sys._is_gil_enabled()=}')
+        log(f'{sys._is_gil_enabled()=}')    # # pylint: disable=protected-access
     except AttributeError as e:
         log(f'sys._is_gil_enabled() => exception {e}')
     
@@ -3536,7 +3537,7 @@ def _log_prefix(format_, caller):
 _log_text_line_start = True
 _log_f = None
 
-def _log(text, level, caller, raw=False, nl=True, format_=None):
+def _log(text, level, caller, *, raw=False, nl=True, format_=None):
     '''
     Logs lines with prefix, if <level> is lower or equal to <g_verbose>.
     '''

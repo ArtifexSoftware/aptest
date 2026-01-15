@@ -99,8 +99,8 @@ class Doct:
         >>> d
         {'foo': {'bar': 1}}
         '''
-        super.__setattr__(self, '_dict', dict(*args, **kwargs))
-        super.__setattr__(self, '_autopath', autopath)
+        super().__setattr__('_dict', dict(*args, **kwargs))
+        super().__setattr__('_autopath', autopath)
         # Recursively convert dict items into Doct's.
         for key, value in self._dict.items():
             self._dict[key] = self._convert(value)

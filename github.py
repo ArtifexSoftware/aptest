@@ -80,7 +80,7 @@ def _gh_download(url, path, *, gh=True):
             raise Exception(str(r.json())) from e
     else:
         import requests # pylint: disable=import-outside-toplevel
-        r = requests.get(url, stream=True)
+        r = requests.get(url, stream=True)  # pylint: disable=missing-timeout
     t0 = t1 = time.time()
     bytes_ = 0
     with open(path_, 'wb') as f:

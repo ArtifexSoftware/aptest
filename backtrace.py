@@ -12,7 +12,7 @@ import traceback
 import types
 
 
-def exception_hook(type_, exception, traceback):
+def exception_hook(_type, exception, _traceback):
     '''
     Wrapper for `show()` suitable for use as `sys.excepthook`.
     '''
@@ -346,7 +346,7 @@ def show(
         return out.getvalue()
 
 
-def show_frames(tb=None, limit=None, file=None, outer=True, reverse=False, framef=None):
+def show_frames(tb=None, *, limit=None, file=None, outer=True, reverse=False, framef=None):
     '''
     Generates a text representation of a backtrace.
     
@@ -710,7 +710,7 @@ def show_frame(frame, limit=None, cwd='', framef=None):
         filename, line, fnname, text = frame
         code = None
     elif isinstance(frame, (types.TracebackType, inspect.FrameInfo)):
-        f, filename, line, fnname, text, index = frame
+        f, filename, line, fnname, text, _index = frame
         text = text[0] if text else ''
         code = f.f_code
     else:
@@ -721,7 +721,7 @@ def show_frame(frame, limit=None, cwd='', framef=None):
     if filename.startswith(f'.{os.sep}'):
         filename = filename[ 2:]
     text = framef.format(file=filename, line=line, fn=fnname, text=text)
-    if (0
+    if (0   # pylint: disable=too-many-boolean-expressions
             or (limit == fnname)
             or (code and code == limit)
             or (code and code == getattr(limit, '__code__', None))

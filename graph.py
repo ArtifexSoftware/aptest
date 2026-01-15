@@ -15,7 +15,7 @@ backtrace.exception_hook_install()
 
 def _json_default(o):
     if isinstance(o, doct.Doct):
-        return o._dict
+        return o._dict  # pylint: disable=protected-access
     else:
         raise TypeError
 
@@ -88,7 +88,7 @@ def plotly_figure(data, graph_height=400):
     #
     num_subplots = len(data)
     subplot_titles = list()
-    for graphname, lines in _sorted_items(data):
+    for graphname, _lines in _sorted_items(data):
         subplot_titles.append(graphname)
     
     # Create the subplots.
@@ -152,7 +152,7 @@ def plotly_figure(data, graph_height=400):
             # Create dummy transparent trace with y=0 so that y axis always
             # includes zero.
             #
-            if 0 and rhs:
+            if 0: # and rhs:
                 # Use any existing x coordinate.
                 x, _, _ = rhs[0]
                 figure.add_trace(
@@ -280,7 +280,7 @@ def plot_gnn_html(paths, out_text, out_html):
     data = doct.Doct()
     graphs = doct.Doct()
     graphs.setpath('__overall__', ['precision', 'recall', 'f1'])
-    for graphname, lines in _sorted_items(graphs):
+    for graphname, _lines in _sorted_items(graphs):
         data.setpath(graphname, 'xaxis_name', None)
         data.setpath(graphname, 'yaxis_name', 'Score')
     # Populate <data>.
@@ -312,7 +312,7 @@ def plot_gnn_html(paths, out_text, out_html):
         with open(out_text, 'w') as f:
             for tablename, table in _sorted_items(data):
                 f.write(f'{tablename=}\n')
-                for rowname, row in _sorted_items(table['lines']):
+                for _rowname, row in _sorted_items(table['lines']):
                     for t, value in sorted(row['points']):
                         f.write(f'| {value=}')
                     f.write('\n')
@@ -324,7 +324,7 @@ def plot_gnn_html_select(
         filterfn=lambda results: True,
         ppr=None,
         ppr_git_branch='main',
-        ppr_git_text=None,
+        #ppr_git_text=None,
         ):
     '''
     Gemerates graphs for gnn results for which <filterfn()> returns true.
@@ -364,7 +364,7 @@ def plot_gnn_html_select(
             results = json.load(f)
         if filterfn(results):
             paths.append(path)
-    plot_gnn_html(paths, out_html)
+    plot_gnn_html(paths, out_text=False, out_html=out_html)
     
 
 if __name__ == '__main__':
@@ -417,7 +417,7 @@ if __name__ == '__main__':
         elif arg == '-i':
             pipcl.run(f'pip install numpy plotly')
             inputdata = dict()
-            paths = [path for path in args]
+            paths = list(args)
             plot_gnn_html(paths, 'aptest_test_graph.txtt', 'aptest_test_graph.html')
             
         else:

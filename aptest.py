@@ -125,7 +125,7 @@ def sync_reverse(
     pipcl.run(command, prefix=f'reverse sync {path_remote} => {path_local}: ', log=1)
         
 
-def sync(remote, remote_dir, path, ssh_command, verbose, state):
+def sync(remote, remote_dir, path, ssh_command, verbose, state):    # pylint: disable=too-many-positional-arguments
     '''
     Syncs <path> to <remote>:<remote_dir>/ using rsync.
     
@@ -310,7 +310,7 @@ class Arg:
             # 37: % menu completion
             # 63: ? listing completions after successive tabs
             # 64: @ list completions if the word is not unmodified
-            if 1 or os.environ.get('COMP_TYPE')=='63' or isinstance(self.text, StopIteration) or rhs.startswith(self.text):
+            if 1: # or os.environ.get('COMP_TYPE')=='63' or isinstance(self.text, StopIteration) or rhs.startswith(self.text):
                 #pipcl.log(f'Adding suggestion {rhs=}. {COMP_TYPE=} {self.text=}')
                 self.args_iterator._add_suggestion(rhs)
         return ret
@@ -330,28 +330,27 @@ class Arg:
             if isinstance(self.text, StopIteration):
                 raise StopIteration
             raise Exception(f'Unrecognised bool value: {self.text!r}')
-        else:
-            return ret
+        return ret
     
     def as_float(self):
         try:
             return float(self.text)
         except Exception:
-            self.args_iterator._add_suggestion('<FLOAT>')
+            self.args_iterator._add_suggestion('<FLOAT>')   # pylint: disable=protected-access
             raise
     
     def as_int(self):
         try:
             return int(self.text)
         except Exception:
-            self.args_iterator._add_suggestion('<INT>')
+            self.args_iterator._add_suggestion('<INT>') # pylint: disable=protected-access
             raise
     
     def as_text(self):
         if isinstance(self.text, str):
             return self.text
         else:
-            self.args_iterator._add_suggestion('<TEXT>')
+            self.args_iterator._add_suggestion('<TEXT>')    # pylint: disable=protected-access
             raise Exception(f'Expected <text>')
                 
         
@@ -498,9 +497,9 @@ def get_args(argv):
         APTEST_COMPLETION_DEBUG = os.environ.get('APTEST_COMPLETION_DEBUG')
         #print(f'{APTEST_COMPLETION_DEBUG=}', file=sys.stderr, flush=1)
         if APTEST_COMPLETION_DEBUG:
-            pipcl._log_f = open(APTEST_COMPLETION_DEBUG, 'a')
+            pipcl._log_f = open(APTEST_COMPLETION_DEBUG, 'a')   # pylint: disable=protected-access
         else:
-            pipcl._log_f = open('/dev/null', 'a')
+            pipcl._log_f = open('/dev/null', 'a')   # pylint: disable=consider-using-with,protected-access
         pipcl.log(f'{COMP_LINE=}')
         pipcl.log(f'os.environ COMP_*:')
         for n in sorted(os.environ.keys()):
@@ -537,7 +536,7 @@ def get_args(argv):
         def __setattr__(self, name, value):
             if self._frozen:
                 assert hasattr(self, name), f'Unrecognised state {name=}.'
-            super.__setattr__(self, name, value)
+            super().__setattr__(name, value)
     
     state = State()
     
@@ -628,7 +627,7 @@ def get_args(argv):
     
     if COMP_LINE:
         line = COMP_LINE
-        if 0 and COMP_POINT:
+        if 0: # and COMP_POINT:
             COMP_POINT_int = int(COMP_POINT)
             assert COMP_POINT_int <= len(line)
             line = line[:COMP_POINT_int]
@@ -966,11 +965,11 @@ def get_args(argv):
                 print(f'(No suggestions.)')
                 raise
             sys.exit(1)
-            return 1
+            #return 1
         else:
             backtrace.show()
             sys.exit(1)
-            return 1
+            #return 1
     
     if COMP_LINE:
         pipcl.log(f'completion: no error. {args.suggestions=}')
@@ -978,7 +977,7 @@ def get_args(argv):
         for suggestion in args.suggestions:
             print(suggestion)
         sys.exit(1)
-        return 0
+        #return 0
     
     return args, state
 
@@ -1105,7 +1104,7 @@ def do_remote(state, argv):
 
         # Sync each package.
         all_packages = list(state.packages.items()) + list(state.packages2.items())
-        for package_name, (package_location, args_pos) in all_packages:
+        for _package_name, (package_location, _args_pos) in all_packages:
             if not package_location.startswith(('git:', 'pip:')):
                 pipcl.log(f'{remote=} {remote_dir=} {package_location=} {ssh_command=}')
                 if sync2(package_location):
@@ -1244,7 +1243,7 @@ def do_build(state):
     # This is necessary because packages specified with `pip:` cannot respect
     # any overrides of prerequisite version numbers.
     for package in reversed(state.packages_build):
-        location, args_pos = state.packages[package]
+        location, _args_pos = state.packages[package]
         if not location:
             continue
         if location.startswith('pip:'):
@@ -1261,7 +1260,7 @@ def do_build(state):
     # Now install non-pip packages forwards.
     for package in state.packages_build:
         pipcl.log(f'{package=}')
-        location, args_pos = state.packages[package]
+        location, _args_pos = state.packages[package]
         if not location:
             continue
         if location.startswith('pip:'):
@@ -1592,7 +1591,7 @@ def do_gnn_download(state):
     pipcl.run(f'pip install datasets')
     pipcl.run(f'pip install huggingface_hub[hf_xet]')
     #import datasets
-    import huggingface_hub
+    import huggingface_hub  # pylint: disable=import-error
 
     if 0:
         # List all huggingface datasets.
@@ -1621,7 +1620,7 @@ def do_gnn_download(state):
                 pipcl.log(f'Already exists: {path=}')
             else:
                 if state.gnn_doit:
-                    github._gh_download(url, path, gh=0)
+                    github._gh_download(url, path, gh=0)    # pylint: disable=protected-access
                 else:
                     assert 0, f'Would download but {state.gnn_doit=}: {url} {path=}'
         download(url_doclaynet_core_zip)
@@ -1740,9 +1739,9 @@ def do_gnn_show(state):
     if state.gnn_show_select:
         pipcl.log(f'{state.gnn_show_select=}')
         gnn_select_code = compile(state.gnn_show_select, '', 'eval')
-        def selectfn(results):
+        def selectfn(results):  # pylint: disable=unused-argument
             #r = eval(gnn_select_code, globals=dict(results=results))
-            r = eval(gnn_select_code)
+            r = eval(gnn_select_code)   # pylint: disable=eval-used
             return r
     paths = list()
     if state.gnn_show_paths:
@@ -1777,6 +1776,7 @@ def do_gnn_show(state):
 
     if state.gnn_show_graph == '':
         out_graph = None
+        out_graph_simple = None
     elif state.gnn_show_graph is None:
         out_graph = f'gnn-graph-{time.strftime("%Y-%m-%d-%H-%M-%S")}.html'
         out_graph_simple = f'gnn-graph.html'
@@ -1840,7 +1840,7 @@ def do_test_gnn(state, command):
             pipcl.run(command)
         finally:
             t = time.time() - t
-            pipcl.log(f'Command took {pipcl._duration(t)}.')
+            pipcl.log(f'Command took {pipcl._duration(t)}.')    # pylint: disable=protected-access
 
     if command == 'test-gnn':
         run(f'cd {layout_location} && {sys.executable} eval/eval_gnn.py --pdf_dir ../datasets/DocLayNet/PDF')
@@ -1852,8 +1852,8 @@ def do_test_gnn(state, command):
         pipcl.run(f'pip install tqdm')
         sys.path.insert(0, f'{layout_location}/eval')
         try:
-            import eval_util
-            import eval_pymupdf4llm
+            import eval_util    # pylint: disable=import-error
+            import eval_pymupdf4llm # pylint: disable=import-error
         finally:
             del sys.path[0]
         out_dir = 'test-gnn-devel'
@@ -1954,8 +1954,8 @@ def do_test_gnn(state, command):
         if state.test_gnn_limit:
             kwargs['limit'] = state.test_gnn_limit
         
-            name_t = time.strftime('%Y-%m-%d-%H-%M-%S', time.gmtime(t_start))
-            name = f'test-gnn-pymupdf4llm-{name_t}.json'
+        name_t = time.strftime('%Y-%m-%d-%H-%M-%S', time.gmtime(t_start))
+        name = f'test-gnn-pymupdf4llm-{name_t}.json'
         
         out_json = None
         if state.test_gnn_cache:
@@ -2372,7 +2372,7 @@ def main(argv):
 
                 elif command == 'populate':
                     for package in state.packages_build:
-                        location, args_pos = state.packages[package]
+                        _location, _args_pos = state.packages[package]
                         if 1: # location.startswith('git:'):
                             directory = _get_local(package, state)
                             pipcl.log(f'Local directory for {package=} is: {directory!r}')
@@ -2620,6 +2620,6 @@ if __name__ == '__main__':
             # generated diagnostics.
             pipcl.log(f'{e}')
             raise
-            sys.exit(1)
+            #sys.exit(1)
         # Other exceptions should not happen, and will generate a full Python
         # backtrace etc here.

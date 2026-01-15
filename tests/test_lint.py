@@ -49,6 +49,7 @@ def test_pylint():
             R0912: Too many branches (52/12) (too-many-branches)
             C0415: Import outside toplevel (pipcl) (import-outside-toplevel)
             C0114: Missing module docstring (missing-module-docstring)
+            R0801: Similar lines in 2 files
             '''
             )
     ignores_list = list()
