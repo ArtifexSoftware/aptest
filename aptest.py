@@ -989,7 +989,7 @@ def do_remote_github(state, argv):
     pipcl.log(f'{branch=}.')
 
     if state.remote_github_workflow_id:
-        # Wait for existing workflow istead of creating a new one.
+        # Wait for existing workflow instead of creating a new one.
         workflow_id = state.remote_github_workflow_id
         remote_github_workflow_package = 'aptest'
         info = name_info(remote_github_workflow_package)
@@ -2432,7 +2432,7 @@ def _get_local(package, state, test=False):
         if package in state.clean:
             pipcl.run(f'cd {directory} && git clean -fdx')
     
-    # Show information about the ckeckout, regardless of where it came from.
+    # Show information about the checkout, regardless of where it came from.
     sha, comment, diff, branch = pipcl.git_info(directory)
     with pipcl.LogPrefix(f'Local checkout {directory}: '):
         pipcl.log(f'{sha=}')

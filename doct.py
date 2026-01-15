@@ -87,7 +87,7 @@ class Doct:
     '''
     def __init__(self, *args, autopath=None, **kwargs):
         '''
-        If <autopath> is true, reading non-existant keys will automatically
+        If <autopath> is true, reading non-existent keys will automatically
         set the key to a Doct().
         
         >>> d = Doct(autopath=1)

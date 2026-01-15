@@ -215,7 +215,7 @@ Release procedure
 * Ensure that pymupdf's `setup.py` specifies the correct mupdf version.
 
   If this is not the case, update, commit, push, and wait for the next
-  overnight tests to pass before making the relase.
+  overnight tests to pass before making the release.
 
 * Ensure the version number is correct in all packages.
 
@@ -269,7 +269,7 @@ Release procedure
 
   [This will take a few hours, don't wait for it to finish here.]
 
-* Extra updates to Github's pymupdf respository.
+* Extra updates to Github's pymupdf repository.
 
   * Go to: https://github.com/pymupdf/PyMuPDF/releases
   * Click `Draft a new release`.
@@ -432,7 +432,7 @@ https://github.com/ArtifexSoftware/sce/wiki/How-to-train-GNN.
 Downloads/extracts only as necessary, so is efficient if run more than once.
 
 The `test-gnn*` commands run pymupdf_layout's test scripts on the DocLayNet
-datset:
+dataset:
 
 * 'test-gnn' command runs `sce:eval/eval_gnn.py`.
 * 'test-gnn-pymupdf_layout' command runs `sce:eval/eval_pymupdf_layout.py`.
@@ -700,7 +700,7 @@ Options
 --cibw-name <cibw_name>
 .......................
 
-    Name to use when installing `cibuildwheel` for the `cibw`_ commad, e.g.::
+    Name to use when installing `cibuildwheel` for the `cibw`_ command, e.g.::
     
         --cibw-name cibuildwheel==3.0.0b1
         --cibw-name git+https://github.com/pypa/cibuildwheel
@@ -988,9 +988,9 @@ Options
       equivalent repositories in `github.com/ArtifexSoftware/`.
 
     * Warning: this will make git forget about any new files that
-      have been added but not yet commited.
+      have been added but not yet committed.
 
-      This is because we currently push any uncommited changes as a
+      This is because we currently push any uncommitted changes as a
       temporary commit, then use `git reset HEAD~1` to restore git
       state.
 

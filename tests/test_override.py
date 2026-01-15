@@ -6,7 +6,7 @@ import sys
 def test_override_pip():
     '''
     Check that packages specified with `pip:` and non-default version numbers,
-    are not overriden by prerequisites of later packagesdo not override versions of  packages specified with `pip:`.
+    are not overridden by prerequisites of later packagesdo not override versions of  packages specified with `pip:`.
     '''
     root = os.path.abspath(f'{__file__}/../..')
     

@@ -179,7 +179,7 @@ def plotly_figure(data, graph_height=400):
         rhs.sort( key=lambda item: item[1])
         for j, (x, y, linename) in enumerate(rhs):
             pixel_offset_x = 60
-            pixel_offset_y = - (j+0.5 - len(rhs)/2) * 12    # Default font is 12 pixels hight?
+            pixel_offset_y = - (j+0.5 - len(rhs)/2) * 12    # Default font is 12 pixels high?
             #pipcl.log(f'Adding annotation: {x=} {y=} {linename=}')
             annotations.append(
                     dict(
@@ -253,7 +253,7 @@ def plotly_html(data, path_out):
             # See: https://github.com/plotly/plotly.js/blob/master/src/plot_api/plot_config.js
             config=dict(
                 scrollZoom=True,
-                #doubleClick='reset',
+                # doubleClick='reset',  # codespell:ignore
                 showTips=True,
                 )
             )
