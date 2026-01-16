@@ -18,11 +18,12 @@ Python packages together.
 History
 -------
 
-2026-1-15
-    Fix potentially incorrect package versions if `pip:` is used.
-    Fix flake8 errors.
-    Fix codespell errors.
-    All docs are now in README.rst.
+**2026-1-15**
+
+* Fix potentially incorrect package versions if `pip:` is used.
+* Fix flake8 errors.
+* Fix codespell errors.
+* All docs are now in `README.rst`.
 
 
 Supported packages/projects
@@ -106,7 +107,7 @@ Build/test with cibuildwheel
 * The `cibw`_ command runs `cibuildwheel` on each package.
 * This builds a wheel, and runs tests using pytest.
 * We add each wheel to our internal package repository.
-* We set PIP_EXTRA_INDEX_URL to point to our internal package repository.
+* We set `PIP_EXTRA_INDEX_URL` to point to our internal package repository.
 * cibuildwheel uses pip internally so this ensures that previously-built
   prerequisite wheels will be installed as required.
 
@@ -119,7 +120,7 @@ On Macos:
 
 * Installing python versions with brew does not seem to work - cibuildwheel
   cannot find it.
-* To install python3.14t:
+* To install python-3.14t:
   
   * Run::
   
@@ -157,14 +158,14 @@ Running on Github with `-r @github`
   * We push the local checkout to a branch in the equivalent Github repository.
   * We change the aptest.py command line to specify a `git:...` location.
 
-  For example we would change `-p PyMuPDF` to::
+    For example we would change `-p PyMuPDF` to::
 
-        -p 'git:-b <branch> git@github.com:pymupdf/PyMuPDF.git
+        -p 'git:-b <branch> git@github.com:pymupdf/PyMuPDF.git'
 
-* We use branch name `aptest-$USER`.
+  * We use branch name `aptest-$USER`.
 
-  This allows multiple developers to run on Github simultaneously, without
-  creating an unbounded number of temporary branches.
+    This allows multiple developers to run on Github simultaneously, without
+    creating an unbounded number of temporary branches.
 
 
 Examples
@@ -173,15 +174,15 @@ Examples
 Build, install and test pymupdf, pymupdfpro and pymupdf_layout using
 local checkouts::
 
-    ./aptest/aptest.py -p PyMuPDF -P PyMuPDFPro -m mupdf -l sce build test
+    ./aptest/aptest.py -p PyMuPDF --pro PyMuPDFPro -m mupdf --layout sce build test
 
 Build, install and test pymupdf, pymupdfpro and pymupdf_layout using
 central git repositories::
 
-    ./aptest/aptest.py -p git: -P git: -l git: build test
+    ./aptest/aptest.py -p git: --pro git: --layout git: build test
 
 Make release, building/testing on Github, downloading to local machine,
-and uploading to pypi.org::
+and uploading to pypi.org (also see `Release procedure`_)::
 
     ./aptest/aptest.py --release-1
     ./aptest/aptest.py --release-2
@@ -191,7 +192,7 @@ and uploading to pypi.org::
 Build/test pymupdf, pymupdfpro and pymupdf-layout using cibuildwheel,
 getting packages from different locations::
 
-    ./aptest/aptest.py -r @github -p pip: -P PyMuPDFPlus -l git: cibw
+    ./aptest/aptest.py -r @github -p pip: --pro PyMuPDFPlus --layout git: cibw
 
 Test current pymupdf release with latest test suite in central git::
 
@@ -201,14 +202,14 @@ Test current pymupdf release with test suite in local checkout::
 
     ./aptest/aptest.py -r macmini -p pip: -p PyMuPDF build test
 
-Runs specific Github workflow PyMuPDFPlus/.github/workflows/test_multiple.yml::
+Runs specific Github workflow PyMuPDFPlus/.github/workflows/test_multiple.yml, on windows only::
 
-    ./aptest/aptest.py -r @github --remote-github-yml test_multiple.yml -P PyMuPDFPlus --remote-github-yml-inputs 'args=-o windows'
+    ./aptest/aptest.py -r @github --remote-github-yml test_multiple.yml --pro PyMuPDFPlus --remote-github-yml-inputs 'args=-o windows'
 
 Tests pypi.org's pymupdf, pymupdfpro and pymupdf_layout with the test
 suites on central git::
 
-    ./aptest/aptest.py -r @github -p pip: -P pip: -l pip: -p git: -P git: -l git: build test
+    ./aptest/aptest.py -r @github -p pip: --pro pip: --layout pip: -p git: --pro git: --layout git: build test
 
 
 Release procedure
@@ -230,42 +231,38 @@ Release procedure
 * Ensure the version number is correct in all packages.
 
   * All packages should use the same version number.
-  * Version numbers are always defined in setup.py.
-  * Version numbers may also be defined in other files such as README.
-  * Pymupdf has a test that checks version numbers in changes.txt etc are
-    consistent with setup.py.
+  * Version numbers are always defined in `setup.py`.
+  * Version numbers may also be defined in other files such as `README`.
+  * Pymupdf has a test that checks version numbers in `changes.txt` etc are
+    consistent with `setup.py`.
 
-* Ensure that PyMuPDF issues and changelog are synchronised.
+* Ensure that PyMuPDF's Github issues and `changes.txt` are synchronised.
 
   * Go to https://github.com/pymupdf/PyMuPDF/issues.
   * For all issues that are labeled as `Fixed in next release`, ensure that
-    they are labelled as fixed in PyMuPDF's changes.txt.
-  * For all issues mentioned as fixed in PyMuPDF's changes.txt, ensure that
+    they are labelled as fixed in `changes.txt`.
+  * For all issues mentioned as fixed in `changes.txt`, ensure that
     the corresponding Github issue is labelled as `Fixed in next release`.
 
-* Test local checkouts of all packages on Github machines.
-
-  Run::
+* Test local checkouts of all packages on Github machines::
 
     aptest/aptest.py -r @github -p PyMuPDF --pro PyMuPDFPro --layout sce cibw
 
-* Push each package to github.
+* Push each package to Github.
 * Optionally lock github branches for each project.
 
   On each Github repository go to: `Settings/Branches/main/Edit/Lock branch`.
 
-* Build and release main wheels.
+* Build and release the main wheels::
 
-  Run::
-
-    aptest/aptest.py --release-1
+      aptest/aptest.py --release-1
 
   * On success this will download wheels/sdist to local machine and ask
     (twice) whether you want to upload to pypi.org.
   * At this point one can optionally test the downloaded wheels locally.
   * Agree to upload to pypi.org.
 
-* Tag the release
+* Tag the release.
 
   * We use the version number as the tag, e.g. `1.26.7`.
   * For each repository::
@@ -304,26 +301,23 @@ Release procedure
   * Ensure that `Set as the latest release` is checked.
   * Ensure that `Create a discussion for this release` is checked,
     with `Category: Announcements`.
-    
-    Alternatively create an announcement discussion separately.
   * Click on `Publish release`.
     
     This will also create `.zip` and `.tar.gz` archives for download from
     github.
   * Go to the `Discussions` page and pin the announcement discussion so that
     it appears at the top of the page.
-  * Unpin previous release's announcement discussion if present.
-  * For all github issues that are labeled as `fixed in next release`,
+  * Unpin any previous release's announcement discussion.
+  * For all Github issues that are labeled as `fixed in next release`,
     close the issue with text `Fixed in PyMuPDF-<version>`.
-
   * Check in the release announcement that all fixed issues are now shown as closed.
   * If the new release uses a new version of MuPDF, optionally
     remove all code that is specific to the previous major release
     of MuPDF. E.g. grep for `FZ_VERSION` or `mupdf_version_tuple`.
 
-  * Update pymupdf.readthedocs.io:
+  * Update https://pymupdf.readthedocs.io:
 
-    * Go to: readthedocs.io
+    * Go to: https://readthedocs.io
     * Click `Log in`
     * Click on `Read the Docs Community`.
     * Select login using email.
@@ -332,8 +326,8 @@ Release procedure
     * Click on Builds.
     * Click on top item's refresh button `Rebuild version`.
 
-  * Post to Discord #pymupdf_tech.
-  * Send email to pymupdf-marketing@artifex.com
+  * Post to Discord `#pymupdf_tech`.
+  * Send email to `pymupdf-marketing@artifex.com`.
     
     * Subject: `PyMuPDF-<version> released`
 
@@ -372,21 +366,22 @@ Release procedure
 
     Github settings/Branches/main/Edit/Lock branch - uncheck.
 
-* Post-release changes for all projects:
+* Post-release changes for all projects.
   
-  * Increment version in setup.py.
-  * In pymupdf:
-  
-    In changes.txt:
-    
-    * Add date of release that was just made.
-    * Add title for next release `**Changes in version <next-version>**`
-  
-    In .github/ISSUE_TEMPLATE/bug_report.yml:
-  
-    * Add version of next release to drop-down list of versions.
-    
-      (This is required for tests to pass.)
+  * Increment version in `setup.py`.
+
+* Extra post-release changes for pymupdf.
+
+  In `changes.txt`:
+
+  * Add date of release that was just made.
+  * Add title for next release `**Changes in version <next-version>**`
+
+  In `.github/ISSUE_TEMPLATE/bug_report.yml`:
+
+  * Add version of next release to drop-down list of versions.
+
+    (This is required for tests to pass.)
 
 
 Keys/tokens
@@ -399,13 +394,13 @@ We allow specification of a custom ssh private key to push to and/or
 access git@github.com:PyMuPDF/PyMuPDF and repositories within
 git@github.com/ArtifexSoftware/.
 
-* This key can be provided in two ways:
+This key can be provided in two ways:
 
-  * In file `artifex-software-ssh-key` in the current directory.
-  * In environment variable `ARTIFEX_SOFTWARE_SSH_KEY`.
+* In file `artifex-software-ssh-key` in the current directory.
+* In environment variable `ARTIFEX_SOFTWARE_SSH_KEY`.
 
-* We run ssh with `StrictHostKeyChecking=no`, which may end up writing to
-  .ssh/known_hosts.
+We run ssh with `StrictHostKeyChecking=no`, which may end up writing to
+`~/.ssh/known_hosts`.
 
 Smartoffice ssh key
 ^^^^^^^^^^^^^^^^^^^
@@ -430,16 +425,18 @@ Use of keys with remote runs
   copied to the remote machine. This obviously has security implications.
 
 * If the `-r`_ option is used to defer to a Github runner, we rely on the
-  ArtifexSoftware/aptest repository having secrets that allow the required
+  https://ArtifexSoftware/aptest repository having secrets that allow the required
   access.
 
 
 Using DocLayNet dataset
 -----------------------
 
-The 'gnn' command downloads/extracts the DocLayNet dataset as described in
+The `gnn-download`_ command downloads/extracts the DocLayNet dataset as described in
 https://github.com/ArtifexSoftware/sce/wiki/How-to-train-GNN.
-Downloads/extracts only as necessary, so is efficient if run more than once.
+
+* Downloading and extracting is tracked using marker files, to avoid running
+  unnecessarily more than once.
 
 The `test-gnn*` commands run pymupdf_layout's test scripts on the DocLayNet
 dataset:
@@ -852,14 +849,15 @@ Options
             pymupdf_layout
             pymupdfpro
 
-    location::
+    `location`:
+    
         `pip:`
             Install from pypi.org using pip.
 
-        `pip:<version>`
-            Install specified version from pypi.org using pip.
-            [Doesn't currently work generally because if another project needs a
-            newer version, pip will install again from pypi.org.]
+        `pip:<suffix>`
+            Install `<package-name><suffix>` from pypi.org using pip.
+            For example `pip:==1.26.3` will install version 1.26.3 of
+            the package.
         `pip:*.whl`
             Install from local wheel using pip.
         `pip:*.tar.gz`
@@ -878,10 +876,10 @@ Options
     for building, and the second location used for testing. This allows
     packages on pypi.org to be tested, for example:
 
-        aptest.py -i pymupdf pip: -i pymupdf PyMuPDF build test
-            Test current pymupdf release with testsuite in PyMuPDF/tests.
+        `aptest.py -i pymupdf pip: -i pymupdf PyMuPDF build test`
+            Test current pymupdf release with testsuite in `PyMuPDF/tests`.
 
-        aptest.py -i pymupdf pip: -i pymupdf git: build test
+        `aptest.py -i pymupdf pip: -i pymupdf git: build test`
             Test current pymupdf release with testsuite in current git.
 
 .. _--langchain-pymupdf-layout:
@@ -909,8 +907,8 @@ Options
 -o <os_names>
 .............
     Control which OS's we run on. If current OS is not in
-    (comma-separated) list, we do nothing. <os_names> is case
-    insensitive. Should match linux, windows or darwin.
+    (comma-separated) list `<os_names>`, we do nothing. `<os_names>` is case
+    insensitive, and items should match `linux`, `windows` or `darwin`.
 
 .. _--pymupdf:
 
@@ -967,7 +965,7 @@ Options
 
 --pytest-path <pytest_path>
 ...........................
-    Specify a directory/file/function to use with the `test`_ command, relative
+    Specify a directory/file/test-function to use with the `test`_ command, relative
     to each project root directory. Can be specified multiple times. Default is
     `<package_root>/tests/`.
 
@@ -989,34 +987,38 @@ Options
 -r <remote>
 ...........
     Re-run ourselves on remote machine(s) and on success copy wheels
-    back to local machines.
+    back to local machine.
 
     If `<remote>` is `@github`, we run on Github:
 
     * We push specified local checkouts directories (specified
       by `-i`, `-m`, `-p` etc) to branches called `aptest-$USER` in the
-      equivalent repositories in `github.com/ArtifexSoftware/`.
+      central repositories on https://github.com.
 
-    * Warning: this will make git forget about any new files that
-      have been added but not yet committed.
+    * **Warning**: this will make git forget about any new files in local
+      checkouts that have been added but not yet committed.
 
       This is because we currently push any uncommitted changes as a
       temporary commit, then use `git reset HEAD~1` to restore git
       state.
 
     * We re-run the `aptest.py` command on Github machines, changing
-      `-i`, `-m` etc args to use `git:` to refer to the above
+      `-i`, `-m` etc args to use `git:...` to refer to the above
       repositories.
 
     * On success we copy Github logs and artifacts
-      and extracted wheels etc to local directory
-      `gh_workflow_YYYY-MM-DD-<workflowid>`. Wheels are copied in
-      flat format into `gh_workflow_YYYY-MM-DD-<workflowid>-union/`.
+      and extracted wheels etc to local directory:
+      
+          `gh_workflow_YYYY-MM-DD-<workflowid>`
+          
+      Wheels are also copied in flat format into:
+      
+          `gh_workflow_YYYY-MM-DD-<workflowid>-union/`.
 
     Otherwise `<remote>` should specify a remote machine on which to run
     aptest:
 
-    * If `<remote>` contains a space it is interpreted as the ssh
+    * If `<remote>` contains one or more spaces it is interpreted as the ssh
       command to use, optionally ending with a colon followed by
       the remote directory to use.
 
@@ -1024,17 +1026,20 @@ Options
 
           -r 'ssh -p 2222 -J barfoo@mygateway foobar@mymachine.com:testdir'
 
-    * Otherwise `<remote>` should be a rsync-style specification such
+    * Otherwise `<remote>` should be an rsync-style specification such
       as `macmini` or `username@macmini:testdir`.
 
       Specify a ssh jump host using `::`, for example::
 
           -r <gateway>::<remote-host>
 
-    In both cases:
-
-    * Local checkouts specified by `-i` are coped to the remote
+    * Local checkouts specified by `-i` are copied to the remote
       using rsync, then `git clean -f` is run on the remote.
+    
+    * The `aptest/` directory is copied to the remote, using rsync.
+    
+    * The `aptest.py` command (without the `-r ...` arguments) is run on the
+      remote machine.
 
     * On success:
 
@@ -1064,14 +1069,15 @@ Options
     must be the only arg.
 
     `aptest/aptest.py --release-1`
-        Build wheels for everything except linux-aarch64,
-        linux-x64-musl and win32.
+        Build wheels for pymupdf, pymupdfpro and pymupdf_layout, for all
+        platforms except linux-aarch64, linux-x64-musl and win32.
     `aptest/aptest.py --release-2`
-        Build wheels for linux-aarch64.
+        Build wheels for pymupdf, pymupdfpro and pymupdf_layout, for
+        linux-aarch64.
     `aptest/aptest.py --release-3`
-        Build wheels for win32 (pymupdf only).
+        Build pymupdf wheel for win32.
     `aptest/aptest.py --release-4`
-        Build wheels for linux-x64-musl (pymupdf only).
+        Build pymupdf wheel for linux-x64-musl.
 
 .. _--remote-do:
 
@@ -1088,23 +1094,25 @@ Options
 .........................................
     Changes behaviour of `-r @github`. Don't run anything Github,
     instead continue from previous `-r @github` invocation by waiting
-    for `<workflow_id>` to finish and then downloadings logs and wheels
-    etc. Note that one still needs to include `-r @github cibw`.
+    for `<workflow_id>` to finish and then downloading logs and wheels
+    etc to the local machine. Note that one still needs to include
+    `-r @github`.
 
 .. _--remote-github-yml:
 
 --remote-github-yml <yml>
 .........................
-    With `-r @github`, run `.yml` file (leafname) instead of running
-    `aptest.py`. If no packages are specified, runs on Github's
-    `ArtifexSoftware/aptest repository`; otherwise exactly one package
+    With `-r @github`, run the specified `.yml` file (leafname only) instead
+    of running `aptest.py`.
+    If no packages are specified, runs on Github's
+    `ArtifexSoftware/aptest` repository; otherwise exactly one package
     must be specified.
 
 .. _--remote-github-yml-inputs:
 
 --remote-github-yml-inputs <inputs>
 ...................................
-    Specify inputs used with `--github-yml`. `<inputs>` is comma-separated
+    Specify inputs used with `--github-yml`. `<inputs>` is a comma-separated
     list of `<name>=<value>` pairs.
 
 .. _--remote-prefix:
@@ -1117,18 +1125,21 @@ Options
 
 --remote-prefix-default <remote> <prefix>
 .........................................
-    Sets default remote prefix for different remotes as specified with
-    `-r <remote>`. For example::
+    Sets default remote prefix for a specific remote when specified with
+    `-r <remote>`. For example to always use python-3.12 on remote machine
+    `jules-asus`, use::
 
         --remote-prefix-default jules-asus python312
+    
+    (It can be useful to put this in `~/.aptest`.)
 
 .. _--remote-rsync-path:
 
 --remote-rsync-path <remote_rsync_path>
 .......................................
     Specify `--rsync-path` when running rsync, to identify location of
-    rsync on remote. E.g. `--remote-rsync-path 'wsl rsync` if remote is
-    a Windows machine with rsync installed in default WSL system.
+    rsync on remote. E.g. `--remote-rsync-path 'wsl rsync'` if remote is
+    a Windows machine with rsync installed in the default WSL system.
 
 .. _--remote-rsync-wsl:
 
@@ -1142,7 +1153,7 @@ Options
 
 --run <package> <command>
 .........................
-    Make `run`_ command run specified command within checkout of
+    Make `run`_ command run the specified command within checkout of
     `<package>`.
 
 .. _--sdists:
@@ -1155,19 +1166,19 @@ Options
 
 --swig <swig>
 .............
-    Use <swig> instead of the `swig` command.
+    Use `<swig>` instead of the `swig` command.
 
     Unix only:
         Clone/update/build swig from a git repository using 'git:' prefix.
 
         We default to https://github.com/swig/swig.git branch master, so these
-        are all equivalent:
+        are all equivalent::
 
             --swig 'git:--branch master https://github.com/swig/swig.git'
             --swig 'git:--branch master'
             --swig git:
 
-        2025-08-18: This fixes building with py_limited_api on python-3.13.
+        2025-08-18: This fixes building with `py_limited_api` on python-3.13.
 
 .. _--swig-quick:
 
@@ -1197,12 +1208,13 @@ Options
     Comma-separated ordered list of modifications to the list of
     packages tested by the `test`_ command.
 
-    This list defaults to all packages specified by `-i` or its aliases. Then
-    for each comma-separated item in `<packages>`:
+    This list defaults to all packages specified by `-i` or its aliases.
+    
+    For each comma-separated item in `<packages>`:
 
-        * `-<name>` removes package `<name>` from the list.
-        * `+<name>` and `<name>` adds package `<name>` to the list.
-        * `-` removes all packages from the list.
+    * `-<name>` removes package `<name>` from the list.
+    * `+<name>` and `<name>` adds package `<name>` to the list.
+    * `-` removes all packages from the list.
 
     In addition if the first item does not start with `+` or `-` we
     first remove all packages from the list.
@@ -1213,10 +1225,11 @@ Options
     
         -t -,pro
         -t -,pymudfpro
+        -t pro
 
-    And these remove mupdf and layout from list of packages to test::
+    And these remove `mupdf` and `layout` from the list of packages to test::
     
-        -t -m,-l
+        -t -m,--layout
         -t -mupdf,-pymupdf_layout
 
 .. _--test-extra-packages:
@@ -1237,10 +1250,10 @@ Options
     To match, we require all fields in a `.json` file match the file
     that we would create for the current run, except for:
 
-    * ['results'] - not available for the current run, obviously.
-    * ['t_start']
-    * ['t_duration']
-    * ['pip-list'] - we allow changes to misc other packages, e.g. version numbers may vary.
+    * `['results']` - not available for the current run, obviously.
+    * `['t_start']`
+    * `['t_duration']`
+    * `['pip-list']` - we allow changes to misc other packages, e.g. version numbers may vary.
 
     We require the other settings to be identical, such as:
 
@@ -1255,8 +1268,8 @@ Options
 
 --test-gnn-extra <key>=<value>
 ..............................
-    Adds specified key=value pair to the root of the results dict
-    created by test-gnn* commands.
+    Adds specified `key=value` pair to the root of the results dict
+    created by `test-gnn*` commands.
 
 .. _--test-gnn-limit:
 
@@ -1268,8 +1281,8 @@ Options
 
 --test-gnn-out <path>
 .....................
-    Where to write json data containing test details. Default is a file
-    containing current time.
+    Where to write json data containing test details. Default is a filename
+    containing the current date and time.
 
 .. _--test-gnn-push:
 
@@ -1316,8 +1329,9 @@ Options
     The default is 2.
 
     The venv will be called `venv-aptest-<pthonversion>-<wordsize>`, for
-    example `venv-aptest-3.13.5-64`; we also create a convenience link called
-    `venv-aptest`.
+    example `venv-aptest-3.13.5-64`.
+    
+    We also create a convenience link called `venv-aptest`.
 
 .. _-V2:
 
