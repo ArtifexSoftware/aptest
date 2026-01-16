@@ -114,8 +114,8 @@ def test_codespell():
         command = command.replace('\n', ' \\\n')
     # Don't print entire command because very long, and will be displayed
     # anyway if there is an error.
-    #print(f'test_codespell(): Running: {command}')
-    print(f'Running codespell.')
+    print(f'test_codespell(): Running: {command}')
+    #print(f'Running codespell.')
     subprocess.run(command, shell=1, check=1)
     print('test_codespell(): codespell succeeded.')
 
