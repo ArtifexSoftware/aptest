@@ -184,6 +184,7 @@ g_package_info = {
                 'github_name': 'ArtifexSoftware/aptest',
                 'git_branch': 'main',
                 'aliases':  [],
+                'order': -1,
             },
         'mupdf':
             {
@@ -1246,6 +1247,8 @@ def do_build(state):
         location, _args_pos = state.packages[package]
         if not location:
             continue
+        if package == 'aptest':
+            continue
         if location.startswith('pip:'):
             assert package != 'mupdf', f'Not a package on pypi.org: {package}'
             name = location[4:]
@@ -1262,6 +1265,8 @@ def do_build(state):
         pipcl.log(f'{package=}')
         location, _args_pos = state.packages[package]
         if not location:
+            continue
+        if package == 'aptest':
             continue
         if location.startswith('pip:'):
             pass
