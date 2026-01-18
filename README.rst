@@ -11,19 +11,28 @@ Artifex Packages build/test
 Overview
 --------
 
-The `aptest.py` script can build, test and release (to pypi.org) multiple
+The ``aptest.py`` script can build, test and release (to pypi.org) multiple
 Python packages together.
 
+Aptest is not a Python package - there is no support for building an aptest
+wheel for example.
 
-History
--------
+Instead it is intended to be used directly from a Git checkout, for example::
+
+    git clone git@github.com:ArtifexSoftware/aptest.git
+    
+    ./aptest/aptest.py ...
+
+
+Changelog
+---------
 
 **2026-1-15**
 
-* Fix potentially incorrect package versions if `pip:` is used.
+* Fix potentially incorrect package versions if ``pip:`` is used.
 * Fix flake8 errors.
 * Fix codespell errors.
-* All docs are now in `README.rst`.
+* All docs are now in ``README.rst``.
 
 
 Supported packages/projects
@@ -64,8 +73,8 @@ Also see:
 * `--pymupdf_layout`_ `--layout`_ `-l`_
 
 
-Run in different places
------------------------
+Run remotely
+------------
 
 * Local machine.
 * Remote machine (with ssh/rsync).
@@ -79,11 +88,11 @@ Build/install
 
 For each package:
 
-* The package is built as a wheel using `pip wheel`. This will typically
+* The package is built as a wheel using ``pip wheel``. This will typically
   take place in an internal pip venv.
 * The wheel is installed into the current venv.
 * The wheel is added to a local pypi-style PEP-503 package repository.
-* We use pip's `--extra-index-url` option to refer to our internal package
+* We use pip's ``--extra-index-url`` option to refer to our internal package
   repository.
 * Thus pip will use previously built wheels as prerequisites, as required.
 
@@ -104,10 +113,10 @@ Test
 Build/test with cibuildwheel
 ----------------------------
 
-* The `cibw`_ command runs `cibuildwheel` on each package.
+* The `cibw`_ command runs ``cibuildwheel`` on each package.
 * This builds a wheel, and runs tests using pytest.
 * We add each wheel to our internal package repository.
-* We set `PIP_EXTRA_INDEX_URL` to point to our internal package repository.
+* We set ``PIP_EXTRA_INDEX_URL`` to point to our internal package repository.
 * cibuildwheel uses pip internally so this ensures that previously-built
   prerequisite wheels will be installed as required.
 
@@ -126,7 +135,7 @@ On Macos:
   
       wget https://www.python.org/ftp/python/3.14.0/python-3.14.0-macos11.pkg
   
-  * Create a file called `choicechanges.plist` containing::
+  * Create a file called ``choicechanges.plist`` containing::
   
       <?xml version="1.0" encoding="UTF-8"?>
       <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -150,22 +159,25 @@ On Macos:
   * Also see: https://docs.python.org/3/using/mac.html.
 
 
-Running on Github with `-r @github`
------------------------------------
+Running on Github with ``-r @github``
+-------------------------------------
 
-* If a package is specified as a local checkout:
+We rerun aptest inside a Github action.
 
-  * We push the local checkout to a branch in the equivalent Github repository.
-  * We change the aptest.py command line to specify a `git:...` location.
+For packages that are specified as a local checkout:
 
-    For example we would change `-p PyMuPDF` to::
+* We push the local checkout to a branch in the equivalent Github repository.
 
-        -p 'git:-b <branch> git@github.com:pymupdf/PyMuPDF.git'
+* We change the ``aptest.py`` command line to specify a ``git:...`` location.
 
-  * We use branch name `aptest-$USER`.
+  For example we would change ``-p PyMuPDF`` to::
 
-    This allows multiple developers to run on Github simultaneously, without
-    creating an unbounded number of temporary branches.
+      -p 'git:-b <branch> git@github.com:pymupdf/PyMuPDF.git'
+
+* We use branch name ``aptest-$USER``.
+
+  This allows multiple developers to run on Github simultaneously, without
+  creating an unbounded number of temporary branches.
 
 
 Examples
@@ -215,15 +227,16 @@ suites on central git::
 Release procedure
 -----------------
 
-* Packages are:
+Instructions for releasing wheels for:
 
   * pymupdf
   * pymupdfpro
   * pymupdf_layout
 
+
 * Get local checkout of each package.
 
-* Ensure that pymupdf's `setup.py` specifies the correct mupdf version.
+* Ensure that pymupdf's ``setup.py`` specifies the correct mupdf version.
 
   If this is not the case, update, commit, push, and wait for the next
   overnight tests to pass before making the release.
@@ -231,18 +244,18 @@ Release procedure
 * Ensure the version number is correct in all packages.
 
   * All packages should use the same version number.
-  * Version numbers are always defined in `setup.py`.
-  * Version numbers may also be defined in other files such as `README`.
-  * Pymupdf has a test that checks version numbers in `changes.txt` etc are
-    consistent with `setup.py`.
+  * Version numbers are always defined in ``setup.py``.
+  * Version numbers may also be defined in other files such as ``README``.
+  * Pymupdf has a test that checks version numbers in ``changes.txt`` etc are
+    consistent with ``setup.py``.
 
-* Ensure that PyMuPDF's Github issues and `changes.txt` are synchronised.
+* Ensure that PyMuPDF's Github issues and ``changes.txt`` are synchronised.
 
   * Go to https://github.com/pymupdf/PyMuPDF/issues.
-  * For all issues that are labeled as `Fixed in next release`, ensure that
-    they are labelled as fixed in `changes.txt`.
-  * For all issues mentioned as fixed in `changes.txt`, ensure that
-    the corresponding Github issue is labelled as `Fixed in next release`.
+  * For all issues that are labeled as ``Fixed in next release``, ensure that
+    they are labelled as fixed in ``changes.txt``.
+  * For all issues mentioned as fixed in ``changes.txt``, ensure that
+    the corresponding Github issue is labelled as ``Fixed in next release``.
 
 * Test local checkouts of all packages on Github machines::
 
@@ -251,7 +264,7 @@ Release procedure
 * Push each package to Github.
 * Optionally lock github branches for each project.
 
-  On each Github repository go to: `Settings/Branches/main/Edit/Lock branch`.
+  On each Github repository go to: ``Settings/Branches/main/Edit/Lock branch``.
 
 * Build and release the main wheels::
 
@@ -264,7 +277,7 @@ Release procedure
 
 * Tag the release.
 
-  * We use the version number as the tag, e.g. `1.26.7`.
+  * We use the version number as the tag, e.g. ``1.26.7``.
   * For each repository::
 
       git tag <version>
@@ -279,9 +292,9 @@ Release procedure
 * Extra updates to Github's pymupdf repository.
 
   * Go to: https://github.com/pymupdf/PyMuPDF/releases
-  * Click `Draft a new release`.
-  * In `Choose a tag`, select the tag `<version>`.
-  * In `Release title` enter `PyMuPDF-<version> released`.
+  * Click ``Draft a new release``.
+  * In ``Choose a tag``, select the tag ``<version>``.
+  * In ``Release title`` enter ``PyMuPDF-<version> released``.
   * Add header text explaining pip install, similar to previous releases.
     For example::
 
@@ -296,40 +309,40 @@ Release procedure
 
   * Paste the release's changelog into the text field.
   * Modify any ReST-style links to work as markdown, e.g.
-    rely on Github interpreting `#1234` as a link to issue
+    rely on Github interpreting ``#1234`` as a link to issue
     1234.
-  * Ensure that `Set as the latest release` is checked.
-  * Ensure that `Create a discussion for this release` is checked,
-    with `Category: Announcements`.
-  * Click on `Publish release`.
+  * Ensure that ``Set as the latest release`` is checked.
+  * Ensure that ``Create a discussion for this release`` is checked,
+    with ``Category: Announcements``.
+  * Click on ``Publish release``.
     
-    This will also create `.zip` and `.tar.gz` archives for download from
+    This will also create ``.zip`` and ``.tar.gz`` archives for download from
     github.
-  * Go to the `Discussions` page and pin the announcement discussion so that
+  * Go to the ``Discussions`` page and pin the announcement discussion so that
     it appears at the top of the page.
   * Unpin any previous release's announcement discussion.
-  * For all Github issues that are labeled as `fixed in next release`,
-    close the issue with text `Fixed in PyMuPDF-<version>`.
+  * For all Github issues that are labeled as ``fixed in next release``,
+    close the issue with text ``Fixed in PyMuPDF-<version>``.
   * Check in the release announcement that all fixed issues are now shown as closed.
   * If the new release uses a new version of MuPDF, optionally
     remove all code that is specific to the previous major release
-    of MuPDF. E.g. grep for `FZ_VERSION` or `mupdf_version_tuple`.
+    of MuPDF. E.g. grep for ``FZ_VERSION`` or ``mupdf_version_tuple``.
 
   * Update https://pymupdf.readthedocs.io:
 
     * Go to: https://readthedocs.io
-    * Click `Log in`
-    * Click on `Read the Docs Community`.
+    * Click ``Log in``.
+    * Click on ``Read the Docs Community``.
     * Select login using email.
     * Enter email address and shared password.
     * Go to PyMuPDF.
     * Click on Builds.
-    * Click on top item's refresh button `Rebuild version`.
+    * Click on top item's refresh button ``Rebuild version``.
 
-  * Post to Discord `#pymupdf_tech`.
-  * Send email to `pymupdf-marketing@artifex.com`.
+  * Post to Discord ``#pymupdf_tech``.
+  * Send email to ``pymupdf-marketing@artifex.com``.
     
-    * Subject: `PyMuPDF-<version> released`
+    * Subject: ``PyMuPDF-<version> released``
 
     * Body::
       
@@ -368,16 +381,16 @@ Release procedure
 
 * Post-release changes for all projects.
   
-  * Increment version in `setup.py`.
+  * Increment version in ``setup.py``.
 
 * Extra post-release changes for pymupdf.
 
-  In `changes.txt`:
+  In ``changes.txt``:
 
   * Add date of release that was just made.
-  * Add title for next release `**Changes in version <next-version>**`
+  * Add title for next release ``**Changes in version <next-version>**``.
 
-  In `.github/ISSUE_TEMPLATE/bug_report.yml`:
+  In ``.github/ISSUE_TEMPLATE/bug_report.yml``:
 
   * Add version of next release to drop-down list of versions.
 
@@ -396,11 +409,11 @@ git@github.com/ArtifexSoftware/.
 
 This key can be provided in two ways:
 
-* In file `artifex-software-ssh-key` in the current directory.
-* In environment variable `ARTIFEX_SOFTWARE_SSH_KEY`.
+* In file ``artifex-software-ssh-key`` in the current directory.
+* In environment variable ``ARTIFEX_SOFTWARE_SSH_KEY``.
 
-We run ssh with `StrictHostKeyChecking=no`, which may end up writing to
-`~/.ssh/known_hosts`.
+We run ssh with ``StrictHostKeyChecking=no``, which may end up writing to
+``~/.ssh/known_hosts``.
 
 Smartoffice ssh key
 ^^^^^^^^^^^^^^^^^^^
@@ -409,13 +422,13 @@ We allow specification of a custom ssh private key that allows access to the
 SmartOffice repository; this is required when PyMuPDFPro builds SmartOffice
 because of how the SmartOffice build system works.
 
-* If required, this key should be provided in file `thirdparty-so-key` in the
+* If required, this key should be provided in file ``thirdparty-so-key`` in the
   current directory.
 
 Huggingface token
 ^^^^^^^^^^^^^^^^^
 
-If required, this token should be provided in file `huggingface-key` in the
+If required, this token should be provided in file ``huggingface-key`` in the
 current directory.
 
 Use of keys with remote runs
@@ -438,25 +451,25 @@ https://github.com/ArtifexSoftware/sce/wiki/How-to-train-GNN.
 * Downloading and extracting is tracked using marker files, to avoid running
   unnecessarily more than once.
 
-The `test-gnn*` commands run pymupdf_layout's test scripts on the DocLayNet
+The ``test-gnn*`` commands run pymupdf_layout's test scripts on the DocLayNet
 dataset:
 
-* 'test-gnn' command runs `sce:eval/eval_gnn.py`.
-* 'test-gnn-pymupdf_layout' command runs `sce:eval/eval_pymupdf_layout.py`.
-* 'test-gnn-pymupdf4llm' command runs `sce:eval/eval_pymupdf4llm.py`.
+* 'test-gnn' command runs ``sce:eval/eval_gnn.py``.
+* 'test-gnn-pymupdf_layout' command runs ``sce:eval/eval_pymupdf_layout.py``.
+* 'test-gnn-pymupdf4llm' command runs ``sce:eval/eval_pymupdf4llm.py``.
 
 
 Argument completion with Bash
 -----------------------------
 
-`aptest/aptest.py completion` writes a bash completion script for aptest to
+``aptest/aptest.py completion`` writes a bash completion script for aptest to
 stdout.
 
 * Add argument completion for aptest.py to the current Bash session with::
 
     source <(aptest/aptest.py completion)
 
-  Subsequently when entering an aptest.py command, bash will respond to `<tab>`
+  Subsequently when entering an aptest.py command, bash will respond to ``<tab>``
   by completing and/or showing valid args.
 
 * Or write into relevant files with one of::
@@ -464,7 +477,7 @@ stdout.
   ./aptest/aptest.py completion > /etc/bash_completion.d/aptest.py.bash_completion
   ./aptest/aptest.py completion >> ~/.bash_completion
 
-  See Bash's `help complete` for more information.
+  See Bash's ``help complete`` for more information.
 
 * Also see special command  `completion`_.
 
@@ -478,7 +491,7 @@ Command-line arguments
 Overview
 ^^^^^^^^
 
-* Command line arguments are called options if they start with `-`,
+* Command line arguments are called options if they start with ``-``,
   otherwise they are called commands.
 * Arguments are evaluated first in the order that they were specified.
 * Then commands are run in the order in which they were specified.
@@ -486,14 +499,15 @@ Overview
 * Options and commands can be interleaved but it may be clearer to separate
   them on the command line.
 
-* Command line arguments are prepended with `<.aptest> <APTEST_options>`, where:
+* Command line arguments are prepended with ``<.aptest> <APTEST_options>``, where:
   
-  * `<.aptest>` is the contents of file `~/.aptest` if it exists.
-  * `<APTEST_options>` is the contents of environment variable `APTEST_options` if set.
+  * ``<.aptest>`` is the contents of file ``~/.aptest`` if it exists.
+  * ``<APTEST_options>`` is the contents of environment variable ``APTEST_options`` if set.
   
-  In both cases, arguments are extracted using `shlex.split()`, so are separated by
-  whitespace (e.g. space and newlines characters) unless escaped or inside
-  quotes etc.
+  In both cases, arguments are extracted using
+  `shlex.split() <https://docs.python.org/3/library/shlex.html#shlex.split>`__,
+  so are separated by whitespace (e.g. space and newlines characters) unless
+  escaped or inside quotes etc.
 
 Commands
 ^^^^^^^^
@@ -503,7 +517,7 @@ Commands
 build
 .....
     Builds and installs packages specified by `-i`_ into venv. Wheels
-    are placed in `aptest-wheelhouse`.
+    are placed in ``aptest-wheelhouse``.
 
     Also see:
 
@@ -515,9 +529,9 @@ build
 cibw
 ....
     Build and test packages using cibuildwheel. Wheels are placed
-    in directory `aptest-wheelhouse`, which is initially cleared.
+    in directory ``aptest-wheelhouse``, which is initially cleared.
     * We do not install wheels and it is generally not useful to do
-    `cibw test`.
+    ``cibw test``.
 
     If CIBW_BUILD is unset, we set it as follows:
     * On Github we build and test all supported Python versions.
@@ -544,7 +558,7 @@ gnn-download
 
 gnn-show
 ........
-    Generate graph showing results from previous runs of `test-gnn*`.
+    Generate graph showing results from previous runs of ``test-gnn*``.
 
     For example::
 
@@ -572,7 +586,7 @@ gnn-train
 
 populate
 ........
-    For packages specified with `git:...` populate local checkouts like
+    For packages specified with ``git:...`` populate local checkouts like
     the `build`_ command, but do not actually build/install anything.
 
 .. _run:
@@ -618,16 +632,32 @@ test-gnn-pymupdf4llm
     * Test GNN model via pymupdf4llm.
     * Writes results to test-gnn-pymupdf4llm-YYYY-MM-DD-HH-MM-SS.json.
 
-    Results are a dict with this structure::
+    Results are a dict with this structure:
 
-        results['python']...    Values from python's `platform` and `sys` modules.
-        results['environ'] - selected items from Python's os.environ.
-        results['state'] - description of what values we passed to pymupdf_layout:eval/eval_util.py:evaluate_detection().
-        results['packages'] - information about each package that we built/installed - version, git branch, sha etc.
-        results['pip-list'] - information from `pip list` showing information about all packages.
-        results['results'] - the results from the test.
-        results['t_duration'] - duration of test in seconds.
-        results['t_start'] - Unix start time.
+        ``results['python']``
+            Values from python's `platform <https://docs.python.org/3/library/platform>`__
+            and `sys <https://docs.python.org/3/library/sys>`__ modules.
+        
+        ``results['environ']``
+            Selected items from Python's `os.environ <https://docs.python.org/3/library/os#os.environ>`__.
+        
+        ``results['state']``
+            Description of what values we passed to ``pymupdf_layout:eval/eval_util.py:evaluate_detection()``.
+        
+        ``results['packages']``
+            Information about each package that we built/installed - version, git branch, sha etc.
+            
+        ``results['pip-list']``
+            Information from ``pip list`` showing information about all packages.
+        
+        ``results['results']``
+            The results from the test.
+            
+        ``results['t_duration']``
+            Duration of test in seconds.
+        
+        ``results['t_start']``
+            Unix start time.
 
     Also see:
 
@@ -654,9 +684,9 @@ Options
 -a <env_name>
 .............
     Read next space-separated argument(s) from environmental variable
-    `<env_name>`.
+    ``<env_name>``.
     
-    * Does nothing if `<env_name>` is unset.
+    * Does nothing if ``<env_name>`` is unset.
     * Useful when running via Github action.
 
 .. _-b:
@@ -666,14 +696,14 @@ Options
     Comma-separated ordered list of modifications to the list of
     packages built and installed by the `build`_ command.
 
-    This list defaults to all packages specified by `-i`. Then for each
-    comma-separated item in `<packages>`:
+    This list defaults to all packages specified by `-i`_. Then for each
+    comma-separated item in ``<packages>``:
 
-    * `-<name>`: removes package `<name>` from the list.
-    * `+<name>` and `<name>`: adds package `<name>` to the list.
-    * `-` removes all packages from the list.
+    * ``-<name>``: removes package ``<name>`` from the list.
+    * ``+<name>`` and ``<name>``: adds package ``<name>`` to the list.
+    * ``-`` removes all packages from the list.
 
-    In addition if the first item does not start with `+` or `-` we
+    In addition if the first item does not start with ``+`` or ``-`` we
     first remove all packages from the list.
 
     We allow aliases for package names.
@@ -693,55 +723,55 @@ Options
         -b -mupdf,-pymupdf_layout
 
     If 'mupdf' was specified as a package but has been removed here, we
-    set `PYMUPDF_SETUP_MUPDF_REBUILD=0` so pymupdf will not rebuild its
+    set ``PYMUPDF_SETUP_MUPDF_REBUILD=0`` so pymupdf will not rebuild its
     mupdf.
 
 .. _--build-type:
 
 --build-type debug | memento | release
 ......................................
-    Set build type. Default is `release`.
+    Set build type. Default is ``release``.
 
 .. _--cibw-name:
 
 --cibw-name <cibw_name>
 .......................
 
-    Name to use when installing `cibuildwheel` for the `cibw`_ command, e.g.::
+    Name to use when installing ``cibuildwheel`` for the `cibw`_ command, e.g.::
     
         --cibw-name cibuildwheel==3.0.0b1
         --cibw-name git+https://github.com/pypa/cibuildwheel
 
-    Default is `cibuildwheel`, i.e. the current release.
+    Default is ``cibuildwheel``, i.e. the current release.
 
 .. _--cibw-pyodide:
 
 --cibw-pyodide 0|1
 ..................
-     Make the `cibw`_ command build a pyodide wheel; runs `cibuildwheel
-     --platform pyodide ...` etc.
+     Make the `cibw`_ command build a pyodide wheel; runs
+     ``cibuildwheel --platform pyodide ...`` etc.
 
 .. _--cibw-pyodide-version:
 
 --cibw-pyodide-version <cibw_pyodide_version>
 .............................................
     Override default Pyodide version to use with `cibw`_ command
-    by setting `CIBW_PYODIDE_VERSION`.
+    by setting ``CIBW_PYODIDE_VERSION``.
 
 .. _--cibw-skip-add-defaults:
 
 --cibw-skip-add-defaults 0|1
 ............................
-    If 1 (the default) we add defaults to `CIBW_SKIP` such as `pp*` (to exclude
-    pypy) and `cp3??t-*` (to exclude free-threading), which effects the `cibw`_
+    If 1 (the default) we add defaults to ``CIBW_SKIP`` such as ``pp*`` (to exclude
+    pypy) and ``cp3??t-*`` (to exclude free-threading), which effects the `cibw`_
     command.
 
 .. _--clean:
 
 --clean <packages>
 ..................
-    Add comma-separated packages to list of packages for which we run `git
-    clean -fdx` in the `populate`_ and `build`_ commands.
+    Add comma-separated packages to list of packages for which we run
+    ``git clean -fdx`` in the `build`_ and `populate`_ commands.
 
 .. _--devel:
 
@@ -778,12 +808,12 @@ Options
 
 --gnn-show-select <expression>
 ..............................
-    Specify expression to use to select which `test-gnn-*.json` files to
+    Specify expression to use to select which ``test-gnn-*.json`` files to
     include in output created by command `gnn-show`_.
 
-    `<expression>` should be a Python expression that looks at Python dict `results`.
+    ``<expression>`` should be a Python expression that looks at Python dict ``results``.
 
-    `<results>` will actually be a `doct.Doct()` so dotted notation can
+    ``<results>`` will actually be a ``doct.Doct()`` so dotted notation can
     also be used for keys that are legal Python identifiers.
 
     Example::
@@ -806,8 +836,8 @@ Options
     * If the `cibw`_ command  is specified:
 
       * We use a conventional venv.
-      * We set `CIBW_ENABLE=graalpy`.
-      * We set `CIBW_BUILD = 'gp*'`.
+      * We set ``CIBW_ENABLE=graalpy``.
+      * We set ``CIBW_BUILD = 'gp*'``.
 
     * Otherwise we:
 
@@ -816,7 +846,7 @@ Options
       * Use pyenv to install graalpy.
       * Use graalpy to create venv.
 
-    [After the first time, suggest `-v 1` to avoid delay from
+    [After the first time, suggest ``-v 1`` to avoid delay from
     updating/building pyenv and recreating the graal venv.]
 
 .. _--gnn-show-text:
@@ -838,7 +868,7 @@ Options
 ............................
     Add an input package.
 
-    `package-name`:
+    ``package-name``:
 
         One of::
 
@@ -849,22 +879,22 @@ Options
             pymupdf_layout
             pymupdfpro
 
-    `location`:
+    ``location``:
     
-        `pip:`
+        ``pip:``
             Install from pypi.org using pip.
 
-        `pip:<suffix>`
-            Install `<package-name><suffix>` from pypi.org using pip.
-            For example `pip:==1.26.3` will install version 1.26.3 of
+        ``pip:<suffix>``
+            Install ``<package-name><suffix>`` from pypi.org using pip.
+            For example ``pip:==1.26.3`` will install version 1.26.3 of
             the package.
-        `pip:*.whl`
+        ``pip:*.whl``
             Install from local wheel using pip.
-        `pip:*.tar.gz`
+        ``pip:*.tar.gz``
             Install from local sdist using pip.
-        `'git:[-b <branch>] [-t <tag>] [<remote>]'`
+        ``'git:[-b <branch>] [-t <tag>] [<remote>]'``
             Clone/update from git remote into local checkout
-            `aptest-git-<package-name>`, optionally overriding default
+            ``aptest-git-<package-name>``, optionally overriding default
             branch/tag/remote.
             Note that any changes or commits in the local checkout are
             deleted.
@@ -876,10 +906,10 @@ Options
     for building, and the second location used for testing. This allows
     packages on pypi.org to be tested, for example:
 
-        `aptest.py -i pymupdf pip: -i pymupdf PyMuPDF build test`
-            Test current pymupdf release with testsuite in `PyMuPDF/tests`.
+        ``aptest.py -i pymupdf pip: -i pymupdf PyMuPDF build test``
+            Test current pymupdf release with testsuite in ``PyMuPDF/tests``.
 
-        `aptest.py -i pymupdf pip: -i pymupdf git: build test`
+        ``aptest.py -i pymupdf pip: -i pymupdf git: build test``
             Test current pymupdf release with testsuite in current git.
 
 .. _--langchain-pymupdf-layout:
@@ -891,7 +921,7 @@ Options
 
 --langchain <location>
 ......................
-    Aliases for `-i langchain_pymupdf_layout <location>`
+    Aliases for ``-i langchain_pymupdf_layout <location>``.
 
 .. _--mupdf:
 .. _-m:
@@ -900,15 +930,15 @@ Options
 ..................
 -m <location>
 .............
-    Aliases for `-i mupdf <location>`.
+    Aliases for ``-i mupdf <location>``.
 
 .. _-o:
 
 -o <os_names>
 .............
     Control which OS's we run on. If current OS is not in
-    (comma-separated) list `<os_names>`, we do nothing. `<os_names>` is case
-    insensitive, and items should match `linux`, `windows` or `darwin`.
+    (comma-separated) list ``<os_names>``, we do nothing. ``<os_names>`` is case
+    insensitive, and items should match ``linux``, ``windows`` or ``darwin``.
 
 .. _--pymupdf:
 
@@ -918,7 +948,7 @@ Options
 ....................
 -p <location>
 .............
-    Aliases for `-i pymupdf <location>`.
+    Aliases for ``-i pymupdf <location>``.
 
 .. _--pymupdfpro:
 
@@ -932,7 +962,7 @@ Options
 ................
 -P <location>
 .............
-    Aliases for `-i pymupdfpro <location>`.
+    Aliases for ``-i pymupdfpro <location>``.
 
 .. _pymupdf4llm:
 
@@ -940,7 +970,7 @@ Options
 ........................
 --4llm <location>
 .................
-    Aliases for `-i pymupdf4llm <location>`.
+    Aliases for ``-i pymupdf4llm <location>``.
 
 .. _--pymupdf_layout:
 .. _--layout:
@@ -952,14 +982,14 @@ Options
 ...................
 -l <location>
 .............
-    Aliases for `-i pymupdf_layout <location>`.
+    Aliases for ``-i pymupdf_layout <location>``.
 
 .. _--pytest:
 
 --pytest <pytest-flags>
 .......................
-    Specify pytest flags used by `test`_ command; for example `--pytest '-k
-    test_123'`.
+    Specify pytest flags used by `test`_ command; for example
+    ``--pytest '-k test_123'``.
 
 .. _--pytest-path:
 
@@ -967,7 +997,7 @@ Options
 ...........................
     Specify a directory/file/test-function to use with the `test`_ command, relative
     to each project root directory. Can be specified multiple times. Default is
-    `<package_root>/tests/`.
+    ``<package_root>/tests/``.
 
 .. _--pytest-wrap:
 
@@ -989,36 +1019,36 @@ Options
     Re-run ourselves on remote machine(s) and on success copy wheels
     back to local machine.
 
-    If `<remote>` is `@github`, we run on Github:
+    If ``<remote>`` is ``@github``, we run on Github:
 
     * We push specified local checkouts directories (specified
-      by `-i`, `-m`, `-p` etc) to branches called `aptest-$USER` in the
+      by ``-i``, ``-m``, ``-p`` etc) to branches called ``aptest-$USER`` in the
       central repositories on https://github.com.
 
     * **Warning**: this will make git forget about any new files in local
       checkouts that have been added but not yet committed.
 
       This is because we currently push any uncommitted changes as a
-      temporary commit, then use `git reset HEAD~1` to restore git
+      temporary commit, then use ``git reset HEAD~1`` to restore git
       state.
 
-    * We re-run the `aptest.py` command on Github machines, changing
-      `-i`, `-m` etc args to use `git:...` to refer to the above
+    * We re-run the ``aptest.py`` command on Github machines, changing
+      ``-i``, ``-m`` etc args to use ``git:...`` to refer to the above
       repositories.
 
     * On success we copy Github logs and artifacts
       and extracted wheels etc to local directory:
       
-          `gh_workflow_YYYY-MM-DD-<workflowid>`
+          ``gh_workflow_YYYY-MM-DD-<workflowid>``
           
       Wheels are also copied in flat format into:
       
-          `gh_workflow_YYYY-MM-DD-<workflowid>-union/`.
+          ``gh_workflow_YYYY-MM-DD-<workflowid>-union/``.
 
-    Otherwise `<remote>` should specify a remote machine on which to run
+    Otherwise ``<remote>`` should specify a remote machine on which to run
     aptest:
 
-    * If `<remote>` contains one or more spaces it is interpreted as the ssh
+    * If ``<remote>`` contains one or more spaces it is interpreted as the ssh
       command to use, optionally ending with a colon followed by
       the remote directory to use.
 
@@ -1026,27 +1056,27 @@ Options
 
           -r 'ssh -p 2222 -J barfoo@mygateway foobar@mymachine.com:testdir'
 
-    * Otherwise `<remote>` should be an rsync-style specification such
-      as `macmini` or `username@macmini:testdir`.
+    * Otherwise ``<remote>`` should be an rsync-style specification such
+      as ``macmini`` or ``username@macmini:testdir``.
 
-      Specify a ssh jump host using `::`, for example::
+      Specify a ssh jump host using ``::``, for example::
 
           -r <gateway>::<remote-host>
 
-    * Local checkouts specified by `-i` are copied to the remote
-      using rsync, then `git clean -f` is run on the remote.
+    * Local checkouts specified by ``-i`` are copied to the remote
+      using rsync, then ``git clean -f`` is run on the remote.
     
-    * The `aptest/` directory is copied to the remote, using rsync.
+    * The ``aptest/`` directory is copied to the remote, using rsync.
     
-    * The `aptest.py` command (without the `-r ...` arguments) is run on the
+    * The ``aptest.py`` command (without the ``-r ...`` arguments) is run on the
       remote machine.
 
     * On success:
 
       * Wheels are copied back into local directory
-        `aptest-wheelhouse/`.
+        ``aptest-wheelhouse/``.
 
-      * Files matching `test-gnn-*.json` are copied back into the
+      * Files matching ``test-gnn-*.json`` are copied back into the
         current directory.
 
 .. _--release-1:
@@ -1068,15 +1098,15 @@ Options
     Preset args for making releases. Only one may be specified, and it
     must be the only arg.
 
-    `aptest/aptest.py --release-1`
+    ``aptest/aptest.py --release-1``
         Build wheels for pymupdf, pymupdfpro and pymupdf_layout, for all
         platforms except linux-aarch64, linux-x64-musl and win32.
-    `aptest/aptest.py --release-2`
+    ``aptest/aptest.py --release-2``
         Build wheels for pymupdf, pymupdfpro and pymupdf_layout, for
         linux-aarch64.
-    `aptest/aptest.py --release-3`
+    ``aptest/aptest.py --release-3``
         Build pymupdf wheel for win32.
-    `aptest/aptest.py --release-4`
+    ``aptest/aptest.py --release-4``
         Build pymupdf wheel for linux-x64-musl.
 
 .. _--remote-do:
@@ -1092,53 +1122,53 @@ Options
 
 --remote-github-workflow-id <workflow_id>
 .........................................
-    Changes behaviour of `-r @github`. Don't run anything Github,
-    instead continue from previous `-r @github` invocation by waiting
-    for `<workflow_id>` to finish and then downloading logs and wheels
+    Changes behaviour of ``-r @github``. Don't run anything Github,
+    instead continue from previous ``-r @github`` invocation by waiting
+    for ``<workflow_id>`` to finish and then downloading logs and wheels
     etc to the local machine. Note that one still needs to include
-    `-r @github`.
+    ``-r @github``.
 
 .. _--remote-github-yml:
 
 --remote-github-yml <yml>
 .........................
-    With `-r @github`, run the specified `.yml` file (leafname only) instead
-    of running `aptest.py`.
+    With ``-r @github``, run the specified ``.yml`` file (leafname only) instead
+    of running ``aptest.py``.
     If no packages are specified, runs on Github's
-    `ArtifexSoftware/aptest` repository; otherwise exactly one package
+    ``ArtifexSoftware/aptest`` repository; otherwise exactly one package
     must be specified.
 
 .. _--remote-github-yml-inputs:
 
 --remote-github-yml-inputs <inputs>
 ...................................
-    Specify inputs used with `--github-yml`. `<inputs>` is a comma-separated
-    list of `<name>=<value>` pairs.
+    Specify inputs used with `--remote-github-yml`_. ``<inputs>`` should be a
+    comma-separated list of ``<name>=<value>`` pairs.
 
 .. _--remote-prefix:
 
 --remote-prefix <remote_prefix>
 ...............................
-    Run remote using specified Python command. Ignored by `-r @github`.
+    Run remote using specified Python command. Ignored by ``-r @github``.
 
 .. _--remote-prefix-default:
 
 --remote-prefix-default <remote> <prefix>
 .........................................
     Sets default remote prefix for a specific remote when specified with
-    `-r <remote>`. For example to always use python-3.12 on remote machine
-    `jules-asus`, use::
+    ``-r <remote>``. For example to always use python-3.12 on remote machine
+    ``jules-asus``, use::
 
         --remote-prefix-default jules-asus python312
     
-    (It can be useful to put this in `~/.aptest`.)
+    (It can be useful to put this in ``~/.aptest``.)
 
 .. _--remote-rsync-path:
 
 --remote-rsync-path <remote_rsync_path>
 .......................................
-    Specify `--rsync-path` when running rsync, to identify location of
-    rsync on remote. E.g. `--remote-rsync-path 'wsl rsync'` if remote is
+    Specify ``--rsync-path`` when running rsync, to identify location of
+    rsync on remote. E.g. ``--remote-rsync-path 'wsl rsync'`` if remote is
     a Windows machine with rsync installed in the default WSL system.
 
 .. _--remote-rsync-wsl:
@@ -1154,7 +1184,7 @@ Options
 --run <package> <command>
 .........................
     Make `run`_ command run the specified command within checkout of
-    `<package>`.
+    ``<package>``.
 
 .. _--sdists:
 
@@ -1166,7 +1196,7 @@ Options
 
 --swig <swig>
 .............
-    Use `<swig>` instead of the `swig` command.
+    Use ``<swig>`` instead of the ``swig`` command.
 
     Unix only:
         Clone/update/build swig from a git repository using 'git:' prefix.
@@ -1178,13 +1208,13 @@ Options
             --swig 'git:--branch master'
             --swig git:
 
-        2025-08-18: This fixes building with `py_limited_api` on python-3.13.
+        2025-08-18: This fixes building with ``py_limited_api`` on python-3.13.
 
 .. _--swig-quick:
 
 --swig-quick 0|1
 ................
-    If 1 and `--swig`_'s `<swig>` value starts with `git:`, we do not
+    If 1 and `--swig`_'s ``<swig>`` value starts with ``git:``, we do not
     update/build swig if it is already present.
 
 .. _--system-packages:
@@ -1192,14 +1222,14 @@ Options
 --system-packages 0|1
 .....................
     If 1, automatically install required system packages such as
-    Valgrind, using `apt` on Linux and `brew` on MacOS. Default is 1 if
+    Valgrind, using ``apt`` on Linux and ``brew`` on MacOS. Default is 1 if
     running as Github action, otherwise 0.
 
 .. _--system-site-packages:
 
 --system-site-packages 0|1
 ..........................
-    If 1, use `--system-site-packages` when creating venv. Defaults is 0.
+    If 1, use ``--system-site-packages`` when creating venv. Defaults is 0.
 
 .. _-t:
 
@@ -1208,15 +1238,15 @@ Options
     Comma-separated ordered list of modifications to the list of
     packages tested by the `test`_ command.
 
-    This list defaults to all packages specified by `-i` or its aliases.
+    This list defaults to all packages specified by `-i`_ or its aliases.
     
-    For each comma-separated item in `<packages>`:
+    For each comma-separated item in ``<packages>``:
 
-    * `-<name>` removes package `<name>` from the list.
-    * `+<name>` and `<name>` adds package `<name>` to the list.
-    * `-` removes all packages from the list.
+    * ``-<name>`` removes package ``<name>`` from the list.
+    * ``+<name>`` and ``<name>`` adds package ``<name>`` to the list.
+    * ``-`` removes all packages from the list.
 
-    In addition if the first item does not start with `+` or `-` we
+    In addition if the first item does not start with `+`` or ``-`` we
     first remove all packages from the list.
 
     We allow aliases for package names.
@@ -1227,7 +1257,7 @@ Options
         -t -,pymudfpro
         -t pro
 
-    And these remove `mupdf` and `layout` from the list of packages to test::
+    And these remove ``mupdf`` and ``layout`` from the list of packages to test::
     
         -t -m,--layout
         -t -mupdf,-pymupdf_layout
@@ -1243,33 +1273,33 @@ Options
 
 --test-gnn-cache 0|1
 ....................
-    If 1, `test-gnn*` commands look for a matching `test-gnn-*.json`
+    If 1, ``test-gnn*`` commands look for a matching ``test-gnn-*.json``
     file. If one is found, we do not run, instead creating softlinks to
-    the matching `.json` file.
+    the matching ``.json`` file.
 
-    To match, we require all fields in a `.json` file match the file
+    To match, we require all fields in a ``.json`` file match the file
     that we would create for the current run, except for:
 
-    * `['results']` - not available for the current run, obviously.
-    * `['t_start']`
-    * `['t_duration']`
-    * `['pip-list']` - we allow changes to misc other packages, e.g. version numbers may vary.
+    * ``['results']`` - not available for the current run, obviously.
+    * ``['t_start']``
+    * ``['t_duration']``
+    * ``['pip-list']`` - we allow changes to misc other packages, e.g. version numbers may vary.
 
     We require the other settings to be identical, such as:
 
     * OS, machine name, username etc.
     * Python version, implementation etc.
-    * How Artifex pckages were specified, e.g. `-p git:` or `-p pypi.org`.
-    * git sha's and diffs for Artifex packages specified with `git:` or local checkout.
-    * pypi.org version numbers for Artifex packages specified with `pip:`.
-    * Any `--test-gnn-limit` value.
+    * How Artifex pckages were specified, e.g. ``-p git:`` or ``-p pypi.org``.
+    * git sha's and diffs for Artifex packages specified with ``git:`` or local checkout.
+    * pypi.org version numbers for Artifex packages specified with ``pip:``.
+    * Any `--test-gnn-limit`_ value.
 
 .. _--test-gnn-extra:
 
 --test-gnn-extra <key>=<value>
 ..............................
-    Adds specified `key=value` pair to the root of the results dict
-    created by `test-gnn*` commands.
+    Adds specified ``key=value`` pair to the root of the results dict
+    created by ``test-gnn*`` commands.
 
 .. _--test-gnn-limit:
 
@@ -1295,14 +1325,14 @@ Options
 
 --ticker <delay>
 ................
-    Use ticker with specified delay. Disabled if `delay==0`. Default is
+    Use ticker with specified delay. Disabled if ``delay==0``. Default is
     0.5.
 
 .. _-u:
 
 -u 0|1
 ......
-    If 1 and `-r @github` is used, then on success we ask the user to
+    If 1 and ``-r @github`` is used, then on success we ask the user to
     confirm and then upload wheels to pypi.org.
 
 .. _-v:
@@ -1318,20 +1348,20 @@ Options
         by us earlier and is a valid venv containing all necessary packages;
         this saves a little time.
 
-        Otherwise we create it with `python -m venv ...`.
+        Otherwise we create it with ``python -m venv ...``.
 
     2 - Use a venv.
-        Always (re)create it with `python -m venv ...`.
+        Always (re)create it with ``python -m venv ...``.
 
     3 - Use a clean venv.
-        Delete it if it already exists, then run `python -m venv ...`.
+        Delete it if it already exists, then run ``python -m venv ...``.
 
     The default is 2.
 
-    The venv will be called `venv-aptest-<pthonversion>-<wordsize>`, for
-    example `venv-aptest-3.13.5-64`.
+    The venv will be called ``venv-aptest-<pthonversion>-<wordsize>``, for
+    example ``venv-aptest-3.13.5-64``.
     
-    We also create a convenience link called `venv-aptest`.
+    We also create a convenience link called ``venv-aptest``.
 
 .. _-V2:
 
@@ -1351,7 +1381,7 @@ completion
 
     The script works by using aptest.py itself to write valid
     completions to stdout (which it does if environment variable
-    `COMP_LINE` is defined).
+    ``COMP_LINE`` is defined).
 
-    If `APTEST_COMPLETION_DEBUG` is defined, it is a path to which
+    If ``APTEST_COMPLETION_DEBUG`` is defined, it is a path to which
     diagnostics are appended.
