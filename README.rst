@@ -1044,6 +1044,12 @@ Options
       Wheels are also copied in flat format into:
       
           ``gh_workflow_YYYY-MM-DD-<workflowid>-union/``.
+    
+    * Also see:
+    
+      * `--remote-github-workflow-id`_
+      * `--remote-github-yml`_
+      * `--remote-github-yml-inputs`_
 
     Otherwise ``<remote>`` should specify a remote machine on which to run
     aptest:
@@ -1078,6 +1084,14 @@ Options
 
       * Files matching ``test-gnn-*.json`` are copied back into the
         current directory.
+    
+    * Also see:
+    
+      * `--remote-do`_
+      * `--remote-prefix`_
+      * `--remote-prefix-default`_
+      * `--remote-rsync-path`_
+      * `--remote-rsync-wsl`_
 
 .. _--release-1:
 
