@@ -375,6 +375,14 @@ Instructions for releasing wheels for:
 
   Wait for build to finish, agree to upload.
 
+* Build and release pyodide wheel.
+
+  Run::
+  
+    ./aptest/aptest.py --release-5
+
+  Upload the resulting pyodide wheel e.g. to julian@ghostscript.com:public_html/pyodide/
+
 * Unlock projects' branches if they were locked above:
 
     Github settings/Branches/main/Edit/Lock branch - uncheck.
@@ -1376,6 +1384,19 @@ Options
     example ``venv-aptest-3.13.5-64``.
     
     We also create a convenience link called ``venv-aptest``.
+    
+    Also see:
+    
+    * `--venv-name`_
+
+.. _--venv-name:
+
+--venv-name <venv_name>
+.......................
+    Sets the venv name used by `-v`_.
+    
+    Default is ``venv-aptest-<python-version>-<word-size>``,
+    for example ``venv-aptest-3.14.2-64``.
 
 .. _-V2:
 

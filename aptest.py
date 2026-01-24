@@ -603,6 +603,7 @@ def get_args(argv):
     state.ticker = 0.5
     state.valgrind = False
     state.venv = 2
+    state.venv_name = None
     state.verbose = 0
     state.wheelhouse = 'aptest-wheelhouse'
     
@@ -782,6 +783,8 @@ def get_args(argv):
                     new_args = '-r @github -u 1 -p git: cibw -o windows -e CIBW_ARCHS_WINDOWS=x86 --cibw-skip-add-defaults 0'
                 elif arg == '--release-4':
                     new_args = '-r @github -u 1 -p git: cibw -o linux -e "CIBW_BUILD=cp310-musllinux_x86_64" --cibw-skip-add-defaults 0'
+                elif arg == '--release-5':
+                    new_args = '-r @github -p git: cibw --cibw-pyodide 1 -o linux'
                 else:
                     assert 0, f'Unrecognised {arg=}, should be one of --release-1, --release-2, --release-3.'
                 new_args = shlex.split(new_args)
@@ -864,6 +867,9 @@ def get_args(argv):
             elif arg == '-v':
                 state.venv = next(args).as_int()
                 assert state.venv in (0, 1, 2, 3), f'Invalid {state.venv=} should be 0, 1, 2 or 3.'
+            
+            elif arg == '--venv-name':
+                state.venv_name = next(args).as_text()
             
             elif arg == '-V':
                 state.verbose += 1
@@ -2181,8 +2187,8 @@ def main(argv):
     if (not state.remote and state.commands) or state.remote == '@github':
         if state.venv:
             # Rerun ourselves inside a venv if not already in a venv.
-            if venv_in():
-                pipcl.log(f'Already in venv')
+            if venv_in(state.venv_name):
+                pipcl.log(f'Already in venv; {sys.prefix=} {state.venv_name=}.')
             else:
             
                 if not state.remote and state.graal:
@@ -2219,7 +2225,10 @@ def main(argv):
                     pipcl.log(f'{state.venv=}')
                     Py_GIL_DISABLED = sysconfig.get_config_var('Py_GIL_DISABLED')
                     t = '-t' if Py_GIL_DISABLED else ''
-                    venv_name = f'venv-aptest-{platform.python_version()}{t}-{int.bit_length(sys.maxsize+1)}'
+                    if state.venv_name:
+                        venv_name = state.venv_name
+                    else:
+                        venv_name = f'venv-aptest-{platform.python_version()}{t}-{int.bit_length(sys.maxsize+1)}'
                     e = venv_run(
                             sys.argv,
                             venv_name,
