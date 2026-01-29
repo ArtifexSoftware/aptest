@@ -1244,17 +1244,17 @@ def do_build(state):
         pipcl.log(f'Setting {PYMUPDF_SETUP_MUPDF_REBUILD=}')
         state.env_extra['PYMUPDF_SETUP_MUPDF_REBUILD'] = PYMUPDF_SETUP_MUPDF_REBUILD
     
-    # First install packages specified with `pip:` in reverse order so that
-    # we override default package prerequisites if necessary.
-    #
-    # This is necessary because packages specified with `pip:` cannot respect
-    # any overrides of prerequisite version numbers.
-    for package in reversed(state.packages_build):
+    package_to_wheel = dict()
+    
+    def do_package(package):
         location, _args_pos = state.packages[package]
         if not location:
-            continue
+            return
         if package == 'aptest':
-            continue
+            return
+
+        new_files = pipcl.NewFiles(f'{state.wheelhouse}/{package}*.whl')
+        
         if location.startswith('pip:'):
             assert package != 'mupdf', f'Not a package on pypi.org: {package}'
             name = location[4:]
@@ -1263,22 +1263,24 @@ def do_build(state):
             # Get wheel from pypi.org and put into our wheelhouse
             # so it is available for later builds. Then install;
             # pip uses a cache so will not download twice.
-            pipcl.run(f'pip wheel -w {state.wheelhouse} {name}')
+            #
+            # We need to know the name of the wheel file (we return it). This
+            # is calculated using pipcl.NewFiles so we need to force download
+            # so wheel file is new. We do this by first removing matching
+            # wheels from pip cache and wheelhouse.
+            #
+            pipcl.run(f'pip cache list')
+            pipcl.run(f'pip cache remove {name}')
+            pipcl.run(f'pip cache list')
+            for p in glob.glob(f'{state.wheelhouse}/{package}-*.whl'):
+                pipcl.log(f'Removing: {p}')
+                pipcl.fs_remove(p)
+            pipcl.run(f'pip wheel --no-cache-dir -w {state.wheelhouse} {name}')
+            wheel = new_files.get_one()
             pipcl.run(f'pip install -v {name}')
-    
-    # Now install non-pip packages forwards.
-    for package in state.packages_build:
-        pipcl.log(f'{package=}')
-        location, _args_pos = state.packages[package]
-        if not location:
-            continue
-        if package == 'aptest':
-            continue
-        if location.startswith('pip:'):
-            pass
         else:
             directory = _get_local(package, state)
-            
+
             if package == 'pymupdf4llm':
                 # setup.py is in subdirectory pymupdf4llm/.
                 directory += '/pymupdf4llm'
@@ -1336,7 +1338,6 @@ def do_build(state):
                     if package == 'pymupdf_layout':
                         state.env_extra['PYMUPDF_LAYOUT_SETUP_BUILD_TYPE'] = state.build_type
 
-                new_files = pipcl.NewFiles(f'{state.wheelhouse}/{package}*.whl')
                 pipcl.run(
                         #f'pip wheel -v --extra-index-url {pip_index_url} --no-cache-dir -w {state.wheelhouse} {directory_abs}',
                         f'pip wheel -v --extra-index-url {pip_index_url} -w {state.wheelhouse} {directory_abs}',
@@ -1357,17 +1358,39 @@ def do_build(state):
                         env_extra=state.env_extra,
                         prefix=f'install {package}: ',
                         )
-            
+                
             if package in state.clean:
                 directory = _get_local(package, state)
                 with pipcl.LogPrefix(f'{package=}: git clean -n: '):
                     pipcl.log(f'Showing post-build git-clean for {package=}.')
                     pipcl.run(f'cd {directory} && git clean -ndx')
-                    
-            pipcl.run(
-                    f'piprepo build {state.wheelhouse}',
-                    prefix='piprepo build: ',
-                    )
+    
+        return wheel
+
+    # We install packages in reverse order (e.g. pymupdf_layout before
+    # pymupdf) so that packages specifed to aptest override any package
+    # prerequisites.
+    #
+    # For example with `-p pip:==1.26.3 --layout pip:=1.26.5`, installation
+    # of pymupdf_layout will install prerequisite pymupdf-1.26.5, which we
+    # then override with installation of pymupdf-1.26.3.
+    #
+    
+    for package in state.packages_build:
+        wheel = do_package(package)
+        package_to_wheel[package] = wheel
+        pipcl.run(
+                f'piprepo build {state.wheelhouse}',
+                prefix='piprepo build: ',
+                )
+    
+    for package in reversed(state.packages_build):
+        # Always uninstall first, to ensure we alwaus install the package from
+        # the specified location.
+        #
+        pipcl.run(f'pip uninstall -y {package}')
+        wheel = package_to_wheel[package]
+        pipcl.run(f'pip install --no-deps {wheel}')
 
 
 def do_cibw(state):
