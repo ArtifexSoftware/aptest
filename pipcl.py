@@ -3766,7 +3766,7 @@ class NewFiles:
         '''
         ret = self.get()
         sep = '\n    '
-        assert len(ret) == n, f'{len(ret)=} != {n=}:{sep}{sep.join(ret)}'
+        assert len(ret) == n, f'{len(ret)=} != {n=}:{sep}{sep.join(ret)}. {self.glob_pattern=}.'
         return ret
     
     def get_one(self):
