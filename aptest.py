@@ -1046,9 +1046,13 @@ def do_remote_github(state, argv):
         else:
             # Run ourselves on Github using test.yml, passing argv.
             info = name_info('aptest')
+            args = shlex.join(argv[1:])
+            if not state.verbose:
+                # Run with verbose on Github, e.g. to show os.environ etc.
+                args += ' -V'
             data = dict(
                     ref = branch,
-                    inputs = dict(args=shlex.join(argv[1:])),
+                    inputs = dict(args=args),
                     )
             workflow_id = github.gh_run_workflow(
                     f'https://api.github.com/repos/{info["github_name"]}',
@@ -1472,15 +1476,29 @@ def do_cibw(state):
         state.env_extra['CIBW_PYODIDE_VERSION'] = state.cibw_pyodide_version
         state.env_extra['CIBW_ENABLE'] = 'pyodide-prerelease'
 
-    packages = list()
     for package in state.packages_build:
         pipcl.log(f'{package=}')
         directory = _get_local(package, state)
+        
         if not directory:
             # location is pip.
-            # cibuildwheel will download from pypi as required.
-            pipcl.log(f'Unable to process with cibuildwheel because location is pip: {package=}')
+            pipcl.log(f'Unable to process with cibuildwheel because location is pip: {package=} and now second location')
             continue
+            
+            # Experimental code to try to get cibw to test an existing wheel.
+            #directory = _get_local(package, state, test=1)
+            #if not directory:
+            #    pipcl.log(f'Unable to process with cibuildwheel because location is pip: {package=} and now second location')
+            #    continue
+            #
+            #location, _args_pos = state.packages[package]
+            #assert location.startswith('pip:')
+            #if location.endswith(('.whl', '.tar.gz')):
+            #    pipcl.log(f'Unable to process with cibuildwheel because location is pip: .whl/.tar.gz. {package=} {location=}')
+            #    continue
+            #name = f'{package}{location[4:]}'
+            #state.env_extra['CIBW_BUILD_FRONTEND'] = f'pip wheel {name}'
+        
         directory_abs = os.path.abspath(directory)
         if package == 'mupdf':
             if platform.system() == 'Linux' and not state.cibw_pyodide:
@@ -1496,24 +1514,11 @@ def do_cibw(state):
 
         # Tell cibuildwheel how to test <package>.
         if package in state.packages_test:
-            if 0:
-                CIBW_TEST_COMMAND = f'python {{project}}/scripts/test.py test'
-                if state.pytest_options:
-                    if package == 'pymupdf':
-                        CIBW_TEST_COMMAND += f' -p {shlex.quote(state.pytest_options)}'
-                    elif package == 'pymupdfpro':
-                        CIBW_TEST_COMMAND += f' -t {shlex.quote(state.pytest_options)}'
-                    elif package == 'pymupdf_layout':
-                        CIBW_TEST_COMMAND += f' -t {shlex.quote(state.pytest_options)}'
-                    else:
-                        pipcl.log(f'Unable to add {state.pytest_options=} to CIBW_TEST_COMMAND.')
-                state.env_extra['CIBW_TEST_COMMAND'] = CIBW_TEST_COMMAND
-            else:
-                CIBW_TEST_COMMAND = f'pip install --upgrade pytest && pytest'
-                if state.pytest_options:
-                    CIBW_TEST_COMMAND += f' {state.pytest_options}'
-                CIBW_TEST_COMMAND += f' {{project}}/tests'
-                state.env_extra['CIBW_TEST_COMMAND'] = CIBW_TEST_COMMAND
+            CIBW_TEST_COMMAND = f'pip install --upgrade pytest && pytest'
+            if state.pytest_options:
+                CIBW_TEST_COMMAND += f' {state.pytest_options}'
+            CIBW_TEST_COMMAND += f' {{project}}/tests'
+            state.env_extra['CIBW_TEST_COMMAND'] = CIBW_TEST_COMMAND
 
         else:
             pipcl.log(f'Not testing because not in state.packages_test: {package=}')
@@ -1575,6 +1580,8 @@ def do_cibw(state):
         CIBW_ENVIRONMENT_PASS_LINUX = env_extra.keys()
         CIBW_ENVIRONMENT_PASS_LINUX = list(CIBW_ENVIRONMENT_PASS_LINUX)
         CIBW_ENVIRONMENT_PASS_LINUX.append('PYMUPDFPRO_SETUP_SOT_KEY')  # This can be set in os.environ.
+        # Some tests look at GITHUB_ACTIONS e.g. if known to fail on Github.
+        CIBW_ENVIRONMENT_PASS_LINUX.append('GITHUB_ACTIONS')
         CIBW_ENVIRONMENT_PASS_LINUX.sort()
         CIBW_ENVIRONMENT_PASS_LINUX = ' '.join(CIBW_ENVIRONMENT_PASS_LINUX)
         env_extra['CIBW_ENVIRONMENT_PASS_LINUX'] = CIBW_ENVIRONMENT_PASS_LINUX
@@ -1588,7 +1595,6 @@ def do_cibw(state):
 
         pipcl.run(f'ls -ld {state.wheelhouse}/*')
         pipcl.run(f'piprepo build {state.wheelhouse}')
-        packages.append(package)
 
         if 0:
             pipcl.log(f'Contents of: {state.wheelhouse=} are:')
