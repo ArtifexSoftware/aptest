@@ -381,7 +381,9 @@ Instructions for releasing wheels for:
   
     ./aptest/aptest.py --release-5
 
-  Upload the resulting pyodide wheel e.g. to julian@ghostscript.com:public_html/pyodide/
+  Upload the resulting pyodide wheel to julian@ghostscript.com:public_html/pyodide/.
+  
+  [2026-01-30: hopefully we'll have a more official location soon.]
 
 * Unlock projects' branches if they were locked above:
 
@@ -1109,6 +1111,8 @@ Options
 
 .. _--release-4:
 
+.. _--release-5:
+
 --release-1
 ...........
 --release-2
@@ -1116,6 +1120,8 @@ Options
 --release-3
 ...........
 --release-4
+...........
+--release-5
 ...........
     Preset args for making releases. Only one may be specified, and it
     must be the only arg.
@@ -1130,6 +1136,8 @@ Options
         Build pymupdf wheel for win32.
     ``aptest/aptest.py --release-4``
         Build pymupdf wheel for linux-x64-musl.
+    ``aptest/aptest.py --release-5``
+        Build pyodide wheel.
 
 .. _--remote-do:
 
