@@ -1367,13 +1367,12 @@ def do_build(state):
     
         return wheel
 
-    # We install packages in reverse order (e.g. pymupdf_layout before
-    # pymupdf) so that packages specifed to aptest override any package
-    # prerequisites.
+    # We install packages in reverse order (e.g. pymupdf_layout before pymupdf)
+    # so that packages specified to aptest override any package prerequisites.
     #
-    # For example with `-p pip:==1.26.3 --layout pip:=1.26.5`, installation
-    # of pymupdf_layout will install prerequisite pymupdf-1.26.5, which we
-    # then override with installation of pymupdf-1.26.3.
+    # For example with `-p pip:==1.26.3 --layout pip:=1.26.5`, installation of
+    # pymupdf_layout will install prerequisite pymupdf-1.26.5, which we then
+    # override with installation of pymupdf-1.26.3.
     #
     
     for package in state.packages_build:
@@ -1385,7 +1384,7 @@ def do_build(state):
                 )
     
     for package in reversed(state.packages_build):
-        # Always uninstall first, to ensure we alwaus install the package from
+        # Always uninstall first, to ensure we always install the package from
         # the specified location.
         #
         pipcl.run(f'pip uninstall -y {package}')
