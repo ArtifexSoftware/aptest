@@ -27,7 +27,14 @@ Instead it is intended to be used directly from a Git checkout, for example::
 Changelog
 ---------
 
-**2026-1-15**
+**2026-01-30**
+
+* Allow testing of aptest itself.
+* Added ``release-5`` for building pyodide pymupdf wheel.
+* Avoid remaining potential for ``build`` command to end up installing incorrect package versions.
+
+
+**2026-01-15**
 
 * Fix potentially incorrect package versions if ``pip:`` is used.
 * Fix flake8 errors.
