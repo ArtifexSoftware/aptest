@@ -696,6 +696,14 @@ test-gnn-devel
 Options
 ^^^^^^^
 
+.. _--4llm-unified:
+
+--4llm-unified 0|1
+..................
+
+    If 1 we assume any pymupdf4llm package has been created by merging
+    pymupdf4llm into the layout git repostiory (ArtifexSoftware/sce on Github).
+
 .. _-a:
 
 -a <env_name>
