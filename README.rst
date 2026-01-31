@@ -27,6 +27,11 @@ Instead it is intended to be used directly from a Git checkout, for example::
 Changelog
 ---------
 
+**2026-01-31**
+
+* Update tests to use mupdf 1.27.x branch.
+* Added experimental support for unified 4llm+layout package; see `--4llm-unified`_.
+
 **2026-01-30**
 
 * Allow testing of aptest itself.
@@ -510,7 +515,7 @@ Overview
 
 * Command line arguments are called options if they start with ``-``,
   otherwise they are called commands.
-* Arguments are evaluated first in the order that they were specified.
+* Options are evaluated first in the order that they were specified.
 * Then commands are run in the order in which they were specified.
 * Usually command `test`_ would be specified after commands such as `build`_.
 * Options and commands can be interleaved but it may be clearer to separate
@@ -702,7 +707,7 @@ Options
 ..................
 
     If 1 we assume any pymupdf4llm package has been created by merging
-    pymupdf4llm into the layout git repostiory (ArtifexSoftware/sce on Github).
+    pymupdf4llm into the layout git repository (ArtifexSoftware/sce on Github).
 
 .. _-a:
 
