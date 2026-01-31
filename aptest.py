@@ -244,6 +244,15 @@ g_package_info = {
                 'aliases':  ['pfi'],
                 'order': 4,
             },
+        
+        # Experimental, doesn't work.
+        'presidio':
+            {
+                'github_name': 'ArtifexSoftware/presidio',
+                'git_branch': 'main',
+                'aliases':  list(),
+                'order': 4,
+            }
         }
 
 for name, value in g_package_info.items():
@@ -570,6 +579,7 @@ def get_args(argv):
     state.path_huggingface_key = 'huggingface-key'
     state.path_pro_key = 'thirdparty-so-key'
     state.pybind = False
+    state.pymupdf4llm_unified = False
     state.pytest_options = ''
     state.pytest_paths = list()
     state.pytest_wrap = None
@@ -757,6 +767,13 @@ def get_args(argv):
             elif arg == '--pybind':
                 state.pybind = next(args).as_bool()
 
+            elif arg == '--4llm-unified':
+                if next(args).as_bool():
+                    state.pymupdf4llm_unified = True
+                    g_package_info['pymupdf4llm']['github_name'] = 'ArtifexSoftware/sce'
+                    g_package_info['pymupdf4llm']['git_branch'] = 'master'
+                    g_package_info['pymupdf4llm']['submodules'] = False
+            
             elif arg == '--pytest':
                 state.pytest_options = next(args).as_text()
 
@@ -1251,11 +1268,12 @@ def do_build(state):
     package_to_wheel = dict()
     
     def do_package(package):
+        ret_wheel = None
         location, _args_pos = state.packages[package]
         if not location:
-            return
+            return ret_wheel
         if package == 'aptest':
-            return
+            return ret_wheel
 
         new_files = pipcl.NewFiles(f'{state.wheelhouse}/{package}*.whl')
         
@@ -1280,12 +1298,12 @@ def do_build(state):
                 pipcl.log(f'Removing: {p}')
                 pipcl.fs_remove(p)
             pipcl.run(f'pip wheel --no-cache-dir -w {state.wheelhouse} {name}')
-            wheel = new_files.get_one()
+            ret_wheel = new_files.get_one()
             pipcl.run(f'pip install -v {name}')
         else:
             directory = _get_local(package, state)
 
-            if package == 'pymupdf4llm':
+            if package == 'pymupdf4llm' and not state.pymupdf4llm_unified:
                 # setup.py is in subdirectory pymupdf4llm/.
                 directory += '/pymupdf4llm'
             directory_abs = os.path.abspath(directory)
@@ -1348,17 +1366,17 @@ def do_build(state):
                         env_extra=state.env_extra,
                         prefix=f'build {package}: ',
                         )
-                wheel = new_files.get_one()
+                ret_wheel = new_files.get_one()
 
                 if package == 'pymupdf':
                     # Set PYMUPDF_SETUP_VERSION so subsequent builds are configured
                     # for the PyMuPDF we have just built.
-                    PYMUPDF_SETUP_VERSION = os.path.basename(wheel).split('-')[1]
+                    PYMUPDF_SETUP_VERSION = os.path.basename(ret_wheel).split('-')[1]
                     state.env_extra['PYMUPDF_SETUP_VERSION'] = PYMUPDF_SETUP_VERSION
                     pipcl.log(f'### Have set {PYMUPDF_SETUP_VERSION=}')
                 pipcl.run(
                         #f'pip install -v --extra-index-url {pip_index_url} --no-cache-dir {wheel}',
-                        f'pip install -v --extra-index-url {pip_index_url} {wheel}',
+                        f'pip install -v --extra-index-url {pip_index_url} {ret_wheel}',
                         env_extra=state.env_extra,
                         prefix=f'install {package}: ',
                         )
@@ -1369,7 +1387,7 @@ def do_build(state):
                     pipcl.log(f'Showing post-build git-clean for {package=}.')
                     pipcl.run(f'cd {directory} && git clean -ndx')
     
-        return wheel
+        return ret_wheel
 
     # We install packages in reverse order (e.g. pymupdf_layout before pymupdf)
     # so that packages specified to aptest override any package prerequisites.
@@ -2112,6 +2130,14 @@ def do_test(state):
                 # without specifying any location.
                 #
                 command += f' {directory}/tests'
+            
+            if package == 'pymupdf4llm' and state.pymupdf4llm_unified:
+                # Extra requirements for testing unified pymupdf4llm+layout. We
+                # before this unification we didn't use pytest to run 4llm
+                # tests..
+                pipcl.run(f'pip install llama_index')
+                pipcl.run(f'pip install pytest-asyncio')
+                
             if state.pytest_wrap in ('valgrind', 'helgrind'):
                 if not state.pytest_options:
                     command += ' -sv'
