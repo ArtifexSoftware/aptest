@@ -32,7 +32,7 @@ jobs:
                 ]
         
         args: [
-            '-m "git:-b 1.26.x" -p git: -P git: -l git:',
+            '-m "git:-b 1.27.x" -p git: -P git: -l git:',
             '-m git:            -p git: -P git: -l git:',
             ]
 
