@@ -30,6 +30,7 @@ Graal:
     directory).
 '''
 
+import atexit
 import base64
 import calendar
 import codecs
@@ -3537,11 +3538,43 @@ def _log_prefix(format_, caller):
 _log_text_line_start = True
 _log_f = None
 
+_log_f = None
+
+def log_tee():
+    '''
+    Copies log output to find called `aptest-out-YYYY-MM-DD-HH-MM-SS`. And on
+    exit we make a convenience symlink to this file called `aptest-out`.
+    '''
+    global _log_f
+    if _log_f is None:
+        _log_f = list()
+        _log_f.append(sys.stdout)
+    path = f'aptest-out-{time.strftime(f"%F-%H-%M-%S")}'
+    path2 = 'aptest-out'
+    f = open(path, 'w')
+    def final():
+        fs_remove(path2)
+        os.symlink(path, path2)
+    atexit.register(final)
+    _log_f.append(f)
+
+def _log2(text):
+    #print(f'####### {_log_f=}')
+    #sys.exit()
+    if _log_f is None:
+        f = [sys.stdout]
+    elif hasattr(_log_f, '__len__'):
+        f = _log_f
+    else:
+        f = [_log_f]
+    for ff in f:
+        ff.write(text)
+        ff.flush()
+
 def _log(text, level, caller, *, raw=False, nl=True, format_=None):
     '''
     Logs lines with prefix, if <level> is lower or equal to <g_verbose>.
     '''
-    f = _log_f if _log_f else sys.stdout
     if level > g_verbose:
         return
     if format_ is None:
@@ -3555,19 +3588,18 @@ def _log(text, level, caller, *, raw=False, nl=True, format_=None):
         if not raw or _log_text_line_start:
             if prefix is None:
                 prefix = _log_prefix(format_, caller+1)
-            f.write(prefix)
+            _log2(prefix)
         nlp = text.find('\n', pos)
         if nlp == -1:
-            f.write(text[pos:])
+            _log2(text[pos:])
             if not raw and nl:
-                f.write('\n')
+                _log2('\n')
             pos = len(text)
         else:
-            f.write(text[pos:nlp+1])
+            _log2(text[pos:nlp+1])
             pos = nlp+1
         if raw:
             _log_text_line_start = (nlp >= 0)
-    f.flush()
 
 
 def relpath(path, start=None, allow_up=True):
