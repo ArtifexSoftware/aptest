@@ -582,6 +582,7 @@ def get_args(argv):
     state.gnn_show_select_root = None
     state.graal = False
     state.huggingface_key_path_abs = None
+    state.log_tee = False
     state.os_names = list()
     state.packages2 = dict()   # map from name to location.
     state.packages_build = list() # Sorted list of names.
@@ -755,6 +756,19 @@ def get_args(argv):
             
             elif package := arg_alias(arg):
                 add_package(state, package, next(args), args.pos - 1)
+            
+            elif arg == '--log-tee':
+                state.log_tee = next(args).as_bool()
+                if state.log_tee:
+                    APTEST_LOG_TEE = os.environ.get('APTEST_LOG_TEE')
+                    if APTEST_LOG_TEE == '0':
+                        pass
+                    else:
+                        # Prevent further logging to date-stamped file in
+                        # sub-commands, e.g. if we rerun ourselves inside a
+                        # venv.
+                        os.environ['APTEST_LOG_TEE'] = '0'
+                        pipcl.log_tee()
 
             elif arg == '-o':
                 state.os_names += next(args).as_text().lower().split(',')
@@ -992,13 +1006,13 @@ def get_args(argv):
                 sys.stdout.write('^')
             sys.stdout.write('\n')
             if isinstance(e, StopIteration):
-                print(f'Ran out of arguments.')
+                pipcl.log(f'Ran out of arguments.')
             if args.suggestions:
-                print(f'Expected one of:')
+                pipcl.log(f'Expected one of:')
                 for suggestion in args.suggestions:
-                    print(f'    {suggestion}')
+                    pipcl.log(f'    {suggestion}')
             else:
-                print(f'(No suggestions.)')
+                pipcl.log(f'(No suggestions.)')
                 raise
             sys.exit(1)
             #return 1
@@ -2221,7 +2235,7 @@ def main(argv):
         p = os.path.abspath(f'{__file__}/../README.rst')
         with open(p) as f:
             text = f.read()
-        print(text)
+        pipcl.log(text)
         return
     
     # Check whether we should run with `-o <osname>`.

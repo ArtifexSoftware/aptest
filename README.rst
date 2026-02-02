@@ -652,7 +652,7 @@ test-gnn-pymupdf4llm
 ....................
 
     * Test GNN model via pymupdf4llm.
-    * Writes results to test-gnn-pymupdf4llm-YYYY-MM-DD-HH-MM-SS.json.
+    * Writes results to test-gnn-pymupdf4llm-YYYY-mm-dd-HH-MM-SS.json.
 
     Results are a dict with this structure:
 
@@ -952,6 +952,16 @@ Options
 --langchain <location>
 ......................
     Aliases for ``-i langchain_pymupdf_layout <location>``.
+
+.. _--log-tee 0|1:
+
+--log-tee 0|1
+.............
+    If 1, we copy log output to file ``aptest-log-YYYY-mm-dd-HH-MM-SS``, and on
+    exit create convenience softlink ``aptest-log``.
+    
+    [Ignored if environment has ``APTEST_LOG_TEE=0``; this is used internally
+    when re-running ourselves in a venv etc.]
 
 .. _--mupdf:
 .. _-m:
