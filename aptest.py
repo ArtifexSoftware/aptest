@@ -2497,12 +2497,16 @@ def _get_local(package, state, test=False):
         info = name_info(package)
         local = f'aptest-git-{package}'
         with pipcl.LogPrefix(f'{local}: '):
+            env_extra = state.env_extra
+            if package == 'smartoffice' and state.path_pro_key and os.path.isfile(state.path_pro_key):
+                GIT_SSH_COMMAND = f'ssh -i {os.path.abspath(state.path_pro_key)} -o StrictHostKeyChecking=no'
+                env_extra = env_extra | dict(GIT_SSH_COMMAND=GIT_SSH_COMMAND)
             directory = pipcl.git_get(
                     local,
                     remote=info['git_remote'],
                     branch=info['git_branch'],
                     text=location,
-                    env_extra=state.env_extra,
+                    env_extra=env_extra,
                     submodules=info['submodules'],
                     )
     else:
