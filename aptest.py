@@ -178,6 +178,10 @@ def sync(remote, remote_dir, path, ssh_command, verbose, state):    # pylint: di
     return ret
 
 
+# Hard-coded information about supported packages. This used when deferring
+# to Github with `-r @github`. The `aliases` items are used when looking at
+# command-line arguments.
+#
 g_package_info = {
         'aptest':
             {
@@ -431,6 +435,14 @@ def dummy_completion3():
 
 
 def apply_deltas(items, deltas, check=1, aliasfn=lambda name: name):
+    '''
+    Modifies <items> according to <deltas>.
+    
+    items: list.
+    deltas:
+        List of strings. Each is '+', '-' or '', followed by a package name, or
+        alias for a package name.
+    '''
     #pipcl.log(f'{items=} {deltas=}')
     if deltas and not deltas[0].startswith(('+', '-')):
         del items[:]
