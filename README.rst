@@ -701,14 +701,6 @@ test-gnn-devel
 Options
 ^^^^^^^
 
-.. _--4llm-unified:
-
---4llm-unified 0|1
-..................
-
-    If 1 we assume any pymupdf4llm package has been created by merging
-    pymupdf4llm into the layout git repository (ArtifexSoftware/sce on Github).
-
 .. _-a:
 
 -a <env_name>
@@ -721,13 +713,13 @@ Options
 
 .. _-b:
 
--b <packages>
-.............
+-b <build-packages-modify>
+..........................
     Comma-separated ordered list of modifications to the list of
     packages built and installed by the `build`_ command.
 
     This list defaults to all packages specified by `-i`_. Then for each
-    comma-separated item in ``<packages>``:
+    comma-separated item in ``<build-packages-modify>``:
 
     * ``-<name>``: removes package ``<name>`` from the list.
     * ``+<name>`` and ``<name>``: adds package ``<name>`` to the list.
@@ -758,144 +750,26 @@ Options
 
 .. _--build-type:
 
---build-type debug | memento | release
-......................................
-    Set build type. Default is ``release``.
-
-.. _--cibw-name:
-
---cibw-name <cibw_name>
-.......................
-
-    Name to use when installing ``cibuildwheel`` for the `cibw`_ command, e.g.::
-    
-        --cibw-name cibuildwheel==3.0.0b1
-        --cibw-name git+https://github.com/pypa/cibuildwheel
-
-    Default is ``cibuildwheel``, i.e. the current release.
-
-.. _--cibw-pyodide:
-
---cibw-pyodide 0|1
-..................
-     Make the `cibw`_ command build a pyodide wheel; runs
-     ``cibuildwheel --platform pyodide ...`` etc.
-
-.. _--cibw-pyodide-version:
-
---cibw-pyodide-version <cibw_pyodide_version>
-.............................................
-    Override default Pyodide version to use with `cibw`_ command
-    by setting ``CIBW_PYODIDE_VERSION``.
-
-.. _--cibw-skip-add-defaults:
-
---cibw-skip-add-defaults 0|1
-............................
-    If 1 (the default) we add defaults to ``CIBW_SKIP`` such as ``pp*`` (to exclude
-    pypy) and ``cp3??t-*`` (to exclude free-threading), which effects the `cibw`_
-    command.
-
-.. _--clean:
-
---clean <packages>
-..................
-    Add comma-separated packages to list of packages for which we run
-    ``git clean -fdx`` in the `build`_ and `populate`_ commands.
-
-.. _--devel:
-
---devel 0|1
-...........
-    If 1, output extra information, e.g. backtrace on error.
-
-.. _-e:
-
 -e <name>=<value>
 .................
     Set specified environment variable.
 
 .. _--gnn-doit:
 
---gnn-doit 0|1
-..............
-    If 0 (the default) we never download/extract DocLayNet.
-
-.. _--gnn-show-graph:
-
---gnn-show-graph <path>
-.......................
-    Override default name of gnn-graph out file in `gnn-show`_ command.
-
-.. _--gnn-show-path:
-
---gnn-show-path <path>
-......................
-    Add comma-separated paths of json output file for `gnn-show`_ command. Can
-    be called multiple times.
-
-.. _--gnn-show-select:
-
---gnn-show-select <expression>
-..............................
-    Specify expression to use to select which ``test-gnn-*.json`` files to
-    include in output created by command `gnn-show`_.
-
-    ``<expression>`` should be a Python expression that looks at Python dict ``results``.
-
-    ``<results>`` will actually be a ``doct.Doct()`` so dotted notation can
-    also be used for keys that are legal Python identifiers.
-
-    Example::
-    
-        --gnn-show-select "'environ' in results and results.environ.USER=='jules' and results.python['platform.system()']=='Windows' and  results.state.get('limit')==5
-
---gnn-show-text <path>
-......................
-    Override default filename of `gnn-show`_ text output.
-
-.. _--graal:
-
---graal 0|1
-...........
-    If '1' we use Graal environment.
-
-    As of 2025-08-04, if specified:
-    
-    * We assert-fail if both `cibw`_ and non-cibw commands are specified.
-    * If the `cibw`_ command  is specified:
-
-      * We use a conventional venv.
-      * We set ``CIBW_ENABLE=graalpy``.
-      * We set ``CIBW_BUILD = 'gp*'``.
-
-    * Otherwise we:
-
-      * Don't create a conventional venv.
-      * Clone the latest pyenv and build it.
-      * Use pyenv to install graalpy.
-      * Use graalpy to create venv.
-
-    [After the first time, suggest ``-v 1`` to avoid delay from
-    updating/building pyenv and recreating the graal venv.]
-
-.. _--gnn-show-text:
-
-.. _--help:
-
 .. _-h:
 
-
---help
-......
 -h
 ..
     Show this help.
+    
+    Also see:
+    
+     * `--help`_.
 
 .. _-i:
 
--i <package-name> <location>
-............................
+-i <package-name> <package-location>
+....................................
     Add an input package.
 
     ``package-name``:
@@ -909,7 +783,7 @@ Options
             pymupdf_layout
             pymupdfpro
 
-    ``location``:
+    ``package-location``:
     
         ``pip:``
             Install from pypi.org using pip.
@@ -942,35 +816,44 @@ Options
         ``aptest.py -i pymupdf pip: -i pymupdf git: build test``
             Test current pymupdf release with testsuite in current git.
 
-.. _--langchain-pymupdf-layout:
-
---langchain-pymupdf-layout <location>
-.....................................
-
-.. _--langchain:
-
---langchain <location>
-......................
-    Aliases for ``-i langchain_pymupdf_layout <location>``.
-
-.. _--log-tee 0|1:
-
---log-tee 0|1
-.............
-    If 1, we copy log output to file ``aptest-log-YYYY-mm-dd-HH-MM-SS``, and on
-    exit create convenience softlink ``aptest-log``.
+    Also see:
     
-    [Ignored if environment has ``APTEST_LOG_TEE=0``; this is used internally
-    when re-running ourselves in a venv etc.]
+    * `-m`_.
+    * `-p`_.
+    * `-P <-PP_>`_.
+    * `--langchain`_.
+    * `--langchain-pymupdf-layout`_.
+    * `--layout`_.
+    * `--mupdf`_.
+    * `--pro`_.
+    * `--pymupdf`_.
+    * `--pymupdfpro`_.
+    * `--pymupdf4llm`_.
+    * `--pymupdf_layout`_.
+    * `--4llm`_.
 
-.. _--mupdf:
+.. _-l:
+
+-l <pymupdf_layout-location>
+............................
+    Alias for ``-i pymupdf_layout <location>``.
+    
+    Also see:
+    
+    * `-i`_.
+    * `--layout`_.
+    * `--pymupdf_layout`_.
+
 .. _-m:
 
---mupdf <location>
-..................
--m <location>
-.............
-    Aliases for ``-i mupdf <location>``.
+-m <mupdf-location>
+...................
+    Alias for ``-i mupdf <location>``.
+    
+    Also see:
+    
+    * `-i`_.
+    * `--mupdf`_.
 
 .. _-o:
 
@@ -980,77 +863,16 @@ Options
     (comma-separated) list ``<os_names>``, we do nothing. ``<os_names>`` is case
     insensitive, and items should match ``linux``, ``windows`` or ``darwin``.
 
-.. _--pymupdf:
-
 .. _-p:
 
---pymupdf <location>
-....................
--p <location>
-.............
-    Aliases for ``-i pymupdf <location>``.
-
-.. _--pymupdfpro:
-
-.. _--pro:
-
-.. _-PP:
-
---pymupdfpro <location>
-.......................
---pro <location>
-................
--P <location>
-.............
-    Aliases for ``-i pymupdfpro <location>``.
-
-.. _pymupdf4llm:
-
---pymupdf4llm <location>
-........................
---4llm <location>
-.................
-    Aliases for ``-i pymupdf4llm <location>``.
-
-.. _--pymupdf_layout:
-.. _--layout:
-.. _-l:
-
---pymupdf_layout <location>
-...........................
---layout <location>
-...................
--l <location>
-.............
-    Aliases for ``-i pymupdf_layout <location>``.
-
-.. _--pytest:
-
---pytest <pytest-flags>
-.......................
-    Specify pytest flags used by `test`_ command; for example
-    ``--pytest '-k test_123'``.
-
-.. _--pytest-path:
-
---pytest-path <pytest_path>
-...........................
-    Specify a directory/file/test-function to use with the `test`_ command, relative
-    to each project root directory. Can be specified multiple times. Default is
-    ``<package_root>/tests/``.
-
-.. _--pytest-wrap:
-
---pytest-wrap gdb | valgrind | helgrind
-.......................................
-    Makes `test`_ command run tests under specified tool.
-
-.. _--python:
-
---python <python>
-.................
-    Set Python to use. If set we re-run ourselves using specified
-    python command.
+-p <pymupdf-location>
+.....................
+    Alias for ``-i pymupdf <location>``.
+    
+    Also see:
+    
+    * `-i`_.
+    * `--pymupdf`_.
 
 .. _-r:
 
@@ -1133,6 +955,360 @@ Options
       * `--remote-rsync-path`_
       * `--remote-rsync-wsl`_
 
+.. _-t:
+
+-t <test-packages-modify>
+.........................
+    Comma-separated ordered list of modifications to the list of
+    packages tested by the `test`_ command.
+
+    This list defaults to all packages specified by `-i`_ or its aliases.
+    
+    For each comma-separated item in ``<packages>``:
+
+    * ``-<name>`` removes package ``<name>`` from the list.
+    * ``+<name>`` and ``<name>`` adds package ``<name>`` to the list.
+    * ``-`` removes all packages from the list.
+
+    In addition if the first item does not start with `+`` or ``-`` we
+    first remove all packages from the list.
+
+    We allow aliases for package names.
+
+    For example these test only pymupdfpro::
+    
+        -t -,pro
+        -t -,pymudfpro
+        -t pro
+
+    And these remove ``mupdf`` and ``layout`` from the list of packages to test::
+    
+        -t -m,--layout
+        -t -mupdf,-pymupdf_layout
+
+.. _-u:
+
+-u 0|1
+......
+    If 1 and ``-r @github`` is used, then on success we ask the user to
+    confirm and then upload wheels to pypi.org.
+
+.. _-v:
+
+-v <venv>
+.........
+    Changes how we run ourselves in a venv when required.
+
+    0 - Never use a venv.
+
+    1 - Use a venv but without recreating it if the directory already exists.
+        We assume any existing directory was created
+        by us earlier and is a valid venv containing all necessary packages;
+        this saves a little time.
+
+        Otherwise we create it with ``python -m venv ...``.
+
+    2 - Use a venv.
+        Always (re)create it with ``python -m venv ...``.
+
+    3 - Use a clean venv.
+        Delete it if it already exists, then run ``python -m venv ...``.
+
+    The default is 2.
+
+    The venv will be called ``venv-aptest-<pthonversion>-<wordsize>``, for
+    example ``venv-aptest-3.13.5-64``.
+    
+    We also create a convenience link called ``venv-aptest``.
+    
+    Also see:
+    
+    * `--venv-name`_
+
+.. _-PP:
+
+-P <pymupdfpro-location>
+........................
+    Alias for ``-i pymupdfpro <pymupdfpro-location>``.
+    
+    Also see:
+    
+    * `--pro`_.
+    * `--pymupdfpro`_.
+
+-V
+..
+    Verbose.
+
+--build-type debug | memento | release
+......................................
+    Set build type. Default is ``release``.
+
+.. _--cibw-name:
+
+--cibw-name <cibw_name>
+.......................
+
+    Name to use when installing ``cibuildwheel`` for the `cibw`_ command, e.g.::
+    
+        --cibw-name cibuildwheel==3.0.0b1
+        --cibw-name git+https://github.com/pypa/cibuildwheel
+
+    Default is ``cibuildwheel``, i.e. the current release.
+
+.. _--cibw-pyodide:
+
+--cibw-pyodide 0|1
+..................
+     Make the `cibw`_ command build a pyodide wheel; runs
+     ``cibuildwheel --platform pyodide ...`` etc.
+
+.. _--cibw-pyodide-version:
+
+--cibw-pyodide-version <cibw_pyodide_version>
+.............................................
+    Override default Pyodide version to use with `cibw`_ command
+    by setting ``CIBW_PYODIDE_VERSION``.
+
+.. _--cibw-skip-add-defaults:
+
+--cibw-skip-add-defaults 0|1
+............................
+    If 1 (the default) we add defaults to ``CIBW_SKIP`` such as ``pp*`` (to exclude
+    pypy) and ``cp3??t-*`` (to exclude free-threading), which effects the `cibw`_
+    command.
+
+.. _--clean:
+
+--clean <packages>
+..................
+    Add comma-separated packages to list of packages for which we run
+    ``git clean -fdx`` in the `build`_ and `populate`_ commands.
+
+.. _--devel:
+
+--devel 0|1
+...........
+    If 1, output extra information, e.g. backtrace on error.
+
+.. _-e:
+
+--gnn-doit 0|1
+..............
+    If 0 (the default) we never download/extract DocLayNet.
+
+.. _--gnn-show-graph:
+
+--gnn-show-graph <path>
+.......................
+    Override default name of gnn-graph out file in `gnn-show`_ command.
+
+.. _--gnn-show-path:
+
+--gnn-show-path <path>
+......................
+    Add comma-separated paths of json output file for `gnn-show`_ command. Can
+    be called multiple times.
+
+.. _--gnn-show-select:
+
+--gnn-show-select <expression>
+..............................
+    Specify expression to use to select which ``test-gnn-*.json`` files to
+    include in output created by command `gnn-show`_.
+
+    ``<expression>`` should be a Python expression that looks at Python dict ``results``.
+
+    ``<results>`` will actually be a ``doct.Doct()`` so dotted notation can
+    also be used for keys that are legal Python identifiers.
+
+    Example::
+    
+        --gnn-show-select "'environ' in results and results.environ.USER=='jules' and results.python['platform.system()']=='Windows' and  results.state.get('limit')==5
+
+--gnn-show-text <path>
+......................
+    Override default filename of `gnn-show`_ text output.
+
+.. _--graal:
+
+--graal 0|1
+...........
+    If '1' we use Graal environment.
+
+    As of 2025-08-04, if specified:
+    
+    * We assert-fail if both `cibw`_ and non-cibw commands are specified.
+    * If the `cibw`_ command  is specified:
+
+      * We use a conventional venv.
+      * We set ``CIBW_ENABLE=graalpy``.
+      * We set ``CIBW_BUILD = 'gp*'``.
+
+    * Otherwise we:
+
+      * Don't create a conventional venv.
+      * Clone the latest pyenv and build it.
+      * Use pyenv to install graalpy.
+      * Use graalpy to create venv.
+
+    [After the first time, suggest ``-v 1`` to avoid delay from
+    updating/building pyenv and recreating the graal venv.]
+
+.. _--gnn-show-text:
+
+.. _--help:
+
+--help
+......
+    Show this help.
+    
+    Also see:
+    
+    * `-h`_.
+
+.. _--langchain:
+
+--langchain <langchain-pymupdf-layout-location>
+...............................................
+    Alias for ``-i langchain_pymupdf_layout <langchain-pymupdf-layout-location>``.
+    
+    Also see:
+
+    * `-i`_.
+    * `--langchain-pymupdf-layout`_.
+
+.. _--langchain-pymupdf-layout:
+
+--langchain-pymupdf-layout <langchain-pymupdf-layout-location>
+..............................................................
+
+    Alias for ``-i langchain_pymupdf_layout <langchain-pymupdf-layout-location>``.
+    
+    Also see:
+
+    * `-i`_.
+    * `--langchain`_.
+
+
+.. _--layout:
+
+--layout <pymupdf_layout-location>
+..................................
+    Alias for ``-i pymupdf_layout <pymupdf_layout-location>``.
+    
+    Also see:
+    
+    * `-i`_.
+    * `-l`_.
+    * `--pymupdf_layout`_.
+
+.. _--log-tee 0|1:
+
+--log-tee 0|1
+.............
+    If 1, we copy log output to file ``aptest-log-YYYY-mm-dd-HH-MM-SS``, and on
+    exit create convenience softlink ``aptest-log``.
+    
+    [Ignored if environment has ``APTEST_LOG_TEE=0``; this is used internally
+    when re-running ourselves in a venv etc.]
+
+.. _--mupdf:
+
+--mupdf <mupdf-location>
+........................
+    Alias for ``-i mupdf <mupdf-location>``.
+    
+    Also see:
+    
+    * `-i`_.
+    * `-m`_.
+
+.. _--pro:
+
+--pro <pymupdfpro-location>
+...........................
+    Alias for ``-i pymupdfpro <pymupdfpro-location>``.
+    
+    Also see:
+    
+    * `-P <-PP_>`_.
+    * `--pymupdfpro`_.
+
+.. _--pymupdf:
+
+--pymupdf <pymupdf-location>
+............................
+    Alias for ``-i pymupdf <pymupdf-location>``.
+    
+    Also see:
+    
+    * `-i`_.
+    * `-p`_.
+
+.. _--pymupdfpro:
+
+--pymupdfpro <pymupdfpro-location>
+..................................
+    Alias for ``-i pymupdfpro <pymupdfpro-location>``.
+    
+    Also see:
+    
+    * `--pro`_.
+    * `-P <-PP_>`_.
+
+.. _--pymupdf4llm:
+
+--pymupdf4llm <pymupdf4llm-location>
+....................................
+
+    Alias for ``-i pymupdf4llm <pymupdf4llm-location>``.
+    
+    Also see:
+    
+    * `-i`_.
+    * `--4llm`_.
+
+.. _--pymupdf_layout:
+
+--pymupdf_layout <pymupdf_layout-location>
+..........................................
+    Alias for ``-i pymupdf_layout <pymupdf_layout-location>``.
+    
+    Also see:
+    
+    * `-i`_.
+    * `-l`_.
+    * `--layout`_.
+
+.. _--pytest:
+
+--pytest <pytest-flags>
+.......................
+    Specify pytest flags used by `test`_ command; for example
+    ``--pytest '-k test_123'``.
+
+.. _--pytest-path:
+
+--pytest-path <pytest_path>
+...........................
+    Specify a directory/file/test-function to use with the `test`_ command, relative
+    to each project root directory. Can be specified multiple times. Default is
+    ``<package_root>/tests/``.
+
+.. _--pytest-wrap:
+
+--pytest-wrap gdb | valgrind | helgrind
+.......................................
+    Makes `test`_ command run tests under specified tool.
+
+.. _--python:
+
+--python <python>
+.................
+    Set Python to use. If set we re-run ourselves using specified
+    python command.
+
 .. _--release-1:
 
 .. _--release-2:
@@ -1204,6 +1380,20 @@ Options
 ...................................
     Specify inputs used with `--remote-github-yml`_. ``<inputs>`` should be a
     comma-separated list of ``<name>=<value>`` pairs.
+    
+    For example if the .yml file has::
+    
+        on:
+          workflow_dispatch:
+            inputs:
+              args:
+                type: string
+                default: ''
+                description: 'Arguments to pass to aptest.py'
+    
+    Then::
+    
+        --remote-github-yml-inputs 'args=-o windows'
 
 .. _--remote-prefix:
 
@@ -1291,37 +1481,6 @@ Options
 ..........................
     If 1, use ``--system-site-packages`` when creating venv. Defaults is 0.
 
-.. _-t:
-
--t <packages>
-.............
-    Comma-separated ordered list of modifications to the list of
-    packages tested by the `test`_ command.
-
-    This list defaults to all packages specified by `-i`_ or its aliases.
-    
-    For each comma-separated item in ``<packages>``:
-
-    * ``-<name>`` removes package ``<name>`` from the list.
-    * ``+<name>`` and ``<name>`` adds package ``<name>`` to the list.
-    * ``-`` removes all packages from the list.
-
-    In addition if the first item does not start with `+`` or ``-`` we
-    first remove all packages from the list.
-
-    We allow aliases for package names.
-
-    For example these test only pymupdfpro::
-    
-        -t -,pro
-        -t -,pymudfpro
-        -t pro
-
-    And these remove ``mupdf`` and ``layout`` from the list of packages to test::
-    
-        -t -m,--layout
-        -t -mupdf,-pymupdf_layout
-
 .. _--test-extra-packages:
 
 --test-extra-packages <names>
@@ -1388,45 +1547,6 @@ Options
     Use ticker with specified delay. Disabled if ``delay==0``. Default is
     0.5.
 
-.. _-u:
-
--u 0|1
-......
-    If 1 and ``-r @github`` is used, then on success we ask the user to
-    confirm and then upload wheels to pypi.org.
-
-.. _-v:
-
--v <venv>
-.........
-    Changes how we run ourselves in a venv when required.
-
-    0 - Never use a venv.
-
-    1 - Use a venv but without recreating it if the directory already exists.
-        We assume any existing directory was created
-        by us earlier and is a valid venv containing all necessary packages;
-        this saves a little time.
-
-        Otherwise we create it with ``python -m venv ...``.
-
-    2 - Use a venv.
-        Always (re)create it with ``python -m venv ...``.
-
-    3 - Use a clean venv.
-        Delete it if it already exists, then run ``python -m venv ...``.
-
-    The default is 2.
-
-    The venv will be called ``venv-aptest-<pthonversion>-<wordsize>``, for
-    example ``venv-aptest-3.13.5-64``.
-    
-    We also create a convenience link called ``venv-aptest``.
-    
-    Also see:
-    
-    * `--venv-name`_
-
 .. _--venv-name:
 
 --venv-name <venv_name>
@@ -1438,9 +1558,24 @@ Options
 
 .. _-V2:
 
--V
-..
-    Verbose.
+.. _--4llm:
+
+--4llm <location>
+.................
+    Alias for ``-i pymupdf4llm <location>``.
+    
+    Also see:
+    
+    * `-i`_.
+    * `--pymupdf4llm`_.
+
+.. _--4llm-unified:
+
+--4llm-unified 0|1
+..................
+
+    If 1 we assume any pymupdf4llm package has been created by merging
+    pymupdf4llm into the layout git repository (ArtifexSoftware/sce on Github).
 
 Special arguments
 ^^^^^^^^^^^^^^^^^
