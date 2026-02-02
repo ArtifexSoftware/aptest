@@ -999,7 +999,7 @@ def get_args(argv):
                 if i:
                     sys.stdout.write(' ')
                 if not isinstance(args.current.text, StopIteration) and i+1 == args.pos:
-                    sys.stdout.write('^')
+                    sys.stdout.write('^' * len(arg))
                     break
                 sys.stdout.write(' ' * len(shlex.quote(arg)))
             if isinstance(args.current.text, StopIteration):
