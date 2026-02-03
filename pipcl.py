@@ -2213,6 +2213,33 @@ def git_items( directory, submodules=False):
     return ret
 
 
+def fs_write_key(path, data):
+    '''
+    Writes <data> to <path>, ensuring that <path> is created with appropriate
+    permissions.
+    '''
+    fs_remove(path)
+    if platform.system() == 'Windows':
+        # For unknown reasons, the code below for non-Windows does not work
+        # on Windows.
+        #
+        # Also for unknown reasons, using backslashes in
+        # path doesn't work - we write the file but it
+        # doesn't appear in the filesystem.
+        path = path.replace('\\', '/')
+        with open(path, 'wb') as f:
+            f.write(data.encode('utf8').replace(b'\r', b''))
+    else:
+        # Need to create file as read/write for current user only, so we have
+        # to use `os.open()` instead of `open()`.
+        #
+        fd = os.open(path, os.O_WRONLY|os.O_CREAT|os.O_TRUNC|os.O_EXCL, 0o600)
+        try:
+            os.write(fd, data.encode('utf8'))
+        finally:
+            os.close(fd)
+
+
 def git_get(
         local,
         *,
@@ -2226,6 +2253,8 @@ def git_get(
         update=True,
         submodules=True,
         devel=1,
+        key=None,
+        keyfile=None,
         ):
     '''
     Creates/updates local checkout <local> of remote repository and returns
@@ -2284,8 +2313,23 @@ def git_get(
         submodules:
             If true, we clone with `--recursive --shallow-submodules` and run
             `git submodule update --init --recursive` before returning.
+        key:
+            Ssh key to use.
+        keyfile:
+            Ssh key file to use. Only used if <key> is None.
     '''
-    log0(f'{os.getcwd()=} {remote=} {local=} {branch=} {tag=} {text=} {env_extra=} {update=} {submodules=} {devel=}')
+    log(f'{os.getcwd()=}')
+    log(f'{remote=}')
+    log(f'{local=}')
+    log(f'{branch=}')
+    log(f'{tag=}')
+    log(f'{text=}')
+    log(f'{env_extra=}')
+    log(f'{update=}')
+    log(f'{submodules=}')
+    log(f'{devel=}')
+    log(f'{bool(key)=}')
+    log(f'{keyfile=}')
     
     if text:
         if text.startswith('git:'):
@@ -2324,117 +2368,133 @@ def git_get(
     
     depth_arg = f' --depth {depth}' if depth else ''
     
-    def do_update():
-        # This seems to pull in the entire repository.
-        log0(f'do_update(): attempting to update {local=}.')
-        # Remove any local changes.
-        run(
-                f'cd {local} && git reset --hard',
-                env_extra=env_extra,
-                prefix='git reset: ',
-                )
-        
-        if tag:
-            # `-u` avoids `fatal: Refusing to fetch into current branch`.
-            # Using '+' and `revs/tags/` prefix seems to avoid errors like:
-            #   error: cannot update ref 'refs/heads/v3.16.44':
-            #   trying to write non-commit object
-            #   06c4ae5fe39a03b37a25a8b95214d9f8f8a867b8 to branch
-            #   'refs/heads/v3.16.44'
-            #
-            run(
-                    f'cd {local} && git fetch -fuv{depth_arg} {remote} +refs/tags/{tag}:refs/tags/{tag}',
-                    env_extra=env_extra,
-                    prefix='git fetch: ',
-                    )
-            run(
-                    f'cd {local} && git checkout -f {tag}',
-                    env_extra=env_extra,
-                    prefix='git checkout: ',
-                    )
-        if branch:
-            # `-u` avoids `fatal: Refusing to fetch into current branch`.
-            run(
-                    f'cd {local} && git fetch -fuv{depth_arg} {remote} {branch}:{branch}',
-                    env_extra=env_extra,
-                    prefix='git fetch: ',
-                    )
-            run(
-                    f'cd {local} && git checkout -f {branch}',
-                    env_extra=env_extra,
-                    prefix='git checkout: ',
-                    )
-        if sha:
-            # `-u` avoids `fatal: Refusing to fetch into current branch`.
-            run(
-                    f'cd {local} && git fetch -fuv{depth_arg} {remote} {sha}',
-                    env_extra=env_extra,
-                    prefix='git fetch: ',
-                    )
-            run(
-                    f'cd {local} && git checkout -f {sha}',
-                    env_extra=env_extra,
-                    prefix='git checkout: ',
-                    )
+    paths_to_delete = list()
+    if key:
+        keyfile = os.path.abspath('pipcl-tmp-git-key')
+        paths_to_delete.append(keyfile)
+        fs_write_key(keyfile, key)
+    if keyfile:
+        GIT_SSH_COMMAND = f'ssh -i {os.path.abspath(keyfile)} -o StrictHostKeyChecking=no'
+        log(f'{keyfile=}')
+        log(f'{GIT_SSH_COMMAND=}')
+        env_extra = (env_extra or dict()) | dict(GIT_SSH_COMMAND=GIT_SSH_COMMAND)
     
-    do_clone = True
-    if os.path.isdir(f'{local}/.git'):
-        if update:
-            # Try to update existing checkout.
-            try:
-                do_update()
-                do_clone = False
-            except Exception as e:
-                log0(f'Failed to update existing checkout {local}: {e}')
-        else:
-            do_clone = False
-    
-    if do_clone:
-        # No existing git checkout, so do a fresh clone.
-        #_fs_remove(local)
-        log0(f'{os.getcwd()=}')
-        log0(f'Cloning to: {os.path.abspath(local)}')
-        command = f'git clone --config core.longpaths=true{depth_arg}'
-        if submodules:
-            command += f' --recursive --shallow-submodules'
-        if branch:
-            command += f' -b {branch}'
-        #if tag:
-        #    command += f' -t {tag}'
-        command += f' {remote} {local}'
-        run(
-                command,
-                env_extra=env_extra,
-                prefix='git clone: ',
-                )
-        do_update()
-    
-    if submodules:
-        run(
-                f'cd {local} && git submodule update --init --recursive',
-                env_extra=env_extra,
-                prefix='git submodule update: ',
-                )
+    try:
+        def do_update():
+            # This seems to pull in the entire repository.
+            log0(f'do_update(): attempting to update {local=}.')
+            # Remove any local changes.
+            run(
+                    f'cd {local} && git reset --hard',
+                    env_extra=env_extra,
+                    prefix='git reset: ',
+                    )
 
-    # Show sha of checkout.
-    run(
-            f'cd {local} && git show --pretty=oneline|head -n 1',
-            check=False,
-            prefix='git show: ',
-            )
-    if 0:
-        # Some extra checking that what we're doing is correct.
-        if tag:
-            diff = run(f'cd {local} && git diff {tag}', capture=1)
-        if branch:
-            diff = run(f'cd {local} && git diff {branch}', capture=1)
-        if sha:
-            diff = run(f'cd {local} && git diff {sha}', capture=1)
-        log(f'{diff=}')
-        diff = diff.strip()
-        assert not diff, f'Diff is not empty:\n{textwrap.indent(diff, "    ")}'
+            if tag:
+                # `-u` avoids `fatal: Refusing to fetch into current branch`.
+                # Using '+' and `revs/tags/` prefix seems to avoid errors like:
+                #   error: cannot update ref 'refs/heads/v3.16.44':
+                #   trying to write non-commit object
+                #   06c4ae5fe39a03b37a25a8b95214d9f8f8a867b8 to branch
+                #   'refs/heads/v3.16.44'
+                #
+                run(
+                        f'cd {local} && git fetch -fuv{depth_arg} {remote} +refs/tags/{tag}:refs/tags/{tag}',
+                        env_extra=env_extra,
+                        prefix='git fetch: ',
+                        )
+                run(
+                        f'cd {local} && git checkout -f {tag}',
+                        env_extra=env_extra,
+                        prefix='git checkout: ',
+                        )
+            if branch:
+                # `-u` avoids `fatal: Refusing to fetch into current branch`.
+                run(
+                        f'cd {local} && git fetch -fuv{depth_arg} {remote} {branch}:{branch}',
+                        env_extra=env_extra,
+                        prefix='git fetch: ',
+                        )
+                run(
+                        f'cd {local} && git checkout -f {branch}',
+                        env_extra=env_extra,
+                        prefix='git checkout: ',
+                        )
+            if sha:
+                # `-u` avoids `fatal: Refusing to fetch into current branch`.
+                run(
+                        f'cd {local} && git fetch -fuv{depth_arg} {remote} {sha}',
+                        env_extra=env_extra,
+                        prefix='git fetch: ',
+                        )
+                run(
+                        f'cd {local} && git checkout -f {sha}',
+                        env_extra=env_extra,
+                        prefix='git checkout: ',
+                        )
+
+        do_clone = True
+        if os.path.isdir(f'{local}/.git'):
+            if update:
+                # Try to update existing checkout.
+                try:
+                    do_update()
+                    do_clone = False
+                except Exception as e:
+                    log0(f'Failed to update existing checkout {local}: {e}')
+            else:
+                do_clone = False
+
+        if do_clone:
+            # No existing git checkout, so do a fresh clone.
+            #_fs_remove(local)
+            log0(f'{os.getcwd()=}')
+            log0(f'Cloning to: {os.path.abspath(local)}')
+            command = f'git clone --config core.longpaths=true{depth_arg}'
+            if submodules:
+                command += f' --recursive --shallow-submodules'
+            if branch:
+                command += f' -b {branch}'
+            #if tag:
+            #    command += f' -t {tag}'
+            command += f' {remote} {local}'
+            run(
+                    command,
+                    env_extra=env_extra,
+                    prefix='git clone: ',
+                    )
+            do_update()
+
+        if submodules:
+            run(
+                    f'cd {local} && git submodule update --init --recursive',
+                    env_extra=env_extra,
+                    prefix='git submodule update: ',
+                    )
+
+        # Show sha of checkout.
+        run(
+                f'cd {local} && git show --pretty=oneline|head -n 1',
+                check=False,
+                prefix='git show: ',
+                )
+        if 0:
+            # Some extra checking that what we're doing is correct.
+            if tag:
+                diff = run(f'cd {local} && git diff {tag}', capture=1)
+            if branch:
+                diff = run(f'cd {local} && git diff {branch}', capture=1)
+            if sha:
+                diff = run(f'cd {local} && git diff {sha}', capture=1)
+            log(f'{diff=}')
+            diff = diff.strip()
+            assert not diff, f'Diff is not empty:\n{textwrap.indent(diff, "    ")}'
+
+        return os.path.abspath(local)
     
-    return os.path.abspath(local)
+    finally:
+        for path in paths_to_delete:
+            fs_remove(path)
     
 
 def run(
