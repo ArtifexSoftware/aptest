@@ -1338,6 +1338,8 @@ def do_build(state):
                 state.env_extra['PYMUPDF_SETUP_MUPDF_BUILD'] = directory_abs
                 # fixme: be able to set to '' for system install?
             elif package == 'smartoffice':
+                # We don't build smartoffice here, instead we tell pymupdfpro
+                # where the local smartoffice checkout is.
                 state.env_extra['PYMUPDFPRO_SETUP_SOT'] = directory_abs
             else:
                 if package:
@@ -1394,12 +1396,6 @@ def do_build(state):
                         )
                 ret_wheel = new_files.get_one()
 
-                if package == 'pymupdf':
-                    # Set PYMUPDF_SETUP_VERSION so subsequent builds are configured
-                    # for the PyMuPDF we have just built.
-                    PYMUPDF_SETUP_VERSION = os.path.basename(ret_wheel).split('-')[1]
-                    state.env_extra['PYMUPDF_SETUP_VERSION'] = PYMUPDF_SETUP_VERSION
-                    pipcl.log(f'### Have set {PYMUPDF_SETUP_VERSION=}')
                 pipcl.run(
                         #f'pip install -v --extra-index-url {pip_index_url} --no-cache-dir {wheel}',
                         f'pip install -v --extra-index-url {pip_index_url} {ret_wheel}',
@@ -1413,6 +1409,13 @@ def do_build(state):
                     pipcl.log(f'Showing post-build git-clean for {package=}.')
                     pipcl.run(f'cd {directory} && git clean -ndx')
     
+        if package == 'pymupdf':
+            # Set PYMUPDF_SETUP_VERSION so subsequent builds are configured
+            # for the PyMuPDF we have just built.
+            PYMUPDF_SETUP_VERSION = importlib.metadata.version('pymupdf')
+            state.env_extra['PYMUPDF_SETUP_VERSION'] = PYMUPDF_SETUP_VERSION
+            pipcl.log(f'### Have set {PYMUPDF_SETUP_VERSION=}')
+
         return ret_wheel
 
     # We install packages in reverse order (e.g. pymupdf_layout before pymupdf)
@@ -2333,7 +2336,7 @@ def main(argv):
             # Write to temp file.
             temp_key_path = f'{state.path_artifex_key}-tmp'
             paths_to_delete.append(temp_key_path)
-            fs_write_key(temp_key_path, ARTIFEX_SOFTWARE_SSH_KEY)
+            pipcl.fs_write_key(temp_key_path, ARTIFEX_SOFTWARE_SSH_KEY)
             state.ssh_key_path_abs = os.path.abspath(temp_key_path)
         elif os.path.isfile(state.path_artifex_key):
             state.ssh_key_path_abs = os.path.abspath(state.path_artifex_key)
@@ -2356,7 +2359,7 @@ def main(argv):
             # Write to temp file.
             temp_key_path = f'{state.path_huggingface_key}-tmp'
             paths_to_delete.append(temp_key_path)
-            fs_write_key(temp_key_path, HUGGINGFACE_KEY)
+            pipcl.fs_write_key(temp_key_path, HUGGINGFACE_KEY)
             state.huggingface_keys_path_abs = os.path.abspath(temp_key_path)
         elif os.path.isfile(state.path_huggingface_key):
             state.huggingface_key_path_abs = os.path.abspath(state.path_huggingface_key)
@@ -2512,9 +2515,25 @@ def _get_local(package, state, test=False):
         local = f'aptest-git-{package}'
         with pipcl.LogPrefix(f'{local}: '):
             env_extra = state.env_extra
-            if package == 'smartoffice' and state.path_pro_key and os.path.isfile(state.path_pro_key):
-                GIT_SSH_COMMAND = f'ssh -i {os.path.abspath(state.path_pro_key)} -o StrictHostKeyChecking=no'
-                env_extra = env_extra | dict(GIT_SSH_COMMAND=GIT_SSH_COMMAND)
+            pipcl.log(f'{package=}')
+            pipcl.log(f'{state.path_pro_key=}')
+            pipcl.log(f'{os.path.isfile(state.path_pro_key)=}')
+            
+            ssh_key = None
+            ssh_keyfile = None
+            if package == 'smartoffice':
+                # Special handling uses PYMUPDFPRO_SETUP_SOT_KEY on Github from
+                # repository secret.
+                PYMUPDFPRO_SETUP_SOT_KEY = os.environ.get('PYMUPDFPRO_SETUP_SOT_KEY')
+                pipcl.log(f'{bool(PYMUPDFPRO_SETUP_SOT_KEY)=}')
+                if PYMUPDFPRO_SETUP_SOT_KEY:
+                    ssh_key = PYMUPDFPRO_SETUP_SOT_KEY
+                elif state.path_pro_key:
+                    isfile = os.path.isfile(state.path_pro_key)
+                    pipcl.log(f'{isfile=}')
+                    if isfile:
+                        ssh_keyfile = state.path_pro_key
+                    
             directory = pipcl.git_get(
                     local,
                     remote=info['git_remote'],
@@ -2522,6 +2541,8 @@ def _get_local(package, state, test=False):
                     text=location,
                     env_extra=env_extra,
                     submodules=info['submodules'],
+                    key=ssh_key,
+                    keyfile=ssh_keyfile,
                     )
     else:
         directory = location
@@ -2623,33 +2644,6 @@ def venv_run(args, path, recreate=True, clean=False, makelink=None):
             pipcl.log(f'Warning: failed to create link from {makelink=} to {path=}: {e}')
     e = pipcl.run(command, check=0, prefix=f'{path}: ')
     return e
-
-
-def fs_write_key(path, data):
-    '''
-    Writes <data> to <path>, ensuring that <path> is created with appropriate
-    permissions.
-    '''
-    pipcl.fs_remove(path)
-    if platform.system() == 'Windows':
-        # For unknown reasons, the code below for non-Windows does not work
-        # on Windows.
-        #
-        # Also for unknown reasons, using backslashes in
-        # path doesn't work - we write the file but it
-        # doesn't appear in the filesystem.
-        path = path.replace('\\', '/')
-        with open(path, 'wb') as f:
-            f.write(data.encode('utf8').replace(b'\r', b''))
-    else:
-        # Need to create file as read/write for current user only, so we have
-        # to use `os.open()` instead of `open()`.
-        #
-        fd = os.open(path, os.O_WRONLY|os.O_CREAT|os.O_TRUNC|os.O_EXCL, 0o600)
-        try:
-            os.write(fd, data.encode('utf8'))
-        finally:
-            os.close(fd)
 
 
 def push_results(
