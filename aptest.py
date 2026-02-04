@@ -695,12 +695,14 @@ def get_args(argv):
                 args.pos = pos1
 
             elif arg == '-b':
-                _names = next(args).as_text().split(',')
+                _names = next(args).as_text()
+                _names = _names.split(',') if _names else list()
                 apply_deltas(state.packages_build, _names, aliasfn=package_alias)
 
             elif arg == '--build-type':
-                state.build_type = next(args)
-                assert state.build_type in ('release', 'debug', 'memento')
+                build_type = next(args)
+                assert build_type in ('release', 'debug', 'memento')
+                state.build_type = build_type.as_text()
 
             elif arg == '--cibw-name':
                 state.cibw_name = next(args)
@@ -787,7 +789,8 @@ def get_args(argv):
                 state.run_commands.append((package, command))
 
             elif arg == '-t':
-                _names = next(args).as_text().split(',')
+                _names = next(args).as_text()
+                _names = _names.split(',') if _names else list()
                 apply_deltas(state.packages_test, _names, aliasfn=package_alias)
 
             elif arg == '--pybind':
