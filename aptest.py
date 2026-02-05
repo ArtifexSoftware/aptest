@@ -643,7 +643,11 @@ def get_args(argv):
     aptest_config_path = os.path.expanduser(f'~/.aptest')
     if os.path.exists(aptest_config_path):
         aptest_config = pipcl.fs_read(aptest_config_path)
-        aptest_config = shlex.split(aptest_config)
+        aptest_config2 = ''
+        for line in aptest_config.split('\n'):
+            if not line.startswith('#'):
+                aptest_config2 += f'{line}\n'
+        aptest_config = shlex.split(aptest_config2)
         args_list += aptest_config
     
     APTEST_options = os.environ.get('APTEST_options', '')
@@ -1226,7 +1230,7 @@ def do_remote(state, argv):
         pipcl.log(f'{command=}')
         pipcl.log(f'{ssh_command=}')
 
-        tee_simple = f'out-{remote}'
+        tee_simple = f'aptest-out-{remote}'
         tee = f'{tee_simple}-{time.strftime("%F-%H-%M-%S")}'
         try:
             pipcl.run(
