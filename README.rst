@@ -11,7 +11,7 @@ Artifex Packages build/test
 Overview
 --------
 
-The ``aptest.py`` script can build, test and release (to pypi.org) multiple
+The ``aptest.py`` script can build, test and release (to https://pypi.org) multiple
 Python packages together.
 
 Aptest is not a Python package - there is no support for building an aptest
@@ -24,31 +24,10 @@ Instead it is intended to be used directly from a Git checkout, for example::
     ./aptest/aptest.py ...
 
 
-Changelog
----------
+Packages
+--------
 
-**2026-01-31**
-
-* Update tests to use mupdf 1.27.x branch.
-* Added experimental support for unified 4llm+layout package; see `--4llm-unified`_.
-
-**2026-01-30**
-
-* Allow testing of aptest itself.
-* Added ``release-5`` for building pyodide pymupdf wheel.
-* Avoid remaining potential for ``build`` command to end up installing incorrect package versions.
-
-
-**2026-01-15**
-
-* Fix potentially incorrect package versions if ``pip:`` is used.
-* Fix flake8 errors.
-* Fix codespell errors.
-* All docs are now in ``README.rst``.
-
-
-Supported packages/projects
----------------------------
+Supported packages are:
 
 * mupdf
 * pymupdf
@@ -58,37 +37,32 @@ Supported packages/projects
 * langchain_pymupdf_layout
 * pdf_feature_inspector
 
+Packages can be in different locations:
+
+* Local checkout.
+* Specific branch, tag or sha on remote git repository.
+* https://pypi.org.
+
+See the `-i`_ option.
+
 
 Use of Python venv virtual environments
 ---------------------------------------
 
 If we are not already running inside a Python venv, we automatically create a
-venv and re-run ourselves inside it (see the `-v`_ option).
+venv and re-run ourselves inside it.
 
 * The `build`_ command builds and installs into the current venv.
 * The `test`_ command tests packages that are installed in the current venv.
 
-
-Package locations
------------------
-
-* Local checkout.
-* Specific branch, tag or sha on remote git repository.
-* pypi.org.
-
-Also see:
-
-* `-i`_
-* `--mupdf`_ `-m`_
-* `--pymupdf`_ `-p <-p_>`_
-* `--pymupdfpro`_ `--pro`_ `-P <-PP_>`_
-* `--pymupdf_layout`_ `--layout`_ `-l`_
+See the `-v`_ option.
 
 
 Run remotely
 ------------
 
-* Local machine.
+Aptest can transparently rerun itself in remote locations:
+
 * Remote machine (with ssh/rsync).
 * Github runner (push to unique(ish) branches and run a workflow).
 
@@ -106,20 +80,23 @@ For each package:
 * The wheel is added to a local pypi-style PEP-503 package repository.
 * We use pip's ``--extra-index-url`` option to refer to our internal package
   repository.
-* Thus pip will use previously built wheels as prerequisites, as required.
+* Thus pip will use previously built package wheels as prerequisites, as required.
 
+See the `build`_ command.
 
 Test
 ----
 
 * We run tests in the current venv for each package, using pytest.
-* Packages on pypi.org do not contain test suites, but one can specify a second
+* Packages on https://pypi.org do not contain test suites, but one can specify a second
   package location to be used for testing, for example a local checkout or
   remote git repository.
 
 * One can generate traces of MuPDF calls by setting environment variables in debug
   builds. For details see:
   https://mupdf.readthedocs.io/en/latest/language-bindings.html#environmental-variables
+
+See the `test`_ command.
 
 
 Build/test with cibuildwheel
@@ -131,6 +108,8 @@ Build/test with cibuildwheel
 * We set ``PIP_EXTRA_INDEX_URL`` to point to our internal package repository.
 * cibuildwheel uses pip internally so this ensures that previously-built
   prerequisite wheels will be installed as required.
+
+See the `cibw`_ command.
 
 Cibuildwheel Python version
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -171,27 +150,6 @@ On Macos:
   * Also see: https://docs.python.org/3/using/mac.html.
 
 
-Running on Github with ``-r @github``
--------------------------------------
-
-We rerun aptest inside a Github action.
-
-For packages that are specified as a local checkout:
-
-* We push the local checkout to a branch in the equivalent Github repository.
-
-* We change the ``aptest.py`` command line to specify a ``git:...`` location.
-
-  For example we would change ``-p PyMuPDF`` to::
-
-      -p 'git:-b <branch> git@github.com:pymupdf/PyMuPDF.git'
-
-* We use branch name ``aptest-$USER``.
-
-  This allows multiple developers to run on Github simultaneously, without
-  creating an unbounded number of temporary branches.
-
-
 Examples
 --------
 
@@ -206,12 +164,13 @@ central git repositories::
     ./aptest/aptest.py -p git: --pro git: --layout git: build test
 
 Make release, building/testing on Github, downloading to local machine,
-and uploading to pypi.org (also see `Release procedure`_)::
+and uploading to https://pypi.org (also see `Release procedure`_)::
 
     ./aptest/aptest.py --release-1
     ./aptest/aptest.py --release-2
     ./aptest/aptest.py --release-3
     ./aptest/aptest.py --release-4
+    ./aptest/aptest.py --release-5
 
 Build/test pymupdf, pymupdfpro and pymupdf-layout using cibuildwheel,
 getting packages from different locations::
@@ -230,7 +189,7 @@ Runs specific Github workflow PyMuPDFPlus/.github/workflows/test_multiple.yml, o
 
     ./aptest/aptest.py -r @github --remote-github-yml test_multiple.yml --pro PyMuPDFPlus --remote-github-yml-inputs 'args=-o windows'
 
-Tests pypi.org's pymupdf, pymupdfpro and pymupdf_layout with the test
+Tests https://pypi.org's pymupdf, pymupdfpro and pymupdf_layout with the test
 suites on central git::
 
     ./aptest/aptest.py -r @github -p pip: --pro pip: --layout pip: -p git: --pro git: --layout git: build test
@@ -283,9 +242,9 @@ Instructions for releasing wheels for:
       aptest/aptest.py --release-1
 
   * On success this will download wheels/sdist to local machine and ask
-    (twice) whether you want to upload to pypi.org.
+    (twice) whether you want to upload to https://pypi.org.
   * At this point one can optionally test the downloaded wheels locally.
-  * Agree to upload to pypi.org.
+  * Agree to upload to https://pypi.org.
 
 * Tag the release.
 
@@ -311,7 +270,7 @@ Instructions for releasing wheels for:
     For example::
 
       Wheels for Windows, Linux and MacOS, and the sdist, are available on
-      pypi.org and can be installed in the usual way, for example:
+      https://pypi.org and can be installed in the usual way, for example:
 
       ```
       python -m pip install --upgrade pymupdf
@@ -369,7 +328,7 @@ Instructions for releasing wheels for:
 
     Linux-aarch64 wheels are now available; install in the usual way with pip.
 
-* Agree to upload linux-aarch64 wheels to pypi.org.
+* Agree to upload linux-aarch64 wheels to https://pypi.org.
 
 * Build and release Windows-x32 wheel.
 
@@ -524,6 +483,8 @@ Overview
 * Command line arguments are prepended with ``<.aptest> <APTEST_options>``, where:
   
   * ``<.aptest>`` is the contents of file ``~/.aptest`` if it exists.
+    
+    Lines starting with ``#`` are ignored.
   * ``<APTEST_options>`` is the contents of environment variable ``APTEST_options`` if set.
   
   In both cases, arguments are extracted using
@@ -764,7 +725,7 @@ Options
     
     Also see:
     
-     * `--help`_.
+    * `--help`_.
 
 .. _-i:
 
@@ -775,21 +736,26 @@ Options
     ``package-name``:
 
         One of::
-
+        
+            aptest
             langchain_pymupdf_layout
             mupdf
             pymupdf
             pymupdf4llm
             pymupdf_layout
             pymupdfpro
+            smartoffice
+            pdf_feature_inspector
+        
+        (or their aliases.)
 
     ``package-location``:
     
         ``pip:``
-            Install from pypi.org using pip.
+            Install from https://pypi.org using pip.
 
         ``pip:<suffix>``
-            Install ``<package-name><suffix>`` from pypi.org using pip.
+            Install ``<package-name><suffix>`` from https://pypi.org using pip.
             For example ``pip:==1.26.3`` will install version 1.26.3 of
             the package.
         ``pip:*.whl``
@@ -808,7 +774,7 @@ Options
 
     If a package is specified twice, the first location will be used
     for building, and the second location used for testing. This allows
-    packages on pypi.org to be tested, for example:
+    packages on https://pypi.org to be tested, for example:
 
         ``aptest.py -i pymupdf pip: -i pymupdf PyMuPDF build test``
             Test current pymupdf release with testsuite in ``PyMuPDF/tests``.
@@ -818,25 +784,22 @@ Options
 
     Also see:
     
-    * `-m`_.
-    * `-p`_.
-    * `-P <-PP_>`_.
-    * `--langchain`_.
-    * `--langchain-pymupdf-layout`_.
-    * `--layout`_.
-    * `--mupdf`_.
-    * `--pro`_.
-    * `--pymupdf`_.
-    * `--pymupdfpro`_.
-    * `--pymupdf4llm`_.
-    * `--pymupdf_layout`_.
-    * `--4llm`_.
+    * `--langchain-pymupdf-layout`_ and alias `--langchain`_.
+    * `--mupdf`_ and alias `-m`_.
+    * `--pdf_feature_inspector`_ and alias `--pfi`_.
+    * `--pymupdf`_ and alias `-p`_ .
+    * `--pymupdfpro`_ and aliases `--pro`_, `-P <-PP_>`_.
+    * `--pymupdf4llm`_ and alias `--4llm`_.
+    * `--pymupdf_layout`_ and aliases `--layout`_, `-l`_.
+    * `--smartoffice`_.
 
 .. _-l:
 
 -l <pymupdf_layout-location>
 ............................
-    Alias for ``-i pymupdf_layout <location>``.
+    Specify location of pymupdf_layout.
+    
+    Alias for ``-i pymupdf_layout <pymupdf_layout-location>``.
     
     Also see:
     
@@ -848,6 +811,8 @@ Options
 
 -m <mupdf-location>
 ...................
+    Specify location of mupdf.
+    
     Alias for ``-i mupdf <location>``.
     
     Also see:
@@ -867,6 +832,8 @@ Options
 
 -p <pymupdf-location>
 .....................
+    Specify location of pymupdf.
+    
     Alias for ``-i pymupdf <location>``.
     
     Also see:
@@ -991,7 +958,7 @@ Options
 -u 0|1
 ......
     If 1 and ``-r @github`` is used, then on success we ask the user to
-    confirm and then upload wheels to pypi.org.
+    confirm and then upload wheels to https://pypi.org.
 
 .. _-v:
 
@@ -1029,6 +996,8 @@ Options
 
 -P <pymupdfpro-location>
 ........................
+    Specify location of pymupdfpro.
+    
     Alias for ``-i pymupdfpro <pymupdfpro-location>``.
     
     Also see:
@@ -1171,6 +1140,8 @@ Options
 
 --langchain <langchain-pymupdf-layout-location>
 ...............................................
+    Specify location of langchain-pymupdf-layout.
+    
     Alias for ``-i langchain_pymupdf_layout <langchain-pymupdf-layout-location>``.
     
     Also see:
@@ -1183,6 +1154,8 @@ Options
 --langchain-pymupdf-layout <langchain-pymupdf-layout-location>
 ..............................................................
 
+    Specify location of langchain-pymupdf-layout.
+    
     Alias for ``-i langchain_pymupdf_layout <langchain-pymupdf-layout-location>``.
     
     Also see:
@@ -1195,6 +1168,8 @@ Options
 
 --layout <pymupdf_layout-location>
 ..................................
+    Specify location of pymupdf_layout.
+    
     Alias for ``-i pymupdf_layout <pymupdf_layout-location>``.
     
     Also see:
@@ -1203,12 +1178,14 @@ Options
     * `-l`_.
     * `--pymupdf_layout`_.
 
-.. _--log-tee 0|1:
+.. _--log-tee:
 
 --log-tee 0|1
 .............
     If 1, we copy log output to file ``aptest-log-YYYY-mm-dd-HH-MM-SS``, and on
     exit create convenience softlink ``aptest-log``.
+    
+    Default is 0.
     
     [Ignored if environment has ``APTEST_LOG_TEE=0``; this is used internally
     when re-running ourselves in a venv etc.]
@@ -1217,6 +1194,8 @@ Options
 
 --mupdf <mupdf-location>
 ........................
+    Specify location of mupdf.
+    
     Alias for ``-i mupdf <mupdf-location>``.
     
     Also see:
@@ -1224,10 +1203,38 @@ Options
     * `-i`_.
     * `-m`_.
 
+.. _--pdf_feature_inspector:
+
+--pdf_feature_inspector
+.......................
+    Specify location of pdf_feature_inspector.
+    
+    Alias for ``-i pdf_feature_inspector <pdf_feature_inspector-location>``
+    
+    Also see:
+    
+    * `-i`_.
+    * `--pfi`_.
+
+.. _--pfi:
+
+--pfi <pdf_feature_inspector-location>
+......................................
+    Specify location of pdf_feature_inspector.
+    
+    Alias for ``-i pdf_feature_inspector <pdf_feature_inspector-location>``
+    
+    Also see:
+    
+    * `-i`_.
+    * `--pdf_feature_inspector`_.
+
 .. _--pro:
 
 --pro <pymupdfpro-location>
 ...........................
+    Specify location of pymupdfpro.
+    
     Alias for ``-i pymupdfpro <pymupdfpro-location>``.
     
     Also see:
@@ -1239,6 +1246,8 @@ Options
 
 --pymupdf <pymupdf-location>
 ............................
+    Specify location of pymupdf.
+    
     Alias for ``-i pymupdf <pymupdf-location>``.
     
     Also see:
@@ -1250,6 +1259,8 @@ Options
 
 --pymupdfpro <pymupdfpro-location>
 ..................................
+    Specify location of pymupdfpro.
+    
     Alias for ``-i pymupdfpro <pymupdfpro-location>``.
     
     Also see:
@@ -1261,7 +1272,8 @@ Options
 
 --pymupdf4llm <pymupdf4llm-location>
 ....................................
-
+    Specify location of pymupdf4llm.
+    
     Alias for ``-i pymupdf4llm <pymupdf4llm-location>``.
     
     Also see:
@@ -1273,6 +1285,8 @@ Options
 
 --pymupdf_layout <pymupdf_layout-location>
 ..........................................
+    Specify location of pymupdf_layout.
+    
     Alias for ``-i pymupdf_layout <pymupdf_layout-location>``.
     
     Also see:
@@ -1442,6 +1456,18 @@ Options
 ............
     If 1, the `build`_ and `cibw`_ commands will also build sdists.
 
+.. _--smartoffice:
+
+--smartoffice
+.............
+    Specify location of smartoffice.
+    
+    Alias for ``-i smartoffice <smartoffice-location>``.
+    
+    Also see:
+    
+    * `-i`_.
+
 .. _--swig:
 
 --swig <swig>
@@ -1485,7 +1511,7 @@ Options
 
 --test-extra-packages <names>
 .............................
-    Installs specified comma-separated packages from pypi.org before
+    Installs specified comma-separated packages from https://pypi.org before
     running tests in `test`_ command.
 
 .. _--test-gnn-cache:
@@ -1508,9 +1534,9 @@ Options
 
     * OS, machine name, username etc.
     * Python version, implementation etc.
-    * How Artifex pckages were specified, e.g. ``-p git:`` or ``-p pypi.org``.
+    * How Artifex pckages were specified, e.g. ``-p git:`` or ``-p pip:``.
     * git sha's and diffs for Artifex packages specified with ``git:`` or local checkout.
-    * pypi.org version numbers for Artifex packages specified with ``pip:``.
+    * https://pypi.org version numbers for Artifex packages specified with ``pip:...``.
     * Any `--test-gnn-limit`_ value.
 
 .. _--test-gnn-extra:
@@ -1562,6 +1588,8 @@ Options
 
 --4llm <location>
 .................
+    Specify location of pymupdf4llm.
+    
     Alias for ``-i pymupdf4llm <location>``.
     
     Also see:
@@ -1593,3 +1621,38 @@ completion
 
     If ``APTEST_COMPLETION_DEBUG`` is defined, it is a path to which
     diagnostics are appended.
+
+
+Changelog
+---------
+
+**2026-02-05**
+
+* Fix ``--smartoffice`` to use ``thirdparty-so-key``.
+* Optionally copy output to date-stamped file. See `--log-tee`_.
+* Improved sorting of options in ``README.rst``.
+* Improved handling of ``-p pip:`` - we now set ``PYMUPDF_SETUP_VERSION`` so other
+  packages will match correctly.
+* Fix ``--smartoffice git:`` on Github - use ``PYMUPDFPRO_SETUP_SOT_KEY`` if set.
+* Added test of pymupdfpro with latest smartoffice to Github tests.
+* Fix `-b`_ and `-t`_ to do nothing if given empty string value.
+* In ``.aptest``, ignore lines starting with ``#``.
+
+**2026-01-31**
+
+* Update tests to use mupdf 1.27.x branch.
+* Added experimental support for unified 4llm+layout package; see `--4llm-unified`_.
+
+**2026-01-30**
+
+* Allow testing of aptest itself.
+* Added ``release-5`` for building pyodide pymupdf wheel.
+* Avoid remaining potential for ``build`` command to end up installing incorrect package versions.
+
+
+**2026-01-15**
+
+* Fix potentially incorrect package versions if ``pip:`` is used.
+* Fix flake8 errors.
+* Fix codespell errors.
+* All docs are now in ``README.rst``.
