@@ -1328,6 +1328,7 @@ def do_build(state):
                 pipcl.fs_remove(p)
             pipcl.run(f'pip wheel --no-cache-dir -w {state.wheelhouse} {name}')
             ret_wheel = new_files.get_one()
+            pipcl.run(f'pip uninstall -y {name}')
             pipcl.run(f'pip install -v {name}')
         else:
             directory = _get_local(package, state)
