@@ -378,6 +378,34 @@ Instructions for releasing wheels for:
     (This is required for tests to pass.)
 
 
+Workarounds
+-----------
+
+With `cibw`_ we do not test with python-3.14 on Windows.
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    2026-02-06
+    
+    When cibuildwheel internally attempts to install packages with ``pip
+    install`` (with ``PIP_EXTRA_INDEX_URL`` pointing to our piprepo wrapping of
+    aptest-wheelhouse), pip complains::
+  
+        WARNING: Location 'file://D:/a/aptest/aptest/aptest-wheelhouse/simple/pymupdf/' is ignored: it is neither a file nor a directory.
+        INFO: pip is looking at multiple versions of pymupdfpro to determine which version is compatible with other requirements. This could take a while.
+        ERROR: Could not find a version that satisfies the requirement PyMuPDF==1.27.1 (from pymupdfpro) (from versions: ...)
+        ERROR: No matching distribution found for PyMuPDF==1.27.1
+    
+    I.e. preprequsite packages are not found, despite being in
+    ``aptest-wheelhouse``.
+  
+    This failure does not happen with python-3.10-3.13.
+
+With `cibw`_ we do not test ``pymupdf_layout`` on python-3.14.
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    2026-02-06
+    
+    This is because prerequiste package ``onnxruntime`` is not available on
+    python-3.14.
+
 Keys/tokens
 -----------
 
