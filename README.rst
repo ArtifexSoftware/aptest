@@ -1086,7 +1086,10 @@ Options
 
 --devel 0|1
 ...........
-    If 1, output extra information, e.g. backtrace on error.
+    If 1, output extra information, including:
+    
+    * File/line information in log messages.
+    * Backtraces in error messages.
 
 .. _-e:
 
