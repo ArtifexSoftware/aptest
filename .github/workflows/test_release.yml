@@ -1,0 +1,53 @@
+# Run aptest.py release on Github.
+
+name: test_release
+
+on:
+  schedule:
+    - cron: '47 2 * * *'
+  workflow_dispatch:
+    inputs:
+      args:
+        type: string
+        default: '-p git: -P git: -l git: cibw --sdists 1'
+        description: 'Arguments to pass to aptest.py'
+
+jobs:
+
+  test:
+    name: test_multiple
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [
+                ubuntu-latest,
+                windows-2022,
+                macos-14,
+                macos-15-intel,
+                ]
+        
+      # Avoid cancelling of all runs after a single failure.
+      fail-fast: false
+
+    steps:
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+
+      - name: test_multiple
+        env:
+          APTEST_args: ${{inputs.args}}
+          ARTIFEX_SOFTWARE_SSH_KEY: ${{secrets.ARTIFEX_SOFTWARE_SSH_KEY}}
+          PYMUPDFPRO_SETUP_SOT_KEY: ${{secrets.PYMUPDFPRO_SETUP_SOT_KEY}}
+        run:
+          python aptest.py ${{matrix.args}} -a APTEST_args
+      
+      # Upload generated wheels, to be accessible from github Actions page.
+      #
+      - uses: actions/upload-artifact@v4
+        with:
+          path: |
+              wheelhouse/*.whl
+              wheelhouse/*.tar.gz
+          name: artifact-${{ matrix.os }}
