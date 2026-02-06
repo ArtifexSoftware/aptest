@@ -3596,19 +3596,14 @@ def _log_prefix(format_, caller):
     return ret
 
 _log_text_line_start = True
-_log_f = None
 
-_log_f = None
+_log_f = [sys.stdout]
 
 def log_tee():
     '''
     Copies log output to find called `aptest-out-YYYY-MM-DD-HH-MM-SS`. And on
     exit we make a convenience symlink to this file called `aptest-out`.
     '''
-    global _log_f
-    if _log_f is None:
-        _log_f = list()
-        _log_f.append(sys.stdout)
     path = f'aptest-out-{time.strftime(f"%F-%H-%M-%S")}'
     path2 = 'aptest-out'
     f = open(path, 'w')
