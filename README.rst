@@ -194,6 +194,10 @@ suites on central git::
 
     ./aptest/aptest.py -r @github -p pip: --pro pip: --layout pip: -p git: --pro git: --layout git: build test
 
+Download wheels from a previous Aptest Github workflow run::
+
+    ./aptest/aptest.py -r @github --aptest aptest --remote-github-workflow-id 21760695687
+
 
 Release procedure
 -----------------
