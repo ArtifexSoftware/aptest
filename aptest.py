@@ -1513,6 +1513,22 @@ def do_cibw(state):
         elif os.environ.get('GITHUB_ACTIONS') == 'true':
             # Build/test all supported Python versions.
             CIBW_BUILD = cibw_cp(*python_versions_minor)
+            if platform.system() == 'Windows':
+                # 2026-02-06: cibuildwheel appears to fail on windows with python-3.14 when testing pymupdfpro.
+                # It looks like pip fails to find pymupdf wheel in our piprepo wheelhouse.
+                #
+                # cibw pymupdfpro: + pip install 'D:\a\aptest\aptest\aptest-wheelhouse\pymupdfpro-1.27.1-cp310-abi3-win_amd64.whl'
+                # cibw pymupdfpro: Looking in indexes: https://pypi.org/simple, file://D:/a/aptest/aptest/aptest-wheelhouse/simple
+                # cibw pymupdfpro: Processing d:\a\aptest\aptest\aptest-wheelhouse\pymupdfpro-1.27.1-cp310-abi3-win_amd64.whl
+                # cibw pymupdfpro: WARNING: Location 'file://D:/a/aptest/aptest/aptest-wheelhouse/simple/pymupdf/' is ignored: it is neither a file nor a directory.
+                # cibw pymupdfpro: INFO: pip is looking at multiple versions of pymupdfpro to determine which version is compatible with other requirements. This could take a while.
+                # cibw pymupdfpro: ERROR: Ignored the following yanked versions: 1.18.11
+                # cibw pymupdfpro: ERROR: Could not find a version that satisfies the requirement PyMuPDF==1.27.1 (from pymupdfpro) (from versions: 1.11.2, 1.12.5, 1.13.20, 1.14.19.post2, 1.14.20, 1.14.21, 1.16.0, 1.16.1, 1.16.2, 1.16.3, 1.16.4, 1.16.5, 1.16.6, 1.16.7, 1.16.8, 1.16.9, 1.16.10, 1.16.11, 1.16.12, 1.16.13, 1.16.14, 1.16.15, 1.16.16, 1.16.17, 1.16.18, 1.17.0, 1.17.1, 1.17.2, 1.17.3, 1.17.4, 1.17.5, 1.17.6, 1.17.7, 1.18.0, 1.18.1, 1.18.2, 1.18.3, 1.18.4, 1.18.5, 1.18.6, 1.18.7, 1.18.8, 1.18.9, 1.18.10, 1.18.12, 1.18.13, 1.18.14, 1.18.15, 1.18.16, 1.18.17, 1.18.18, 1.18.19, 1.19.0, 1.19.1, 1.19.2, 1.19.3, 1.19.4, 1.19.5, 1.19.6, 1.20.0, 1.20.1, 1.20.2, 1.21.0, 1.21.1, 1.22.0, 1.22.1, 1.22.2, 1.22.3, 1.22.5, 1.23.0rc1, 1.23.0rc2, 1.23.0, 1.23.1, 1.23.2rc1, 1.23.2, 1.23.3, 1.23.4, 1.23.5, 1.23.6, 1.23.7, 1.23.8, 1.23.9rc1, 1.23.9rc2, 1.23.9, 1.23.10, 1.23.11, 1.23.12, 1.23.13, 1.23.14, 1.23.15, 1.23.16, 1.23.18, 1.23.19, 1.23.20, 1.23.21, 1.23.22, 1.23.23, 1.23.24, 1.23.25, 1.23.26, 1.24.0, 1.24.1, 1.24.2, 1.24.3, 1.24.4, 1.24.5, 1.24.6, 1.24.7, 1.24.8, 1.24.9, 1.24.10, 1.24.11, 1.24.12, 1.24.13, 1.24.14, 1.25.0, 1.25.1, 1.25.2, 1.25.3, 1.25.4, 1.25.5, 1.26.0, 1.26.1, 1.26.3, 1.26.4, 1.26.5, 1.26.6, 1.26.7)
+                # cibw pymupdfpro: ERROR: No matching distribution found for PyMuPDF==1.27.1
+                #
+                # cibuildwheel seems to force use of pip==25.3.
+                #
+                CIBW_BUILD = CIBW_BUILD.replace(' cp314*', '')
         else:
             # Build/test current Python only.
             v = platform.python_version_tuple()[:2]
@@ -1627,7 +1643,12 @@ def do_cibw(state):
         env_extra['PIP_EXTRA_INDEX_URL'] = \
                 f'file://{prefix}{os.path.abspath(state.wheelhouse)}/simple'.replace('\\', '/')
 
-        env_extra['CIBW_BUILD'] = CIBW_BUILD
+        if package == 'pymupdf_layout':
+            # 2026-02-06: Pymupdf_layout does not currently work with python-3.14 because
+            # onnxruntime not available on 3.14.
+            env_extra['CIBW_BUILD'] = CIBW_BUILD.replace(' cp314*', '')
+        else:
+            env_extra['CIBW_BUILD'] = CIBW_BUILD
 
         # Pass all the environment variables we have set in
         # state.env_extra, to Linux docker. Note that this will
@@ -1651,7 +1672,7 @@ def do_cibw(state):
         pipcl.run(f'ls -ld {state.wheelhouse}/*')
         pipcl.run(f'piprepo build {state.wheelhouse}')
 
-        if 0:
+        if 1:
             pipcl.log(f'Contents of: {state.wheelhouse=} are:')
             for dirpath, dirnames, filenames in os.walk(state.wheelhouse):
                 for filename in filenames:
