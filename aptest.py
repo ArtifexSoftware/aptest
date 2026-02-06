@@ -35,6 +35,7 @@ g_root = pipcl.relpath(g_root_abs)
 # With cibw we build and test Python 3.x for x in this range.
 python_versions_minor = range(10, 14+1)
 
+g_devel = False
 
 def cibw_cp(*version_minors):
     '''
@@ -516,12 +517,13 @@ def get_args(argv):
     #pipcl.log(f'{COMP_LINE=}')
     #pipcl.log(f'{COMP_POINT=}')
     if COMP_LINE:
+        # We must not write to stdout.
+        del pipcl._log_f[:]
         APTEST_COMPLETION_DEBUG = os.environ.get('APTEST_COMPLETION_DEBUG')
         #print(f'{APTEST_COMPLETION_DEBUG=}', file=sys.stderr, flush=1)
         if APTEST_COMPLETION_DEBUG:
-            pipcl._log_f = open(APTEST_COMPLETION_DEBUG, 'a')   # pylint: disable=protected-access
-        else:
-            pipcl._log_f = open('/dev/null', 'a')   # pylint: disable=consider-using-with,protected-access
+            f = open(APTEST_COMPLETION_DEBUG, 'a')   # pylint: disable=protected-access
+            pipcl._log_f.append(f)
         pipcl.log(f'{COMP_LINE=}')
         pipcl.log(f'os.environ COMP_*:')
         for n in sorted(os.environ.keys()):
@@ -630,6 +632,9 @@ def get_args(argv):
     state.verbose = 0
     state.wheelhouse = 'aptest-wheelhouse'
     
+    global g_devel
+    g_devel = state.devel
+    
     # Prevent future additions to items in <state>. We can still modify
     # existing values.
     state.freeze()
@@ -726,6 +731,7 @@ def get_args(argv):
             
             elif arg == '--devel':
                 state.devel = next(args).as_bool()
+                g_devel = state.devel
 
             elif arg == '-e':
                 _nv = next(args).as_text()
@@ -784,7 +790,11 @@ def get_args(argv):
 
             elif arg == '-r':
                 state.remote_arg = args.pos
-                state.remote = next(args).as_text()
+                _remote = next(args)
+                # Provide useful command-line completion if _remote starts with @.
+                if _remote.startswith('@'):
+                    assert _remote == '@github'
+                state.remote = _remote.as_text()
                 #pipcl.log(f'Found -r: {arg=} {state.remote=}')
 
             elif arg == '--run':
@@ -850,8 +860,17 @@ def get_args(argv):
                 state.remote_github_workflow_id = next(args).as_text()
 
             elif arg == '--remote-github-yml':
-                state.remote_github_yml = next(args).as_text()
-                assert state.remote_github_yml.endswith('.yml')
+                _yml = next(args)
+                _pattern = os.path.normpath(f'{__file__}/../.github/workflows/*.yml')
+                _leafs = [os.path.basename(i) for i in glob.glob(_pattern)]
+                _leafs.sort()
+                assert _yml in _leafs, f'yml should be one of {_leafs}'
+                
+                #if not _yml.as_text().endswith('.yml'):
+                #    if _yml == f'{_yml}.yml':
+                #        pass
+                state.remote_github_yml = _yml.as_text()
+                assert state.remote_github_yml.endswith('.yml'), f'remote_github_yml={state.remote_github_yml} must end with .yml'
 
             elif arg == '--remote-github-yml-inputs':
                 state.remote_github_yml_inputs = next(args).as_text()
@@ -995,38 +1014,31 @@ def get_args(argv):
             sys.exit(1)
         
         elif arg is not None:
-            # Print command line with caret showing where error occurred.
-            #pipcl.log(f'{args.current=}')
-            if state.devel:
-                backtrace.show()
+            text = ''
+            text += 'Bad command line\n'
             for i, arg in enumerate(args.argv):
-                sys.stdout.write(f'{" " if i else ""}{shlex.quote(arg)}')
-            sys.stdout.write('\n')
+                text += f'{" " if i else ""}{shlex.quote(arg)}'
+            text += '\n'
             for i, arg in enumerate(args.argv):
                 if i:
-                    sys.stdout.write(' ')
+                    text += ' '
                 if not isinstance(args.current.text, StopIteration) and i+1 == args.pos:
-                    sys.stdout.write('^' * len(arg))
+                    text += '^' * len(arg)
                     break
-                sys.stdout.write(' ' * len(shlex.quote(arg)))
+                text += ' ' * len(shlex.quote(arg))
             if isinstance(args.current.text, StopIteration):
-                sys.stdout.write('^')
-            sys.stdout.write('\n')
+                text += '^'
+            text += '\n'
+            
             if isinstance(e, StopIteration):
-                pipcl.log(f'Ran out of arguments.')
+                text += f'Ran out of arguments.\n'
             if args.suggestions:
-                pipcl.log(f'Expected one of:')
+                text += f'Expected one of:\n'
                 for suggestion in args.suggestions:
-                    pipcl.log(f'    {suggestion}')
-            else:
-                pipcl.log(f'(No suggestions.)')
-                raise
-            sys.exit(1)
-            #return 1
+                    text += f'    {suggestion}\n'
+            raise Exception(text.strip()) from e
         else:
-            backtrace.show()
-            sys.exit(1)
-            #return 1
+            raise
     
     if COMP_LINE:
         pipcl.log(f'completion: no error. {args.suggestions=}')
@@ -1034,7 +1046,6 @@ def get_args(argv):
         for suggestion in args.suggestions:
             print(suggestion)
         sys.exit(1)
-        #return 0
     
     return args, state
 
@@ -2737,10 +2748,11 @@ if __name__ == '__main__':
         try:
             sys.exit(main(sys.argv))
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
-            # Terminate relatively quietly, failed commands will usually have
-            # generated diagnostics.
-            pipcl.log(f'{e}')
-            raise
-            #sys.exit(1)
-        # Other exceptions should not happen, and will generate a full Python
-        # backtrace etc here.
+            # Terminate quietly, because failed commands will have generated
+            # diagnostics already.
+            sys.exit(1)
+        
+        # With other exceptions it's useful to show information here.
+        except Exception as e:
+            backtrace.show(reverse_chain=1, limit=None if g_devel else 0, brief=1)
+            sys.exit(1)
