@@ -37,7 +37,9 @@ def show(
         outer = True,
         show_exception_type = True,
         reverse = False,
+        reverse_chain = False,
         framef = None,
+        brief = False,
         ):
     '''
     Shows an exception and/or backtrace.
@@ -97,8 +99,14 @@ def show(
             frames last followed by any exception, similar to `traceback.*()`
             functions. In both cases the exception is shown next to the frame
             that raised it, which helps readability.
+        reverse_chain:
+            If false (the default) we output inner exceptions first (error
+            bar caused error foo), otherwise we output outer exceptions first
+            ('error foo because error bar').
         framef:
             See `show_frame()`'s `framef` arg.
+        brief:
+            If true we generate shorter explanatory text.
     
     Install as system default with `backtrace.exception_hook_install()`.
 
@@ -149,7 +157,7 @@ def show(
             ...     try:
             ...         b()
             ...     except Exception as e:
-            ...         show(file=sys.stdout, limit=main, reverse=g_reverse, chain=g_chain, framef=show_framef_doctest)
+            ...         show(file=sys.stdout, limit=main, reverse=g_reverse, chain=g_chain, reverse_chain=g_reverse_chain, framef=show_framef_doctest)
             >>> def main():
             ...     a()
 
@@ -159,6 +167,7 @@ def show(
 
             >>> g_reverse = False
             >>> g_chain = True
+            >>> g_reverse_chain = False
             >>> main()
             Exception: d(): deliberate error
             Traceback (most recent call first):
@@ -177,10 +186,11 @@ def show(
                 a(): b()
 
             Setting `reverse` to `True` reverses the order of frames with
-            backtraces (which matches what `traceback.*()`), and also reverses
-            the order of chained exceptions.
+            backtraces (which matches what `traceback.*()`), and `reverse_chain
+            = True` also reverses the order of chained exceptions.
             
             >>> g_reverse = True
+            >>> g_reverse_chain = True
             >>> main()  # doctest: +REPORT_UDIFF +ELLIPSIS
             Traceback (most recent call last):
                 a(): b()
@@ -293,15 +303,21 @@ def show(
                 framef=framef,
                 )
 
-    if chain and exception and not reverse:
+    if chain and exception and not reverse_chain:
         # Output any inner chained exception(s) before current exception.
         if exception.__cause__:
             do_chain(exception.__cause__)
-            out.write('\nThe above exception was the direct cause of the following exception:\n')
+            if brief:
+                out.write('Which caused:\n')
+            else:
+                out.write('\nThe above exception was the direct cause of the following exception:\n')
             outer = False
         elif exception.__context__:
             do_chain(exception.__context__)
-            out.write('\nDuring handling of the above exception, another exception occurred:\n')
+            if brief:
+                out.write('Failed to handle because:\n')
+            else:
+                out.write('\nDuring handling of the above exception, another exception occurred:\n')
             outer = False
 
     def write_exception():
@@ -319,7 +335,7 @@ def show(
 
     def write_tb():
         outer2 = outer
-        if chain and reverse and exception and (exception.__cause__ or exception.__context__):
+        if chain and reverse_chain and exception and (exception.__cause__ or exception.__context__):
             outer2 = False
         show_frames(tb, limit=limit, file=out, outer=outer2, reverse=reverse, framef=framef)
     
@@ -333,13 +349,19 @@ def show(
         write_exception()
         write_tb()
 
-    if chain and exception and reverse:
+    if chain and exception and reverse_chain:
         # Output any inner chained exception(s) after current exception.
         if exception.__cause__:
-            out.write(f'\nThe above exception was directly caused by the following exception:\n')
+            if brief:
+                out.write(f'\nBecause: ')
+            else:
+                out.write(f'\nThe above exception was directly caused by the following exception:\n')
             do_chain(exception.__cause__)
         elif exception.__context__:
-            out.write(f'\nThe above exception was raised during handling of the following exception:\n')
+            if brief:
+                out.write(f'While handling: ')
+            else:
+                out.write(f'\nThe above exception was raised during handling of the following exception:\n')
             do_chain(exception.__context__)
 
     if file is str:
