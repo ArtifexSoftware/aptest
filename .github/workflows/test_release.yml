@@ -1,4 +1,4 @@
-# Run aptest.py release on Github.
+# Do basic release build.
 
 name: test_release
 
@@ -9,13 +9,13 @@ on:
     inputs:
       args:
         type: string
-        default: '-p git: -P git: -l git: cibw --sdists 1'
-        description: 'Arguments to pass to aptest.py'
+        default: ''
+        description: 'Extra arguments to pass to aptest.py'
 
 jobs:
 
   test:
-    name: test_multiple
+    name: test_release
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -25,7 +25,7 @@ jobs:
                 macos-14,
                 macos-15-intel,
                 ]
-        
+
       # Avoid cancelling of all runs after a single failure.
       fail-fast: false
 
@@ -35,13 +35,13 @@ jobs:
 
       - uses: actions/setup-python@v5
 
-      - name: test_multiple
+      - name: test_release
         env:
           APTEST_args: ${{inputs.args}}
           ARTIFEX_SOFTWARE_SSH_KEY: ${{secrets.ARTIFEX_SOFTWARE_SSH_KEY}}
           PYMUPDFPRO_SETUP_SOT_KEY: ${{secrets.PYMUPDFPRO_SETUP_SOT_KEY}}
         run:
-          python aptest.py ${{matrix.args}} -a APTEST_args
+          'python aptest.py -p git: --pro git: --layout git: cibw -a APTEST_args'
       
       # Upload generated wheels, to be accessible from github Actions page.
       #
