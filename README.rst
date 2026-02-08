@@ -403,12 +403,12 @@ With `cibw`_ we do not test with python-3.14 on Windows.
   
     This failure does not happen with python-3.10-3.13.
 
-With `cibw`_ we do not test ``pymupdf_layout`` on python-3.14.
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    2026-02-06
-    
-    This is because prerequiste package ``onnxruntime`` is not available on
-    python-3.14.
+Use of setuptools<81 for piprepo
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    2026-02-08
+
+    Package piprepo requires pkg_resources, which is part of setuptools, but
+    only setuptools<81.
 
 Keys/tokens
 -----------
