@@ -1654,9 +1654,10 @@ def do_cibw(state):
         env_extra['PIP_EXTRA_INDEX_URL'] = \
                 f'file://{prefix}{os.path.abspath(state.wheelhouse)}/simple'.replace('\\', '/')
 
-        if package == 'pymupdf_layout':
+        if 0 and package == 'pymupdf_layout':
             # 2026-02-06: Pymupdf_layout does not currently work with python-3.14 because
             # onnxruntime not available on 3.14.
+            # 2026-02-08: onnxruntime is now available on python-3.14.
             env_extra['CIBW_BUILD'] = CIBW_BUILD.replace(' cp314*', '')
         else:
             env_extra['CIBW_BUILD'] = CIBW_BUILD
@@ -2475,7 +2476,8 @@ def main(argv):
             
                 if command in ('build', 'cibw'):
                     # 2025-11-14: piprepo seems to also required setuptools.
-                    pipcl.run(f'pip install --upgrade piprepo setuptools')
+                    # 2026-02-08: we need setuptools<81 otherwise there is no pkg_resources module.
+                    pipcl.run(f'pip install --upgrade piprepo "setuptools<81"')
                     #pipcl.fs_ensure_empty_dir(state.wheelhouse)
                     pipcl.run(
                             f'piprepo build {state.wheelhouse}',
