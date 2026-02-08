@@ -58,9 +58,25 @@ jobs:
       
       # Upload generated wheels, to be accessible from github Actions page.
       #
-      - uses: actions/upload-artifact@v4
-        with:
-          path: |
-              aptest-wheelhouse/*.whl
-              aptest-wheelhouse/*.tar.gz
-          name: artifact-${{ matrix.os }}-${{ matrix.args }}
+      # This doesn't work:
+      #
+      #     Error: The artifact name is not valid: artifact-ubuntu-latest--m
+      #     git: -p git: --pro git: --layout git:. Contains the following
+      #     character:  Colon :
+      #
+      #     Invalid characters include:  Double quote ", Colon :, Less than
+      #     <, Greater than >, Vertical bar |, Asterisk *, Question mark ?,
+      #     Carriage return \r, Line feed \n, Backslash \, Forward slash /
+      #
+      #     These characters are not allowed in the artifact name due to
+      #     limitations with certain file systems such as NTFS. To maintain
+      #     file system agnostic behavior, these characters are intentionally
+      #     not allowed to prevent potential problems with downloads on
+      #     different file systems.
+      #
+      #- uses: actions/upload-artifact@v4
+      #  with:
+      #    path: |
+      #        aptest-wheelhouse/*.whl
+      #        aptest-wheelhouse/*.tar.gz
+      #    name: artifact-${{ matrix.os }}-${{ matrix.args }}
