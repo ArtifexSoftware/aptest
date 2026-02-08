@@ -1654,10 +1654,13 @@ def do_cibw(state):
         env_extra['PIP_EXTRA_INDEX_URL'] = \
                 f'file://{prefix}{os.path.abspath(state.wheelhouse)}/simple'.replace('\\', '/')
 
-        if 0 and package == 'pymupdf_layout':
-            # 2026-02-06: Pymupdf_layout does not currently work with python-3.14 because
-            # onnxruntime not available on 3.14.
-            # 2026-02-08: onnxruntime is now available on python-3.14.
+        if (1
+                and package == 'pymupdf_layout'
+                and platform.system() == 'Darwin'
+                and platform.machine() == 'x86_64'
+                ):
+            # 2026-02-08: onnxruntime is not available on macos-intel-python3.14.
+            #
             env_extra['CIBW_BUILD'] = CIBW_BUILD.replace(' cp314*', '')
         else:
             env_extra['CIBW_BUILD'] = CIBW_BUILD
