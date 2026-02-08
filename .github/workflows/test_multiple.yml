@@ -63,4 +63,4 @@ jobs:
           path: |
               aptest-wheelhouse/*.whl
               aptest-wheelhouse/*.tar.gz
-          name: artifact-${{ matrix.os }}
+          name: artifact-${{ matrix.os }}-${{ matrix.args }}
