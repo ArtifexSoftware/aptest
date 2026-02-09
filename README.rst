@@ -794,12 +794,17 @@ Options
             Install from local wheel using pip.
         ``pip:*.tar.gz``
             Install from local sdist using pip.
-        ``'git:[-b <branch>] [-t <tag>] [<remote>]'``
+        ``"git:[-b|--branch <branch>] [--depth <depth>] [-s|--sha <40-char-sha>] [-t|--tag <tag>] [<remote>]"``
             Clone/update from git remote into local checkout
-            ``aptest-git-<package-name>``, optionally overriding default
-            branch/tag/remote.
-            Note that any changes or commits in the local checkout are
-            deleted.
+            ``aptest-git-<package-name>``.
+            
+            * Any local changes in an existing local checkout are deleted.
+            
+            Defaults:
+            
+            * branch: hard-coded for each package (typically "master" or "main").
+            * remote: hard-coded for each package (typically a Github repository).
+            * depth: 1.
 
         <local-dir>
             Local directory, typically a git checkout.
