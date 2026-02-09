@@ -1037,8 +1037,10 @@ Options
     * `--pro`_.
     * `--pymupdfpro`_.
 
+.. _-VV:
+
 -V 0 | 1
-..
+........
     Set verbose level.
 
 --build-type debug | memento | release
@@ -1659,9 +1661,9 @@ completion
 Changelog
 ---------
 
-*2026-02-09*
+**2026-02-09**
 
-* Changed `-V`_ to take the verbose level (0 or 1) instead of incrementing it.
+* Changed `-V <-VV_>`_ to take the verbose level (0 or 1) instead of incrementing it.
 * Changed default verbose level to 1.
 * Show git sha and diff of aptest itself on startup if verbose.
 * `cibw`_: don't attempt to build/test layout on macos-intel-python3.14
