@@ -2280,6 +2280,7 @@ def main(argv):
         pipcl.show_system()
         sha, comment, diff, branch = pipcl.git_info(g_root)
         pipcl.log(f'aptest: {sha=}')
+        pipcl.log(f'aptest: {comment=}')
         pipcl.log(f'aptest: diff:\n{textwrap.indent(diff, "    ")}')
         
     if state.show_help:
