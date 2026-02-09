@@ -629,7 +629,7 @@ def get_args(argv):
     state.valgrind = False
     state.venv = 2
     state.venv_name = None
-    state.verbose = 0
+    state.verbose = True
     state.wheelhouse = 'aptest-wheelhouse'
     
     global g_devel
@@ -941,7 +941,8 @@ def get_args(argv):
                 state.venv_name = next(args).as_text()
             
             elif arg == '-V':
-                state.verbose += 1
+                state.verbose = next(args).as_int()
+                assert state.verbose in (0, 1), f'Verbose level should be 0 or 1'
 
             elif arg.startswith('-'):
                 assert 0, f'Unrecognised option: {arg=}.'
@@ -2277,6 +2278,9 @@ def main(argv):
     
     if state.verbose:
         pipcl.show_system()
+        sha, comment, diff, branch = pipcl.git_info(g_root)
+        pipcl.log(f'aptest: {sha=}')
+        pipcl.log(f'aptest: diff:\n{textwrap.indent(diff, "    ")}')
         
     if state.show_help:
         p = os.path.abspath(f'{__file__}/../README.rst')
@@ -2385,11 +2389,12 @@ def main(argv):
         elif os.path.isfile(state.path_artifex_key):
             state.ssh_key_path_abs = os.path.abspath(state.path_artifex_key)
         else:
-            pipcl.log(
-                    f'## May not be able to clone/update/test pymupdfpro/layout'
-                    f' because ARTIFEX_SOFTWARE_SSH_KEY unset and file'
-                    f' {state.path_artifex_key!r} does not exist'
-                    )
+            if 0:
+                pipcl.log(
+                        f'## May not be able to clone/update/test pymupdfpro/layout'
+                        f' because ARTIFEX_SOFTWARE_SSH_KEY unset and file'
+                        f' {state.path_artifex_key!r} does not exist'
+                        )
             state.ssh_key_path_abs = None
         if state.ssh_key_path_abs:
             # We need to use forward slashes on Windows.
