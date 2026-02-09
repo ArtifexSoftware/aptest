@@ -1037,9 +1037,9 @@ Options
     * `--pro`_.
     * `--pymupdfpro`_.
 
--V
+-V 0 | 1
 ..
-    Verbose.
+    Set verbose level.
 
 --build-type debug | memento | release
 ......................................
@@ -1217,8 +1217,8 @@ Options
 
 --log-tee 0|1
 .............
-    If 1, we copy log output to file ``aptest-log-YYYY-mm-dd-HH-MM-SS``, and on
-    exit create convenience softlink ``aptest-log``.
+    If 1, we copy log output to file ``aptest-out-YYYY-mm-dd-HH-MM-SS``, and on
+    exit create convenience softlink ``aptest-out``.
     
     Default is 0.
     
@@ -1617,8 +1617,6 @@ Options
     Default is ``venv-aptest-<python-version>-<word-size>``,
     for example ``venv-aptest-3.14.2-64``.
 
-.. _-V2:
-
 .. _--4llm:
 
 --4llm <location>
@@ -1660,6 +1658,17 @@ completion
 
 Changelog
 ---------
+
+*2026-02-09*
+
+* Changed `-V`_ to take the verbose level (0 or 1) instead of incrementing it.
+* Changed default verbose level to 1.
+* Show git sha and diff of aptest itself on startup if verbose.
+* `cibw`_: don't attempt to build/test layout on macos-intel-python3.14
+  because onnxruntime not available.
+* Fixed .github/workflows/test_multiple.yml failures.
+* Improved error diagnostics.
+
 
 **2026-02-05**
 
