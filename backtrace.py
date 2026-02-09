@@ -176,7 +176,7 @@ def show(
                 b(): c()
                 ^raise except:
                 b(): raise Exception('b: c() failed') from e
-                a(): show(file=sys.stdout, limit=main, reverse=g_reverse, chain=g_chain, framef=show_framef_doctest)
+                a(): show(file=sys.stdout, limit=main, reverse=g_reverse, chain=g_chain, reverse_chain=g_reverse_chain, framef=show_framef_doctest)
                 main(): a()
             <BLANKLINE>
             The above exception was the direct cause of the following exception:
@@ -200,7 +200,7 @@ def show(
             The above exception was directly caused by the following exception:
             Traceback (most recent call last):
                 main(): a()
-                a(): show(file=sys.stdout, limit=main, reverse=g_reverse, chain=g_chain, framef=show_framef_doctest)
+                a(): show(file=sys.stdout, limit=main, reverse=g_reverse, chain=g_chain, reverse_chain=g_reverse_chain, framef=show_framef_doctest)
                 b(): raise Exception('b: c() failed') from e
                 ^except raise:
                 b(): c()
@@ -218,7 +218,7 @@ def show(
                 b(): raise Exception('b: c() failed') from e
                 a(): b()
                 ^raise except:
-                a(): show(file=sys.stdout, limit=main, reverse=g_reverse, chain=g_chain, framef=show_framef_doctest)
+                a(): show(file=sys.stdout, limit=main, reverse=g_reverse, chain=g_chain, reverse_chain=g_reverse_chain, framef=show_framef_doctest)
                 main(): a()
         
         Show current backtrace by using default `exception_or_traceback=None`:
