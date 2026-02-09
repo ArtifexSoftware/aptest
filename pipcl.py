@@ -3174,6 +3174,8 @@ def run_if( command, out, *prerequisites, caller=1):
 
     If the output file does not exist, the command is run:
 
+        >>> del _log_f[:]
+        >>> _log_f.append(sys.stdout)
         >>> log_prefix('%p:%f(): ')
         >>> out = 'run_if_test_out'
         >>> fs_remove(out)
@@ -3608,7 +3610,7 @@ def log_tee():
     '''
     path = f'aptest-out-{time.strftime(f"%F-%H-%M-%S")}'
     path2 = 'aptest-out'
-    f = open(path, 'w')
+    f = open(path, 'w') # pylint: disable=consider-using-with
     def final():
         fs_remove(path2)
         os.symlink(path, path2)
