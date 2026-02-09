@@ -79,7 +79,7 @@ def _gh_download(url, path, *, gh=True):
             # r.json() can have useful info about the error.
             raise Exception(str(r.json())) from e
     else:
-        import requests # pylint: disable=import-outside-toplevel
+        import requests # pylint: disable=import-outside-toplevel,import-error
         r = requests.get(url, stream=True)  # pylint: disable=missing-timeout
     t0 = t1 = time.time()
     bytes_ = 0
@@ -188,7 +188,7 @@ def _gh_get(url, *, raise_for_status=True, stream=False, params=None, headers=No
         auth:
             None or (username, password).
     '''
-    import requests # pylint: disable=import-outside-toplevel
+    import requests # pylint: disable=import-outside-toplevel,import-error
     url = _url_expand(url)
     assert url.startswith(f'https://')
     r = requests.get(   # pylint: disable=missing-timeout
@@ -214,7 +214,7 @@ def _gh_post(url, json, raise_for_status=True): # pylint: disable=redefined-oute
         json:
             Dict to pass as requests.post()'s `json` arg.
     '''
-    import requests # pylint: disable=import-outside-toplevel
+    import requests # pylint: disable=import-outside-toplevel,import-error
     pipcl.log(f'{url=}')
     url = _url_expand(url)
     pipcl.log(f'{url=}')
