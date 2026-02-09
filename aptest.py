@@ -1449,11 +1449,11 @@ def do_build(state):
                         prefix=f'install {package}: ',
                         )
                 
-            if package in state.git_clean:
-                directory = _get_local(package, state)
-                with pipcl.LogPrefix(f'{package=}: git clean -n: '):
-                    pipcl.log(f'Showing post-build git-clean for {package=}.')
-                    pipcl.run(f'cd {directory} && git clean -ndx')
+            #if package in state.clean_:
+            #    directory = _get_local(package, state)
+            #    with pipcl.LogPrefix(f'{package=}: git clean -n: '):
+            #        pipcl.log(f'Showing post-build git-clean for {package=}.')
+            #        pipcl.run(f'cd {directory} && git clean -ndx')
     
         if package == 'pymupdf':
             # Set PYMUPDF_SETUP_VERSION so subsequent builds are configured
