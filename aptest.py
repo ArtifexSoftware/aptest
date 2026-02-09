@@ -534,12 +534,12 @@ def get_args(argv):
     #pipcl.log(f'{COMP_POINT=}')
     if COMP_LINE:
         # We must not write to stdout.
-        del pipcl._log_f[:]
+        del pipcl._log_f[:] # pylint: disable=protected-access
         APTEST_COMPLETION_DEBUG = os.environ.get('APTEST_COMPLETION_DEBUG')
         #print(f'{APTEST_COMPLETION_DEBUG=}', file=sys.stderr, flush=1)
         if APTEST_COMPLETION_DEBUG:
-            f = open(APTEST_COMPLETION_DEBUG, 'a')   # pylint: disable=protected-access
-            pipcl._log_f.append(f)
+            f = open(APTEST_COMPLETION_DEBUG, 'a')   # pylint: disable=consider-using-with
+            pipcl._log_f.append(f)  # pylint: disable=protected-access
         pipcl.log(f'{COMP_LINE=}')
         pipcl.log(f'os.environ COMP_*:')
         for n in sorted(os.environ.keys()):
@@ -2385,7 +2385,7 @@ def main(argv):
     
     if state.verbose:
         pipcl.show_system()
-        sha, comment, diff, branch = pipcl.git_info(g_root)
+        sha, comment, diff, _branch = pipcl.git_info(g_root)
         pipcl.log(f'aptest: {sha=}')
         pipcl.log(f'aptest: {comment=}')
         pipcl.log(f'aptest: diff:\n{textwrap.indent(diff, "    ")}')
@@ -2783,12 +2783,12 @@ if __name__ == '__main__':
     else:
         try:
             sys.exit(main(sys.argv))
-        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
             # Terminate quietly, because failed commands will have generated
             # diagnostics already.
             sys.exit(1)
         
         # With other exceptions it's useful to show information here.
-        except Exception as e:
+        except Exception:
             backtrace.show(reverse_chain=1, limit=None if g_devel else 0, brief=1)
             sys.exit(1)
