@@ -84,6 +84,15 @@ For each package:
 
 See the `build`_ command.
 
+
+Cleaning packages
+-----------------
+
+Packages can be cleaned before building or when populating.
+
+See the `--clean-git`_, `--clean-setup`_ and `--clean-setup-all`_ options.
+
+
 Test
 ----
 
@@ -540,6 +549,9 @@ build
 
     * `-b`_
     * `--build-type`_
+    * `--clean-git`_
+    * `--clean-setup`_
+    * `--clean-setup-all`_
 
 .. _cibw:
 
@@ -603,8 +615,16 @@ gnn-train
 
 populate
 ........
-    For packages specified with ``git:...`` populate local checkouts like
+    For packages specified with ``git:...``, populate local checkouts like
     the `build`_ command, but do not actually build/install anything.
+    
+    Packages are also cleaned if specified.
+
+    Also see:
+    
+    * `--clean-git`_
+    * `--clean-setup`_
+    * `--clean-setup-all`_
 
 .. _run:
 
@@ -1088,12 +1108,26 @@ Options
     pypy) and ``cp3??t-*`` (to exclude free-threading), which effects the `cibw`_
     command.
 
-.. _--clean:
+.. _--clean-git:
 
---clean <packages>
-..................
-    Add comma-separated packages to list of packages for which we run
+--clean-git <packages>
+......................
+    Add comma-separated packages/aliases to list of packages for which we run
     ``git clean -fdx`` in the `build`_ and `populate`_ commands.
+
+.. _--clean-setup:
+
+--clean-setup <packages>
+........................
+    Add comma-separated packages/aliases to list of packages for which we run
+    ``setup.py clean`` in the `build`_ and `populate`_ commands.
+
+.. _--clean-setup-all:
+
+--clean-setup-all <packages>
+............................
+    Add comma-separated packages/aliases to list of packages for which we run
+    ``setup.py clean --all`` in the `build`_ and `populate`_ commands.
 
 .. _--devel:
 
@@ -1677,6 +1711,7 @@ Changelog
   because onnxruntime not available.
 * Fixed .github/workflows/test_multiple.yml failures.
 * Improved error diagnostics.
+* Improved clean options.
 
 
 **2026-02-05**
