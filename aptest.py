@@ -288,6 +288,22 @@ def package_alias(package):
             return fullname
     #return package
 
+def package_aliases(packages):
+    '''
+    Returns list of full names, from list of names/aliases or string containing
+    comma-separated names/aliases.
+    '''
+    if isinstance(packages, Arg):
+        packages = packages.as_text()
+    if isinstance(packages, str):
+        packages = packages.split(',')
+    ret = list()
+    for package in packages:
+        for fullname, info in g_package_info.items():
+            if package in [fullname] + info['aliases']:
+                ret.append(fullname)
+    return ret
+
 
 def name_info(package):
     ret = g_package_info.get(package)
@@ -571,7 +587,9 @@ def get_args(argv):
     state.cibw_skip_add_defaults = True
     state.cibw_test_project = None
     state.cibw_test_project_setjmp = False
-    state.clean = list()
+    state.clean_git = list()
+    state.clean_setup = list()
+    state.clean_setup_all = list()
     state.commands = list()
     state.devel = False
     state.env_extra = dict()
@@ -725,9 +743,17 @@ def get_args(argv):
             elif arg == '--cibw-skip-add-defaults':
                 state.cibw_skip_add_defaults = next(args).as_bool()
             
-            elif arg == '--clean':
-                packages = next(args).as_text().split(',')
-                state.clean += packages
+            elif arg == '--clean-git':
+                packages = package_aliases(next(args))
+                state.clean_git += packages
+            
+            elif arg == '--clean-setup':
+                packages = package_aliases(next(args))
+                state.clean_setup += packages
+            
+            elif arg == '--clean-setup-all':
+                packages = package_aliases(next(args))
+                state.clean_setup_all += packages
             
             elif arg == '--devel':
                 state.devel = next(args).as_bool()
@@ -1423,7 +1449,7 @@ def do_build(state):
                         prefix=f'install {package}: ',
                         )
                 
-            if package in state.clean:
+            if package in state.git_clean:
                 directory = _get_local(package, state)
                 with pipcl.LogPrefix(f'{package=}: git clean -n: '):
                     pipcl.log(f'Showing post-build git-clean for {package=}.')
@@ -2520,10 +2546,11 @@ def main(argv):
 
                 elif command == 'populate':
                     for package in state.packages_build:
-                        _location, _args_pos = state.packages[package]
-                        if 1: # location.startswith('git:'):
-                            directory = _get_local(package, state)
-                            pipcl.log(f'Local directory for {package=} is: {directory!r}')
+                        with pipcl.LogPrefix(f'{package}: '):
+                            _location, _args_pos = state.packages[package]
+                            if 1: # location.startswith('git:'):
+                                directory = _get_local(package, state)
+                                pipcl.log(f'Local directory for {package=} is: {directory!r}')
 
                 elif command.startswith('test-gnn'):
                     do_test_gnn(state, command)
@@ -2599,8 +2626,12 @@ def _get_local(package, state, test=False):
         directory = location
     
     if not test:
-        if package in state.clean:
-            pipcl.run(f'cd {directory} && git clean -fdx')
+        if package in state.clean_git:
+            pipcl.run(f'cd {directory} && git clean -fdx', prefix=f'clean_git: ')
+        if package in state.clean_setup:
+            pipcl.run(f'cd {directory} && {sys.executable} setup.py clean', prefix=f'clean_setup: ')
+        if package in state.clean_setup_all:
+            pipcl.run(f'cd {directory} && {sys.executable} setup.py clean --all', prefix=f'clean_setup_all: ')
     
     # Show information about the checkout, regardless of where it came from.
     sha, comment, diff, branch = pipcl.git_info(directory)
