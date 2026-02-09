@@ -1079,8 +1079,8 @@ class Package:
                 path = os.path.abspath(path)
                 assert path.startswith(self.root+os.sep), \
                         f'path={path!r} does not start with root={self.root+os.sep!r}'
-                log2(f'Removing: {path}')
-                shutil.rmtree(path, ignore_errors=True)
+                log(f'Removing: {path}')
+                fs_remove(path)
 
     def install(self, record_path=None, root=None):
         '''
@@ -2122,7 +2122,7 @@ def fs_write(path, data, binary=False):
 def git_info( directory):
     '''
     Returns `(sha, comment, diff, branch)`, all items are str or None if not
-    available.
+    available. <comment> is the first line of the commit message.
 
     directory:
         Root of git checkout.
