@@ -204,9 +204,9 @@ Release procedure
 
 Instructions for releasing wheels for:
 
-  * pymupdf
-  * pymupdfpro
-  * pymupdf_layout
+* pymupdf
+* pymupdfpro
+* pymupdf_layout
 
 
 * Get local checkout of each package.
@@ -364,7 +364,7 @@ Instructions for releasing wheels for:
 
 * Unlock projects' branches if they were locked above:
 
-    Github settings/Branches/main/Edit/Lock branch - uncheck.
+  Github settings/Branches/main/Edit/Lock branch - uncheck.
 
 * Post-release changes for all projects.
   
@@ -389,28 +389,28 @@ Workarounds
 
 With `cibw`_ we do not test with python-3.14 on Windows.
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    2026-02-06
-    
-    When cibuildwheel internally attempts to install packages with ``pip
-    install`` (with ``PIP_EXTRA_INDEX_URL`` pointing to our piprepo wrapping of
-    aptest-wheelhouse), pip complains::
-  
-        WARNING: Location 'file://D:/a/aptest/aptest/aptest-wheelhouse/simple/pymupdf/' is ignored: it is neither a file nor a directory.
-        INFO: pip is looking at multiple versions of pymupdfpro to determine which version is compatible with other requirements. This could take a while.
-        ERROR: Could not find a version that satisfies the requirement PyMuPDF==1.27.1 (from pymupdfpro) (from versions: ...)
-        ERROR: No matching distribution found for PyMuPDF==1.27.1
-    
-    I.e. preprequsite packages are not found, despite being in
-    ``aptest-wheelhouse``.
-  
-    This failure does not happen with python-3.10-3.13.
+**2026-02-06**
+
+When cibuildwheel internally attempts to install packages with ``pip
+install`` (with ``PIP_EXTRA_INDEX_URL`` pointing to our piprepo wrapping of
+aptest-wheelhouse), pip complains::
+
+    WARNING: Location 'file://D:/a/aptest/aptest/aptest-wheelhouse/simple/pymupdf/' is ignored: it is neither a file nor a directory.
+    INFO: pip is looking at multiple versions of pymupdfpro to determine which version is compatible with other requirements. This could take a while.
+    ERROR: Could not find a version that satisfies the requirement PyMuPDF==1.27.1 (from pymupdfpro) (from versions: ...)
+    ERROR: No matching distribution found for PyMuPDF==1.27.1
+
+I.e. preprequsite packages are not found, despite being in
+``aptest-wheelhouse``.
+
+This failure does not happen with python-3.10-3.13.
 
 Use of setuptools<81 for piprepo
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    2026-02-08
+**2026-02-08**
 
-    Package piprepo requires pkg_resources, which is part of setuptools, but
-    only setuptools<81.
+Package piprepo requires pkg_resources, which is part of setuptools, but
+only setuptools<81.
 
 Keys/tokens
 -----------
