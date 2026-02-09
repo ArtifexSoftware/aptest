@@ -2775,6 +2775,8 @@ def show_system():
     log(f'{sys.version=}')
     log(f'{sys.version_info=}')
     log(f'{list(sys.version_info)=}')
+    log(f'{sys.prefix=}')
+    log(f'{sys.base_prefix=}')
     
     log(f'{sysconfig.get_config_var("Py_GIL_DISABLED")=}')
     try:
