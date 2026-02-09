@@ -2296,13 +2296,6 @@ def main(argv):
         # Don't output file:line etc, just output elapsed time.
         pipcl.g_log_format = '[+%d]: '
     
-    if state.verbose:
-        pipcl.show_system()
-        sha, comment, diff, branch = pipcl.git_info(g_root)
-        pipcl.log(f'aptest: {sha=}')
-        pipcl.log(f'aptest: {comment=}')
-        pipcl.log(f'aptest: diff:\n{textwrap.indent(diff, "    ")}')
-        
     if state.show_help:
         p = os.path.abspath(f'{__file__}/../README.rst')
         with open(p) as f:
@@ -2390,6 +2383,13 @@ def main(argv):
                             )
                 sys.exit(e)
     
+    if state.verbose:
+        pipcl.show_system()
+        sha, comment, diff, branch = pipcl.git_info(g_root)
+        pipcl.log(f'aptest: {sha=}')
+        pipcl.log(f'aptest: {comment=}')
+        pipcl.log(f'aptest: diff:\n{textwrap.indent(diff, "    ")}')
+        
     os.makedirs(state.wheelhouse, exist_ok=1)
         
     # Set environment variable values in <state.env_extra> to give access to
