@@ -327,12 +327,12 @@ Instructions for releasing wheels for:
 
 * Wait for Linux aarch64 wheels build to finish.
 
-* Update release discussion to say that Linux aarch64 wheels are now
+* Agree to upload linux-aarch64 wheels to https://pypi.org.
+
+* Update Github release discussion to say that Linux aarch64 wheels are now
   available, e.g. with a post saying::
 
     Linux-aarch64 wheels are now available; install in the usual way with pip.
-
-* Agree to upload linux-aarch64 wheels to https://pypi.org.
 
 * Build and release Windows-x32 wheel.
 
@@ -357,6 +357,8 @@ Instructions for releasing wheels for:
     ./aptest/aptest.py --release-5
 
   Upload the resulting pyodide wheel to julian@ghostscript.com:public_html/pyodide/.
+  
+  Tell @jamie about the Pyodide wheel.
   
   [2026-01-30: hopefully we'll have a more official location soon.]
 
