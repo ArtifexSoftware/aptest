@@ -587,7 +587,7 @@ def get_args(argv):
             super().__setattr__(name, value)
     
     state = State()
-    
+    state.speak = False
     state.build_type = None
     state.cibw_ignore_test_failures = False
     state.cibw_name = 'cibuildwheel'
@@ -742,6 +742,9 @@ def get_args(argv):
                 _names = next(args).as_text()
                 _names = _names.split(',') if _names else list()
                 apply_deltas(state.packages_build, _names, aliasfn=package_alias)
+
+            elif arg == '--atexit-speak':
+                state.speak = True
 
             elif arg == '--build-type':
                 build_type = next(args)
@@ -2362,6 +2365,20 @@ def do_test(state):
             pipcl.log(f'    {package}')
         raise Exception(f'Packages failed tests: {failed_packages}')
 
+def speak(fail):
+    try:
+        import pyttsx3
+        engine = pyttsx3.init()
+
+        if fail:
+            engine.say('aptest failed')
+        else:
+            engine.say('aptest complete')
+        engine.runAndWait()
+        engine.stop()
+    except:
+        print('\a')
+
 
 def main(argv):
     
@@ -2582,6 +2599,7 @@ def main(argv):
     try:    # pylint: disable=too-many-nested-blocks.
         # Handle commands.
         #
+        failed = False
         for command in state.commands:
             pipcl.log(f'### {command=}.')
             
@@ -2644,9 +2662,16 @@ def main(argv):
 
                 else:
                     assert 0, f'{command=}'
+
+    except Exception:
+        failed = True
+        raise
+
     finally:
         for path in paths_to_delete:
             pipcl.fs_remove(path)
+        if len(state.commands) > 0 and state.speak:
+            speak(failed)
 
 
 def _get_local(package, state, test=False):
