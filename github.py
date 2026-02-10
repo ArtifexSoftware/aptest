@@ -663,17 +663,23 @@ def gh_workflow_download_multiple(url_base, ids, download=True, extra_wheels=Non
     _check_identical_wheels(leaf_to_paths)
     
     pyodide_wheels = _create_download_union(leaf_to_paths, extra_wheels, local_dir_union)
-    pipcl.log(f'Have coped {len(pyodide_wheels)} wheels into {local_dir_union}.')
+    #pipcl.log(f'Have copied {len(pyodide_wheels)} Pyodide wheels into {local_dir_union}.')
+    
+    leafs = os.listdir(local_dir_union)
+    pipcl.log(f'{local_dir_union}/ ({len(leafs)}):')
+    for leaf in leafs:
+        pipcl.log(f'    {local_dir_union}/{leaf}')
     
     if errors:
         raise Exception(f'One or more workflows failed: {errors}')
 
-    # Create pypi-style 'simple' directory within local_dir_union.
-    make_piprepo(local_dir_union)
-    pipcl.log(f'Have created pypi {local_dir_union}/simple.')
-    
-    if upload:
-        _upload(local_dir_union, pyodide_wheels, upload)
+    if 0:
+        # Create pypi-style 'simple' directory within local_dir_union.
+        make_piprepo(local_dir_union)
+        pipcl.log(f'Have created pypi {local_dir_union}/simple.')
+
+        if upload:
+            _upload(local_dir_union, pyodide_wheels, upload)
 
 
 def make_piprepo(wheel_dir):
