@@ -1626,101 +1626,120 @@ def do_cibw(state):
                 state.env_extra['PYMUPDF_SETUP_MUPDF_BUILD'] = directory_abs
             # fixme: be able to set to '' for system install?
             continue
-
-        if state.sdists and platform.system() == 'Linux':
-            build_sdist(state, package, directory)
-
-        # Tell cibuildwheel how to test <package>.
-        if package in state.packages_test:
-            CIBW_TEST_COMMAND = f'pip install --upgrade pytest && pytest'
-            if state.pytest_options:
-                CIBW_TEST_COMMAND += f' {state.pytest_options}'
-            CIBW_TEST_COMMAND += f' {{project}}/tests'
-            if state.cibw_ignore_test_failures:
-                CIBW_TEST_COMMAND += ' || true'
-            state.env_extra['CIBW_TEST_COMMAND'] = CIBW_TEST_COMMAND
-
-        else:
-            pipcl.log(f'Not testing because not in state.packages_test: {package=}')
-        # fixme: prefer to just run pytest directly. Needs
-        # test/conftest.py to always `pip install` packages
-        # required for testing.
-        #state.env_extra['CIBW_TEST_COMMAND'] = f'pytest {{project}}/tests'
-
-        # Use a copy of state.env_extra because we modify it if
-        # using manylinux docker.
-        #
-        env_extra = state.env_extra.copy()
-
-        if platform.system() == 'Linux':
-            prefix = '/host'
-            # Update GIT_SSH_COMMAND and
-            # PYMUPDFPRO_SETUP_SOT_KEY_PATH if set, to be within
-            # /host in manylinux docker. Otherwise for example
-            # tests that access remote git repositories will not
-            # use the appropriate key.
-            GIT_SSH_COMMAND_0 = env_extra.get('GIT_SSH_COMMAND')
-            if GIT_SSH_COMMAND_0:
-                GIT_SSH_COMMAND = f'ssh -i {prefix}{state.ssh_key_path_abs} -o StrictHostKeyChecking=no'
-                pipcl.log(f'Changing GIT_SSH_COMMAND from {GIT_SSH_COMMAND_0!r} to {GIT_SSH_COMMAND!r}.')
-                env_extra['GIT_SSH_COMMAND'] = GIT_SSH_COMMAND
-
-            PYMUPDFPRO_SETUP_SOT_KEY_PATH = env_extra.get('PYMUPDFPRO_SETUP_SOT_KEY_PATH')
-            if PYMUPDFPRO_SETUP_SOT_KEY_PATH:
-                env_extra['PYMUPDFPRO_SETUP_SOT_KEY_PATH'] = \
-                        f'{prefix}{os.path.abspath(PYMUPDFPRO_SETUP_SOT_KEY_PATH)}'
-        else:
-            prefix = ''
-
-        if platform.system() == 'Linux' and package == 'pymupdfpro':
-            # Build will run inside a CentOS-7 container; we
-            # need to install fontconfig-devel so `#include
-            # <fontconfig/fonctconfig.h>` works. And for SO build
-            # we need ssh to allow its git submodule commands.
-            #
-            env_extra['CIBW_BEFORE_BUILD_LINUX'] = (
-                    'echo "installing fontconfig-devel and ssh"'
-                    ' && yum -y install fontconfig-devel'
-                    ' && yum groupinstall -y fonts'
-                    ' && yum install -y openssh-clients'
+        
+        if package == 'pdf2docx':
+            pipcl.log(f'Not using cibuildwheel for {package=} because does not support pure python wheels.')
+            PIP_EXTRA_INDEX_URL = f'file://{os.path.abspath(state.wheelhouse)}/simple'.replace('\\', '/')
+            new_files = pipcl.NewFiles(f'{state.wheelhouse}/{package}-*.whl')
+            pipcl.run(
+                    f'pip wheel -v --extra-index-url {PIP_EXTRA_INDEX_URL} -w {state.wheelhouse} {directory_abs}',
+                    env_extra=state.env_extra,
                     )
-
-        # Ensure that when cibuildwheel runs pip to
-        # install prerequisite packages, it also looks in
-        # state.wheelhouse. PIP_EXTRA_INDEX_URL is equivalent to
-        # pip's `--extra-index-url`.
-        env_extra['PIP_EXTRA_INDEX_URL'] = \
-                f'file://{prefix}{os.path.abspath(state.wheelhouse)}/simple'.replace('\\', '/')
-
-        if (1
-                and package == 'pymupdf_layout'
-                and platform.system() == 'Darwin'
-                and platform.machine() == 'x86_64'
-                ):
-            # 2026-02-08: onnxruntime is not available on macos-intel-python3.14.
-            #
-            env_extra['CIBW_BUILD'] = CIBW_BUILD.replace(' cp314*', '')
+            wheel = new_files.get_one()
+            pipcl.run(f'pip uninstall -y {package}')
+            pipcl.run(f'pip install -v {wheel}')
+            
+            if platform.system() == 'Windows':
+                pipcl.log(f'Not testing {package=} on Windows because needs make.')
+            else:
+                pipcl.run(f'pip install pytest-cov')
+                pipcl.run(f'cd {directory_abs} && make test')
         else:
-            env_extra['CIBW_BUILD'] = CIBW_BUILD
+            if state.sdists and platform.system() == 'Linux':
+                build_sdist(state, package, directory)
 
-        # Pass all the environment variables we have set in
-        # state.env_extra, to Linux docker. Note that this will
-        # miss any settings in the original environment.
-        CIBW_ENVIRONMENT_PASS_LINUX = env_extra.keys()
-        CIBW_ENVIRONMENT_PASS_LINUX = list(CIBW_ENVIRONMENT_PASS_LINUX)
-        CIBW_ENVIRONMENT_PASS_LINUX.append('PYMUPDFPRO_SETUP_SOT_KEY')  # This can be set in os.environ.
-        # Some tests look at GITHUB_ACTIONS e.g. if known to fail on Github.
-        CIBW_ENVIRONMENT_PASS_LINUX.append('GITHUB_ACTIONS')
-        CIBW_ENVIRONMENT_PASS_LINUX.sort()
-        CIBW_ENVIRONMENT_PASS_LINUX = ' '.join(CIBW_ENVIRONMENT_PASS_LINUX)
-        env_extra['CIBW_ENVIRONMENT_PASS_LINUX'] = CIBW_ENVIRONMENT_PASS_LINUX
+            # Tell cibuildwheel how to test <package>.
+            if package in state.packages_test:
+                CIBW_TEST_COMMAND = f'pip install --upgrade pytest && pytest'
+                if state.pytest_options:
+                    CIBW_TEST_COMMAND += f' {state.pytest_options}'
+                CIBW_TEST_COMMAND += f' {{project}}/tests'
+                if state.cibw_ignore_test_failures:
+                    CIBW_TEST_COMMAND += ' || true'
+                state.env_extra['CIBW_TEST_COMMAND'] = CIBW_TEST_COMMAND
 
-        pipcl.run(
-                f'cd {directory} && cibuildwheel{cibw_pyodide_args}'
-                    f' --output-dir {os.path.abspath(state.wheelhouse)}',
-                env_extra=env_extra,
-                prefix=f'cibw {package}: ',
-                )
+            else:
+                pipcl.log(f'Not testing because not in state.packages_test: {package=}')
+            # fixme: prefer to just run pytest directly. Needs
+            # test/conftest.py to always `pip install` packages
+            # required for testing.
+            #state.env_extra['CIBW_TEST_COMMAND'] = f'pytest {{project}}/tests'
+
+            # Use a copy of state.env_extra because we modify it if
+            # using manylinux docker.
+            #
+            env_extra = state.env_extra.copy()
+
+            if platform.system() == 'Linux':
+                prefix = '/host'
+                # Update GIT_SSH_COMMAND and
+                # PYMUPDFPRO_SETUP_SOT_KEY_PATH if set, to be within
+                # /host in manylinux docker. Otherwise for example
+                # tests that access remote git repositories will not
+                # use the appropriate key.
+                GIT_SSH_COMMAND_0 = env_extra.get('GIT_SSH_COMMAND')
+                if GIT_SSH_COMMAND_0:
+                    GIT_SSH_COMMAND = f'ssh -i {prefix}{state.ssh_key_path_abs} -o StrictHostKeyChecking=no'
+                    pipcl.log(f'Changing GIT_SSH_COMMAND from {GIT_SSH_COMMAND_0!r} to {GIT_SSH_COMMAND!r}.')
+                    env_extra['GIT_SSH_COMMAND'] = GIT_SSH_COMMAND
+
+                PYMUPDFPRO_SETUP_SOT_KEY_PATH = env_extra.get('PYMUPDFPRO_SETUP_SOT_KEY_PATH')
+                if PYMUPDFPRO_SETUP_SOT_KEY_PATH:
+                    env_extra['PYMUPDFPRO_SETUP_SOT_KEY_PATH'] = \
+                            f'{prefix}{os.path.abspath(PYMUPDFPRO_SETUP_SOT_KEY_PATH)}'
+            else:
+                prefix = ''
+
+            if platform.system() == 'Linux' and package == 'pymupdfpro':
+                # Build will run inside a CentOS-7 container; we
+                # need to install fontconfig-devel so `#include
+                # <fontconfig/fonctconfig.h>` works. And for SO build
+                # we need ssh to allow its git submodule commands.
+                #
+                env_extra['CIBW_BEFORE_BUILD_LINUX'] = (
+                        'echo "installing fontconfig-devel and ssh"'
+                        ' && yum -y install fontconfig-devel'
+                        ' && yum groupinstall -y fonts'
+                        ' && yum install -y openssh-clients'
+                        )
+
+            PIP_EXTRA_INDEX_URL = f'file://{prefix}{os.path.abspath(state.wheelhouse)}/simple'.replace('\\', '/')
+
+            # Ensure that when cibuildwheel runs pip to
+            # install prerequisite packages, it also looks in
+            # state.wheelhouse. PIP_EXTRA_INDEX_URL is equivalent to
+            # pip's `--extra-index-url`.
+            env_extra['PIP_EXTRA_INDEX_URL'] = PIP_EXTRA_INDEX_URL
+
+            if (1
+                    and package == 'pymupdf_layout'
+                    and platform.system() == 'Darwin'
+                    and platform.machine() == 'x86_64'
+                    ):
+                # 2026-02-08: onnxruntime is not available on macos-intel-python3.14.
+                #
+                env_extra['CIBW_BUILD'] = CIBW_BUILD.replace(' cp314*', '')
+            else:
+                env_extra['CIBW_BUILD'] = CIBW_BUILD
+
+            # Pass all the environment variables we have set in
+            # state.env_extra, to Linux docker. Note that this will
+            # miss any settings in the original environment.
+            CIBW_ENVIRONMENT_PASS_LINUX = env_extra.keys()
+            CIBW_ENVIRONMENT_PASS_LINUX = list(CIBW_ENVIRONMENT_PASS_LINUX)
+            CIBW_ENVIRONMENT_PASS_LINUX.append('PYMUPDFPRO_SETUP_SOT_KEY')  # This can be set in os.environ.
+            # Some tests look at GITHUB_ACTIONS e.g. if known to fail on Github.
+            CIBW_ENVIRONMENT_PASS_LINUX.append('GITHUB_ACTIONS')
+            CIBW_ENVIRONMENT_PASS_LINUX.sort()
+            CIBW_ENVIRONMENT_PASS_LINUX = ' '.join(CIBW_ENVIRONMENT_PASS_LINUX)
+            env_extra['CIBW_ENVIRONMENT_PASS_LINUX'] = CIBW_ENVIRONMENT_PASS_LINUX
+
+            pipcl.run(
+                    f'cd {directory} && cibuildwheel{cibw_pyodide_args}'
+                        f' --output-dir {os.path.abspath(state.wheelhouse)}',
+                    env_extra=env_extra,
+                    prefix=f'cibw {package}: ',
+                    )
 
         pipcl.run(f'ls -ld {state.wheelhouse}/*')
         pipcl.run(f'piprepo build {state.wheelhouse}')
