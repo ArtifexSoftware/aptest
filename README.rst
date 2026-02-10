@@ -571,6 +571,7 @@ cibw
 
     Also see:
 
+    * `--cibw-ignore-test-failures`_
     * `--cibw-name`_
     * `--cibw-pyodide`_
     * `--cibw-pyodide-version`_
@@ -1643,6 +1644,12 @@ Options
 ...................
     If 1, we push gnn results to
     https://github.com/ArtifexSoftware/PyMuPDF-pymupdf-results. Default is 0.
+
+.. _--cibw-ignore-test-failures:
+
+--cibw-ignore-test-failures 0|1
+...............................
+    If 1, the `cibw`_ command ignores test failures. Default is 0.
 
 .. _--ticker:
 

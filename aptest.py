@@ -581,6 +581,7 @@ def get_args(argv):
     state = State()
     
     state.build_type = None
+    state.cibw_ignore_test_failures = False
     state.cibw_name = 'cibuildwheel'
     state.cibw_pyodide = None
     state.cibw_pyodide_version = None
@@ -952,6 +953,9 @@ def get_args(argv):
 
             elif arg == '--test-gnn-push':
                 state.test_gnn_push = next(args).as_bool()
+            
+            elif arg == '--cibw-ignore-test-failures':
+                state.cibw_ignore_test_failures = next(args).as_bool()
 
             elif arg == '--ticker':
                 state.ticker = next(args).as_float()
@@ -1621,6 +1625,8 @@ def do_cibw(state):
             if state.pytest_options:
                 CIBW_TEST_COMMAND += f' {state.pytest_options}'
             CIBW_TEST_COMMAND += f' {{project}}/tests'
+            if state.cibw_ignore_test_failures:
+                CIBW_TEST_COMMAND += ' || true'
             state.env_extra['CIBW_TEST_COMMAND'] = CIBW_TEST_COMMAND
 
         else:
