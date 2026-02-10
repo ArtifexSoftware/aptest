@@ -677,7 +677,7 @@ def gh_workflow_download_multiple(url_base, ids, download=True, extra_wheels=Non
 
 
 def make_piprepo(wheel_dir):
-    pipcl.run(f'pip install --upgrade piprepo setuptools<81', prefix=f'pip install piprepo setuptools: ')
+    pipcl.run(f'pip install --upgrade piprepo "setuptools<81"', prefix=f'pip install piprepo setuptools: ')
     pipcl.run(f'piprepo build {wheel_dir}')
 
 
