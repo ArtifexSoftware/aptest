@@ -724,6 +724,7 @@ def get_args(argv):
             
             elif arg == '--atexit':
                 g_atexit = next(args).as_text()
+                args.argv[args.pos-1] = ''  # Omit if we recurse.
 
             elif arg == '-b':
                 _names = next(args).as_text()
