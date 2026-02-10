@@ -1744,16 +1744,16 @@ completion
 Changelog
 ---------
 
-**2026-02-10**
-
+2026-02-10
+^^^^^^^^^^
 * Improved output after downloading from Github.
 * Added `--cibw-ignore-test-failures`_.
 * Renamed ``--log-tee`` to `--tee-auto`_.
 * Added `--tee-path`_.
 * Added `--atexit`_.
 
-**2026-02-09**
-
+2026-02-09
+^^^^^^^^^^
 * Changed `-V <-VV_>`_ to take the verbose level (0 or 1) instead of incrementing it.
 * Changed default verbose level to 1.
 * Show git sha and diff of aptest itself on startup if verbose.
@@ -1764,8 +1764,8 @@ Changelog
 * Improved clean options.
 
 
-**2026-02-05**
-
+2026-02-05
+^^^^^^^^^^
 * Added `--atexit`_
 * Fix `--smartoffice`_ to use ``thirdparty-so-key``.
 * Optionally copy output to date-stamped file. See ``--log-tee``.
@@ -1777,20 +1777,22 @@ Changelog
 * Fix `-b`_ and `-t`_ to do nothing if given empty string value.
 * In ``~/.aptest``, ignore lines starting with ``#``.
 
-**2026-01-31**
 
+2026-01-31
+^^^^^^^^^^
 * Update tests to use mupdf 1.27.x branch.
 * Added experimental support for unified 4llm+layout package; see `--4llm-unified`_.
 
-**2026-01-30**
 
+2026-01-30
+^^^^^^^^^^
 * Allow testing of aptest itself.
 * Added `--release-5`_ for building pyodide pymupdf wheel.
 * Avoid remaining potential for ``build`` command to end up installing incorrect package versions.
 
 
-**2026-01-15**
-
+2026-01-15
+^^^^^^^^^^
 * Fix potentially incorrect package versions if ``pip:`` is used.
 * Fix flake8 errors.
 * Fix codespell errors.
