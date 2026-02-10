@@ -207,6 +207,9 @@ Download wheels from a previous Aptest Github workflow run::
 
     ./aptest/aptest.py -r @github --aptest aptest --remote-github-workflow-id 21760695687
 
+Test aptest itself::
+
+    ./aptest/aptest.py --aptest aptest test
 
 Release procedure
 -----------------
@@ -1136,6 +1139,14 @@ Options
 ........................
     Add comma-separated packages/aliases to list of packages for which we run
     ``setup.py clean`` in the `build`_ and `populate`_ commands.
+    
+    * As of 2026-02-10, only pymupdf does anything in response to this.
+    
+    * pymupdf's ``setup.py clean`` deletes files for pymupdf's extension and
+      mupdf's C++/Python APIs.
+      
+    ``--clean-setup pymupdf`` can be useful if pymupdf fails to import mupdf;
+    this can be caused by the build system not rebuilding correctly.
 
 .. _--clean-setup-all:
 
@@ -1143,6 +1154,11 @@ Options
 ............................
     Add comma-separated packages/aliases to list of packages for which we run
     ``setup.py clean --all`` in the `build`_ and `populate`_ commands.
+    
+    * As of 2026-02-10, only pymupdf does anything in response to this.
+    
+    * pymupdf's ``setup.py clean --all`` deletes files for pymupdf's extension and
+      mupdf's C++/Python APIs and the mupdf C API.
 
 .. _--devel:
 
