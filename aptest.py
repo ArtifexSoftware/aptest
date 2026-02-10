@@ -626,6 +626,7 @@ def get_args(argv):
     state.pytest_wrap = None
     state.python = None
     state.remote_dir = 'artifex-remote'
+    state.remote_arg = None
     state.remote_do = True
     state.remote_github_workflow_id = None
     state.remote_github_yml_inputs = None
@@ -828,9 +829,9 @@ def get_args(argv):
                     assert os_name in names, f'{os_name=} should be one of {names!r}.'
 
             elif arg == '-r':
-                #state.remote_arg = args.pos
+                state.remote_arg = args.pos
                 _remote = next(args)
-                args.argv[args.pos - 1] = ''    # So we don't recurse.
+                #args.argv[args.pos - 1] = ''    # So we don't recurse.
                 # Provide useful command-line completion if _remote starts with @.
                 if _remote.startswith('@'):
                     assert _remote == '@github'
@@ -2484,6 +2485,7 @@ def main(argv):
                         )
     
     if state.remote:  # pylint: disable=too-many-nested-blocks
+        args.argv[state.remote_arg] = ''    # So we don't recurse.
         if state.remote == '@github':
             return do_remote_github(state, args.argv)
         else:
