@@ -1073,6 +1073,18 @@ Options
 ........
     Set verbose level.
 
+.. _--atexit:
+
+--atexit <command>
+..................
+    Run ``<command>`` when aptest terminates.
+    
+    For example:
+    
+    * `--atexit 'printf "\\a"'`
+    * `--atexit beep`
+
+
 --build-type debug | memento | release
 ......................................
     Set build type. Default is ``release``.
@@ -1722,6 +1734,7 @@ Changelog
 * Added `--cibw-ignore-test-failures`_.
 * Renamed ``--log-tee`` to `--tee-auto`_.
 * Added `--tee-path`_.
+* Added `--atexit`_.
 
 **2026-02-09**
 
@@ -1737,6 +1750,7 @@ Changelog
 
 **2026-02-05**
 
+* Added `--atexit`_
 * Fix `--smartoffice`_ to use ``thirdparty-so-key``.
 * Optionally copy output to date-stamped file. See ``--log-tee``.
 * Improved sorting of options in ``README.rst``.

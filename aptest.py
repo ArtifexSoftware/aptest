@@ -36,6 +36,7 @@ g_root = pipcl.relpath(g_root_abs)
 python_versions_minor = range(10, 14+1)
 
 g_devel = False
+g_atexit = None
 
 def cibw_cp(*version_minors):
     '''
@@ -650,6 +651,8 @@ def get_args(argv):
     
     global g_devel
     g_devel = state.devel
+
+    global g_atexit
     
     # Prevent future additions to items in <state>. We can still modify
     # existing values.
@@ -718,6 +721,9 @@ def get_args(argv):
                 new_args = shlex.split(_value)
                 args.argv[pos1:pos2] = new_args
                 args.pos = pos1
+            
+            elif arg == '--atexit':
+                g_atexit = next(args).as_text()
 
             elif arg == '-b':
                 _names = next(args).as_text()
@@ -2796,3 +2802,9 @@ if __name__ == '__main__':
             else:
                 backtrace.show(reverse_chain=1, limit=None if g_devel else 0, brief=1)
             sys.exit(1)
+        finally:
+            if g_atexit:
+                with pipcl.LogPrefix('atexit: '):
+                    e = pipcl.run(g_atexit, check=0)
+                    if e:
+                        pipcl.log(f'Warning, {g_atexit=} failed: {e=}')
