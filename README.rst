@@ -534,6 +534,8 @@ Overview
   `shlex.split() <https://docs.python.org/3/library/shlex.html#shlex.split>`__,
   so are separated by whitespace (e.g. space and newlines characters) unless
   escaped or inside quotes etc.
+  
+  In ``~/.aptest``, lines starting with ``#`` are ignored.
 
 Commands
 ^^^^^^^^
@@ -1257,18 +1259,6 @@ Options
     * `-l`_.
     * `--pymupdf_layout`_.
 
-.. _--log-tee:
-
---log-tee 0|1
-.............
-    If 1, we copy log output to file ``aptest-out-YYYY-mm-dd-HH-MM-SS``, and on
-    exit create convenience softlink ``aptest-out``.
-    
-    Default is 0.
-    
-    [Ignored if environment has ``APTEST_LOG_TEE=0``; this is used internally
-    when re-running ourselves in a venv etc.]
-
 .. _--mupdf:
 
 --mupdf <mupdf-location>
@@ -1588,6 +1578,23 @@ Options
 
 .. _--test-extra-packages:
 
+.. _--tee-auto:
+
+--tee-auto 0|1
+..............
+    If 1, we copy log output to file ``aptest-out-YYYY-mm-dd-HH-MM-SS``, and on
+    exit create convenience softlink ``aptest-out``.
+    
+    Default is 0.
+
+.. _--tee-path:
+
+--tee-path <path>
+.................
+    Copy log output to file ``<path>``.
+    
+    Default is 0.
+
 --test-extra-packages <names>
 .............................
     Installs specified comma-separated packages from https://pypi.org before
@@ -1709,6 +1716,13 @@ completion
 Changelog
 ---------
 
+**2026-02-10**
+
+* Improved output after downloading from Github.
+* Added `--cibw-ignore-test-failures`_.
+* Renamed ``--log-tee`` to `--tee-auto`_.
+* Added `--tee-path`_.
+
 **2026-02-09**
 
 * Changed `-V <-VV_>`_ to take the verbose level (0 or 1) instead of incrementing it.
@@ -1723,15 +1737,15 @@ Changelog
 
 **2026-02-05**
 
-* Fix ``--smartoffice`` to use ``thirdparty-so-key``.
-* Optionally copy output to date-stamped file. See `--log-tee`_.
+* Fix `--smartoffice`_ to use ``thirdparty-so-key``.
+* Optionally copy output to date-stamped file. See ``--log-tee``.
 * Improved sorting of options in ``README.rst``.
 * Improved handling of ``-p pip:`` - we now set ``PYMUPDF_SETUP_VERSION`` so other
   packages will match correctly.
 * Fix ``--smartoffice git:`` on Github - use ``PYMUPDFPRO_SETUP_SOT_KEY`` if set.
 * Added test of pymupdfpro with latest smartoffice to Github tests.
 * Fix `-b`_ and `-t`_ to do nothing if given empty string value.
-* In ``.aptest``, ignore lines starting with ``#``.
+* In ``~/.aptest``, ignore lines starting with ``#``.
 
 **2026-01-31**
 
@@ -1741,7 +1755,7 @@ Changelog
 **2026-01-30**
 
 * Allow testing of aptest itself.
-* Added ``release-5`` for building pyodide pymupdf wheel.
+* Added `--release-5`_ for building pyodide pymupdf wheel.
 * Avoid remaining potential for ``build`` command to end up installing incorrect package versions.
 
 

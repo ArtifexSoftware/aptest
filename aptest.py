@@ -547,7 +547,7 @@ def get_args(argv):
                 v = os.environ[n]
                 pipcl.log(f'    {n}: {v!r}')
     
-    if sys.argv[1:] == ['completion']:
+    if argv[1:] == ['completion']:
         # Write bash completion script to stdout and exit.
         print(textwrap.dedent(f'''
                 _aptest_py() {{
@@ -555,7 +555,7 @@ def get_args(argv):
                             COMP_LINE="$COMP_LINE" \\
                             COMP_POINT="$COMP_POINT" \\
                             COMP_TYPE="$COMP_TYPE" \\
-                            {os.path.abspath(sys.argv[0])} \\
+                            {os.path.abspath(argv[0])} \\
                             ))
                 }}
                 complete -F _aptest_py aptest.py
@@ -603,7 +603,6 @@ def get_args(argv):
     state.gnn_show_select_root = None
     state.graal = False
     state.huggingface_key_path_abs = None
-    state.log_tee = False
     state.os_names = list()
     state.packages2 = dict()   # map from name to location.
     state.packages_build = list() # Sorted list of names.
@@ -618,8 +617,6 @@ def get_args(argv):
     state.pytest_paths = list()
     state.pytest_wrap = None
     state.python = None
-    state.python_args_pos = None
-    state.remote_arg = None
     state.remote_dir = 'artifex-remote'
     state.remote_do = True
     state.remote_github_workflow_id = None
@@ -782,8 +779,9 @@ def get_args(argv):
                 state.gnn_show_text = next(args).as_text()
             
             elif arg == '--graal':
-                state.graal_arg = args.pos
+                #state.graal_arg = args.pos
                 state.graal = next(args).as_bool()
+                args.argv[args.pos-1] = ''
 
             elif arg in ('-h', '--help'):
                 state.show_help = True
@@ -796,18 +794,18 @@ def get_args(argv):
             elif package := arg_alias(arg):
                 add_package(state, package, next(args), args.pos - 1)
             
-            elif arg == '--log-tee':
-                state.log_tee = next(args).as_bool()
-                if state.log_tee:
-                    APTEST_LOG_TEE = os.environ.get('APTEST_LOG_TEE')
-                    if APTEST_LOG_TEE == '0':
-                        pass
-                    else:
-                        # Prevent further logging to date-stamped file in
-                        # sub-commands, e.g. if we rerun ourselves inside a
-                        # venv.
-                        os.environ['APTEST_LOG_TEE'] = '0'
-                        pipcl.log_tee()
+            elif arg == '--tee-auto':
+                tee_auto = next(args).as_bool()
+                args.argv[args.pos-1] = '0' # Disable if we rerun ourselves.
+                if tee_auto:
+                    pipcl.log_tee()
+
+            elif arg == '--tee-path':
+                path = next(args).as_text()
+                args.argv[args.pos-1] = ''
+                if path:
+                    f = open(path, 'w') # pylint:disable=consider-using-with
+                    pipcl._log_f.append(f)  # pylint:disable=protected-access
 
             elif arg == '-o':
                 state.os_names += next(args).as_text().lower().split(',')
@@ -816,8 +814,9 @@ def get_args(argv):
                     assert os_name in names, f'{os_name=} should be one of {names!r}.'
 
             elif arg == '-r':
-                state.remote_arg = args.pos
+                #state.remote_arg = args.pos
                 _remote = next(args)
+                args.argv[args.pos - 1] = ''    # So we don't recurse.
                 # Provide useful command-line completion if _remote starts with @.
                 if _remote.startswith('@'):
                     assert _remote == '@github'
@@ -855,13 +854,13 @@ def get_args(argv):
                 assert state.pytest_wrap in ('gdb', 'valgrind', 'helgrind')
 
             elif arg == '--python':
-                state.python_args_pos = args.pos
                 state.python = next(args).as_text()
+                args.argv[args.pos-1] = ''  # Avoid recursion when we rerun ourselves.
 
             elif arg.startswith('--release-'):
                 args.suggestions.clear()
                 pos = args.pos - 1
-                assert pos == 1 and len(args.argv) == 2, f'{pos=} {len(sys.argv)=} args `--release-*` must be only arg.'
+                assert pos == 1 and len(args.argv) == 2, f'{pos=} {len(argv)=} args `--release-*` must be only arg.'
                 if arg == '--release-1':
                     new_args = '-r @github -u 1 -p git: -P git: -l git: cibw --sdists 1'
                 elif arg == '--release-2':
@@ -893,9 +892,6 @@ def get_args(argv):
                 _leafs.sort()
                 assert _yml in _leafs, f'yml should be one of {_leafs}'
                 
-                #if not _yml.as_text().endswith('.yml'):
-                #    if _yml == f'{_yml}.yml':
-                #        pass
                 state.remote_github_yml = _yml.as_text()
                 assert state.remote_github_yml.endswith('.yml'), f'remote_github_yml={state.remote_github_yml} must end with .yml'
 
@@ -1073,7 +1069,7 @@ def get_args(argv):
     
     if COMP_LINE:
         pipcl.log(f'completion: no error. {args.suggestions=}')
-        pipcl.log(f'{sys.argv=}')
+        pipcl.log(f'{argv=}')
         for suggestion in args.suggestions:
             print(suggestion)
         sys.exit(1)
@@ -2297,6 +2293,13 @@ def main(argv):
     if args is None:
         # COMP_LINE.
         return 0
+    
+    # It's important that we do not use <argv> any more - we need to use
+    # args.argv instead, because this contains any args from ~/.aptest and
+    # `-a <name>`, and more importantly will have had some items set to empty
+    # string, for example `-r foo` will have been converted to `foo ''`, which
+    # avoids recursion when we rerun ourselves on local or remote machine.
+    del argv
         
     if not state.devel:
         # Don't output file:line etc, just output elapsed time.
@@ -2329,9 +2332,7 @@ def main(argv):
             pipcl.log(f'Already running on required python. {platform.python_version_tuple()=} {python_version_tuple=}')
         else:
             pipcl.log(f'{state.python=}: rerunning because {platform.python_version_tuple()[:2]=} != {python_version_tuple[:2]=}')
-            argv = args.argv[:]
-            argv[state.python_args_pos] = ''  # _pylint: disable=used-before-assignment
-            e = pipcl.run(f'{state.python} {shlex.join(argv[1:])}', check=0)
+            e = pipcl.run(f'{state.python} {shlex.join(args.argv[1:])}', check=0)
             sys.exit(e)
             
     # Rerun ourselves in a venv if necessary.
@@ -2367,7 +2368,7 @@ def main(argv):
                         pipcl.run(f'which pyenv')
                         pipcl.run(f'pyenv install -v -s {graalpy}')
                         pipcl.run(f'{pyenv_dir}/versions/{graalpy}/bin/graalpy -m venv {venv_name}')
-                    e = pipcl.run(f'. {venv_name}/bin/activate && python {shlex.join(sys.argv)}',
+                    e = pipcl.run(f'. {venv_name}/bin/activate && python {shlex.join(args.argv)}',
                             check=False,
                             prefix='{venv_name}: ',
                             )
@@ -2381,7 +2382,7 @@ def main(argv):
                     else:
                         venv_name = f'venv-aptest-{platform.python_version()}{t}-{int.bit_length(sys.maxsize+1)}'
                     e = venv_run(
-                            sys.argv,
+                            args.argv,
                             venv_name,
                             recreate=(state.venv>=2),
                             clean=(state.venv>=3),
@@ -2461,14 +2462,11 @@ def main(argv):
                         )
     
     if state.remote:  # pylint: disable=too-many-nested-blocks
-        argv = args.argv[:]
-        argv[state.remote_arg] = ''   # Change `-r github` to `-r ''`. # pylint: disable=used-before-assignment.
-        
         if state.remote == '@github':
-            return do_remote_github(state, argv)
+            return do_remote_github(state, args.argv)
         else:
             # Use rsync/ssh to sync to/run on remote machine.
-            return do_remote(state, argv)
+            return do_remote(state, args.argv)
         
     if not state.commands and not state.remote_github_workflow_id:
         pipcl.log(f'## Warning, no commands specified so nothing to do.')
@@ -2789,12 +2787,12 @@ if __name__ == '__main__':
     else:
         try:
             sys.exit(main(sys.argv))
-        except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
-            # Terminate quietly, because failed commands will have generated
-            # diagnostics already.
-            sys.exit(1)
-        
-        # With other exceptions it's useful to show information here.
-        except Exception:
-            backtrace.show(reverse_chain=1, limit=None if g_devel else 0, brief=1)
+        except Exception as e:
+            
+            if isinstance(e, (subprocess.CalledProcessError, subprocess.TimeoutExpired)) and not g_devel:
+                # Terminate quietly, because failed commands will have generated
+                # diagnostics already.
+                pass
+            else:
+                backtrace.show(reverse_chain=1, limit=None if g_devel else 0, brief=1)
             sys.exit(1)
