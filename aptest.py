@@ -2225,7 +2225,7 @@ def do_test(state):
                 e = 0
             else:
                 pipcl.run(f'pip install pytest-cov')
-                e = pipcl.run(f'cd {location} && make test', check=0)
+                e = pipcl.run(f'cd {directory} && make test', check=0)
         else:
             command = f'pytest'
             if state.pytest_options:
