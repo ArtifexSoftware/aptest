@@ -1620,8 +1620,6 @@ Options
 --tee-path <path>
 .................
     Copy log output to file ``<path>``.
-    
-    Default is 0.
 
 --test-extra-packages <names>
 .............................
@@ -1648,7 +1646,7 @@ Options
 
     * OS, machine name, username etc.
     * Python version, implementation etc.
-    * How Artifex pckages were specified, e.g. ``-p git:`` or ``-p pip:``.
+    * How Artifex packages were specified, e.g. ``-p git:`` or ``-p pip:``.
     * git sha's and diffs for Artifex packages specified with ``git:`` or local checkout.
     * https://pypi.org version numbers for Artifex packages specified with ``pip:...``.
     * Any `--test-gnn-limit`_ value.
