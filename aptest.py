@@ -199,6 +199,13 @@ g_package_info = {
                 'aliases':  ['m'],
                 'order': 0,
             },
+        'pdf2docx':
+            {
+                'github_name': 'ArtifexSoftware/pdf2docx',
+                'git_branch': 'master',
+                'aliases':  [],
+                'order': 2,
+            },
         'pymupdf':
             {
                 'github_name': 'pymupdf/PyMuPDF',
@@ -2211,6 +2218,14 @@ def do_test(state):
                     check=0,
                     )
             pipcl.log(f'langchain_pymupdf_layout command returned {e=}.')
+        elif package == 'pdf2docx':
+            # No pytest tests, instead a Makefile.
+            if platform.system() == 'Windows':
+                pipcl.log(f'Not attempting to test on Windows because needs make.')
+                e = 0
+            else:
+                pipcl.run(f'pip install pytest-cov')
+                e = pipcl.run(f'cd {location} && make test', check=0)
         else:
             command = f'pytest'
             if state.pytest_options:

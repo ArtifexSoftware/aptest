@@ -29,13 +29,14 @@ Packages
 
 Supported packages are:
 
+* langchain_pymupdf_layout
 * mupdf
+* pdf2docx
+* pdf_feature_inspector
 * pymupdf
 * pymupdf4llm
-* pymupdfpro
 * pymupdf_layout
-* langchain_pymupdf_layout
-* pdf_feature_inspector
+* pymupdfpro
 
 Packages can be in different locations:
 
@@ -800,12 +801,13 @@ Options
             aptest
             langchain_pymupdf_layout
             mupdf
+            pdf2docx
+            pdf_feature_inspector
             pymupdf
             pymupdf4llm
             pymupdf_layout
             pymupdfpro
             smartoffice
-            pdf_feature_inspector
         
         (or their aliases.)
 
@@ -851,11 +853,12 @@ Options
     
     * `--langchain-pymupdf-layout`_ and alias `--langchain`_.
     * `--mupdf`_ and alias `-m`_.
+    * `--pdf2docx`_.
     * `--pdf_feature_inspector`_ and alias `--pfi`_.
-    * `--pymupdf`_ and alias `-p`_ .
-    * `--pymupdfpro`_ and aliases `--pro`_, `-P <-PP_>`_.
     * `--pymupdf4llm`_ and alias `--4llm`_.
+    * `--pymupdf`_ and alias `-p`_ .
     * `--pymupdf_layout`_ and aliases `--layout`_, `-l`_.
+    * `--pymupdfpro`_ and aliases `--pro`_, `-P <-PP_>`_.
     * `--smartoffice`_.
 
 .. _-l:
@@ -1302,11 +1305,23 @@ Options
 
 .. _--pdf_feature_inspector:
 
+.. _--pdf2docx:
+
+--pdf2docx <pdf2docx-location>
+..............................
+    Specify location of pdf2docx.
+    
+    Alias for ``-i pdf2docx <pdf2docx-location>``.
+    
+    Also see:
+    
+    * `-i`_.
+
 --pdf_feature_inspector
 .......................
     Specify location of pdf_feature_inspector.
     
-    Alias for ``-i pdf_feature_inspector <pdf_feature_inspector-location>``
+    Alias for ``-i pdf_feature_inspector <pdf_feature_inspector-location>``.
     
     Also see:
     
@@ -1319,7 +1334,7 @@ Options
 ......................................
     Specify location of pdf_feature_inspector.
     
-    Alias for ``-i pdf_feature_inspector <pdf_feature_inspector-location>``
+    Alias for ``-i pdf_feature_inspector <pdf_feature_inspector-location>``.
     
     Also see:
     
@@ -1749,6 +1764,8 @@ Changelog
 * Renamed ``--log-tee`` to `--tee-auto`_.
 * Added `--tee-path`_.
 * Added `--atexit`_.
+* Added support for ``pdf2docx`` - see `--pdf2docx`_.
+
 
 2026-02-09
 ^^^^^^^^^^
