@@ -686,6 +686,8 @@ def get_args(argv):
     APTEST_options = shlex.split(APTEST_options)
     args_list += APTEST_options
     
+    args_list_base_len = len(args_list)
+    
     if COMP_LINE:
         line = COMP_LINE
         if 0: # and COMP_POINT:
@@ -875,7 +877,10 @@ def get_args(argv):
             elif arg.startswith('--release-'):
                 args.suggestions.clear()
                 pos = args.pos - 1
-                assert pos == 1 and len(args.argv) == 2, f'{pos=} {len(argv)=} args `--release-*` must be only arg.'
+                assert (1
+                        and pos == args_list_base_len
+                        and len(args.argv) == args_list_base_len + 1
+                        ), f'{len(args_list_base)=} {pos=} {len(args.argv)=} args `--release-*` must be only arg.'
                 if arg == '--release-1':
                     new_args = '-r @github -u 1 -p git: -P git: -l git: cibw --sdists 1'
                 elif arg == '--release-2':
@@ -1165,12 +1170,13 @@ def do_remote_github(state, argv):
 
     assert isinstance(workflow_id, str)
     url = f'https://api.github.com/repos/{info["github_name"]}'
-    #pipcl.log(f'Calling github.gh_workflow_download_multiple() with {url=} {workflow_id=}.')
+    upload = 'pypi' if state.github_upload else None
+    pipcl.log(f'Calling github.gh_workflow_download_multiple() with {url=} {workflow_id=} {upload=}.')
     github.gh_workflow_download_multiple(
             url,
             workflow_id,
             #extra_wheels=upload_extra_wheels,
-            upload='pypi' if state.github_upload else None,
+            upload=upload,
             )
 
 def do_remote(state, argv):
@@ -2679,9 +2685,9 @@ def _get_local(package, state, test=False):
     with pipcl.LogPrefix(f'Local checkout {directory}: '):
         pipcl.log(f'{sha=}')
         pipcl.log(f'{branch=}')
-        pipcl.log(f'comment:\n{textwrap.indent(comment, "    ")}')
+        pipcl.log(f'comment:\n{textwrap.indent(comment or "", "    ")}')
         if diff:
-            pipcl.log(f'diff:\n{textwrap.indent(diff, "    ")}')
+            pipcl.log(f'diff:\n{textwrap.indent(diff or "", "    ")}')
         else:
             pipcl.log(f'{diff=}')
     
