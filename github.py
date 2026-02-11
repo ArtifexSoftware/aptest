@@ -667,7 +667,7 @@ def gh_workflow_download_multiple(url_base, ids, download=True, extra_wheels=Non
     
     leafs = os.listdir(local_dir_union)
     pipcl.log(f'{local_dir_union}/ ({len(leafs)}):')
-    for leaf in leafs:
+    for leaf in sorted(leafs):
         pipcl.log(f'    {local_dir_union}/{leaf}')
     
     if errors:
@@ -678,8 +678,8 @@ def gh_workflow_download_multiple(url_base, ids, download=True, extra_wheels=Non
         make_piprepo(local_dir_union)
         pipcl.log(f'Have created pypi {local_dir_union}/simple.')
 
-        if upload:
-            _upload(local_dir_union, pyodide_wheels, upload)
+    if upload:
+        _upload(local_dir_union, pyodide_wheels, upload)
 
 
 def make_piprepo(wheel_dir):
