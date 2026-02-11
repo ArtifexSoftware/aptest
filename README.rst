@@ -217,12 +217,12 @@ Release procedure
 
 Instructions for releasing wheels for:
 
-* pymupdf
-* pymupdfpro
-* pymupdf_layout
+    * pymupdf
+    * pymupdfpro
+    * pymupdf_layout
 
 
-* Get local checkout of each package.
+* Get local checkout of latest version of each package, corresponding to what will be released.
 
 * Ensure that pymupdf's ``setup.py`` specifies the correct mupdf version.
 
@@ -291,9 +291,9 @@ Instructions for releasing wheels for:
 
       ```
       python -m pip install --upgrade pymupdf
+      ```
 
       [Linux-aarch64 wheels will be built and uploaded later.]
-      ```
 
   * Paste the release's changelog into the text field.
   * Modify any ReST-style links to work as markdown, e.g.
