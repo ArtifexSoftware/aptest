@@ -70,14 +70,26 @@ Aptest can transparently rerun itself in remote locations:
 See the `-r`_ option.
 
 
-Build/install
--------------
+Build/install with the `build`_ command
+---------------------------------------
 
 For each package:
 
-* The package is built as a wheel using ``pip wheel``. This will typically
-  take place in an internal pip venv.
-* The wheel is installed into the current venv.
+* If a package was specified with ``pip:``
+  
+  * A wheel will be downloaded and installed from https://pypi.org.
+
+* Otherwise:
+
+  * The package will be build locally into a wheel with ``pip wheel``.
+  * This will typically take place in an internal pip venv.
+  * The wheel is installed into the current venv.
+  
+  * Note that the wheel will be specific to the current system
+    and might not work on other systems with the same OS.
+    
+    If you need a more portable wheel, see the `cibw`_ command.
+  
 * The wheel is added to a local pypi-style PEP-503 package repository.
 * We use pip's ``--extra-index-url`` option to refer to our internal package
   repository.
@@ -566,12 +578,14 @@ cibw
 ....
     Build and test packages using cibuildwheel. Wheels are placed
     in directory ``aptest-wheelhouse``, which is initially cleared.
+    
     * We do not install wheels and it is generally not useful to do
-    ``cibw test``.
+      ``cibw test``.
 
     If CIBW_BUILD is unset, we set it as follows:
-    * On Github we build and test all supported Python versions.
-    * Otherwise we build and test the current Python version only.
+    
+    * On Github we build and test with all supported Python versions.
+    * Otherwise we build and test with the current Python version only.
 
     If CIBW_ARCHS is unset we set $CIBW_ARCHS_WINDOWS, $CIBW_ARCHS_MACOS
     and $CIBW_ARCHS_LINUX to auto64 if they are unset.
