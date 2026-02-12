@@ -880,7 +880,7 @@ def get_args(argv):
                 assert (1
                         and pos == args_list_base_len
                         and len(args.argv) == args_list_base_len + 1
-                        ), f'{len(args_list_base)=} {pos=} {len(args.argv)=} args `--release-*` must be only arg.'
+                        ), f'{args_list_base_len=} {pos=} {len(args.argv)=} args `--release-*` must be only arg.'
                 if arg == '--release-1':
                     new_args = '-r @github -u 1 -p git: -P git: -l git: cibw --sdists 1'
                 elif arg == '--release-2':
