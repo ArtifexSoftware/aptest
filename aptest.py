@@ -1099,7 +1099,10 @@ def get_args(argv):
 
 def do_remote_github(state, argv):
     pipcl.run('pip install requests')
-    branch = f'aptest-{os.environ["USER"]}'    # -{time.strftime("%F-%T")}'
+    if platform.system() == 'Windows':
+        branch = f'aptest-{os.environ["USERNAME"]}'
+    else:
+        branch = f'aptest-{os.environ["USER"]}'    # -{time.strftime("%F-%T")}'
     pipcl.log(f'{branch=}.')
 
     if state.remote_github_workflow_id:
