@@ -1531,11 +1531,17 @@ Options
 
 --remote-github-workflow-id <workflow_id>
 .........................................
-    Changes behaviour of ``-r @github``. Don't run anything Github,
-    instead continue from previous ``-r @github`` invocation by waiting
-    for ``<workflow_id>`` to finish and then downloading logs and wheels
-    etc to the local machine. Note that one still needs to include
-    ``-r @github``.
+    Changes the behaviour of ``-r @github``. Don't start a new run on Github,
+    instead continue from a previous ``-r @github`` invocation by waiting for
+    ``<workflow_id>`` to finish and then downloading logs and wheels etc to the
+    local machine.
+    
+    * One still needs to specify ``-r @github``.
+    
+    Previous downloads are not repeated unnecessarily:
+    
+    * Downloads are made to a temporary file that is then atomically renamed.
+    * Files that already exist locally are not downloaded again.
 
 .. _--remote-github-yml:
 
