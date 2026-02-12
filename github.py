@@ -22,29 +22,27 @@ import traceback
 import zipfile
 
 
-_gh_headers_cache = None
-
-def _gh_headers(headers=None):
+def _gh_headers(token):
     '''
-    Adds basic headers for gihub rest calls and returns dict.
+    Returns dict containing basic headers for gihub rest calls.
+    
+    Token must be string containing value Github token, typically starting with
+    'ghp_'.
     '''
-    global _gh_headers_cache
-    if not _gh_headers_cache:
-        path = os.path.expanduser('~/artifex/token-github.com')
-        with open(path) as f:
-            _gh_headers_cache = f.read().strip()
-    if headers is None:
-        headers = dict()
+    headers = dict()
     headers['Accept'] = 'application/vnd.github.v3+json'
-    headers['Authorization'] = f'token {_gh_headers_cache}'
+    if token:
+        headers['Authorization'] = f'token {token}'
     return headers
 
 
-def _gh_download(url, path, *, gh=True):
+def _gh_download(token, url, path, *, gh=True):
     '''
     Downloads from github URL to local file.
     
     Args:
+        token:
+            Github token.
         url:
             URL from which to download.
         path:
@@ -68,11 +66,11 @@ def _gh_download(url, path, *, gh=True):
     pipcl.log(f'    from: {url=}')
     pipcl.log(f'    to: {path}')
     if gh:
-        r = _gh_get(url, stream=True, raise_for_status=False)
+        r = _gh_get(token, url, stream=True, raise_for_status=False)
         if r.status_code == 403:
             username = input('username ? ')
             password = getpass.getpass('password ? ')
-            _gh_get(url, stream=True, raise_for_status=False, auth=(username, password))
+            _gh_get(token=None, url=url, stream=True, raise_for_status=False, auth=(username, password))
         try:
             r.raise_for_status()
         except Exception as e:
@@ -168,11 +166,21 @@ def _raise(r):
         raise Exception(str(r.json())) from e
 
 
-def _gh_get(url, *, raise_for_status=True, stream=False, params=None, headers=None, auth=None):
+def _gh_get(
+        token,
+        url,
+        *,
+        raise_for_status=True,
+        stream=False,
+        params=None,
+        auth=None,
+        ):
     '''
     Calls requests.get() for github URL `url`.
     
     Args:
+        token:
+            Github token for _gh_headers().
         url:
             If starts with `https://` is a Rest URL. Otherwise should
             starts with <organisation>/<repository> and we prefix with
@@ -183,8 +191,6 @@ def _gh_get(url, *, raise_for_status=True, stream=False, params=None, headers=No
             Passed as <stream> argument to to requests.get().
         params:
             Passed as <params> argument to to requests.get().
-        headers:
-            Additional headers or None.
         auth:
             None or (username, password).
     '''
@@ -193,7 +199,7 @@ def _gh_get(url, *, raise_for_status=True, stream=False, params=None, headers=No
     assert url.startswith(f'https://')
     r = requests.get(   # pylint: disable=missing-timeout
             url,
-            headers=_gh_headers(headers),
+            headers=_gh_headers(token),
             params=params,
             stream=stream,
             auth=auth,
@@ -203,7 +209,7 @@ def _gh_get(url, *, raise_for_status=True, stream=False, params=None, headers=No
     return r
 
 
-def _gh_post(url, json, raise_for_status=True): # pylint: disable=redefined-outer-name
+def _gh_post(token, url, json, raise_for_status=True): # pylint: disable=redefined-outer-name
     '''
     Calls requests.post() for github URL `url`.
     Args:
@@ -211,6 +217,8 @@ def _gh_post(url, json, raise_for_status=True): # pylint: disable=redefined-oute
             If starts with https:// is a Rest URL. Otherwise should
             be <organisation>/<repository> and we prefix with
             `https://api.github.com/repos/`.
+        token:
+            Github token.
         json:
             Dict to pass as requests.post()'s `json` arg.
     '''
@@ -218,19 +226,20 @@ def _gh_post(url, json, raise_for_status=True): # pylint: disable=redefined-oute
     pipcl.log(f'{url=}')
     url = _url_expand(url)
     pipcl.log(f'{url=}')
-    pipcl.log(f'{_gh_headers()=}')
-    r = requests.post(url, headers=_gh_headers(), json=json)    # pylint: disable=missing-timeout
+    headers = _gh_headers(token)
+    pipcl.log(f'{headers=}')
+    r = requests.post(url, headers=headers, json=json)    # pylint: disable=missing-timeout
     if raise_for_status:
         _raise(r)
     return r
 
 
-def _gh_workflow(url_base, id_):
+def _gh_workflow(token, url_base, id_):
     '''
     Returns dict for specified workflow run.
     '''
     url = f'{url_base}/actions/runs/{id_}'
-    r = _gh_get(url)
+    r = _gh_get(token, url)
     return r.json()
 
 
@@ -238,12 +247,12 @@ def _timestring_to_time(time_string):
     return time.strptime(time_string, '%Y-%m-%dT%H:%M:%SZ')
 
 
-def _gh_runs_newest(url_base, verbose=0):
+def _gh_runs_newest(token, url_base, verbose=0):
     '''
     Returns id of newest workflow run.
     '''
     url = f'{url_base}/actions/runs'
-    r = _gh_get(url)
+    r = _gh_get(token, url)
     response = r.json()
     workflows = response[ 'workflow_runs']
     workflows.sort(key=lambda workflow: _timestring_to_time(workflow["created_at"]))
@@ -273,6 +282,7 @@ def _gh_runs_newest(url_base, verbose=0):
 
 
 def gh_run_workflow(
+        token,
         url_base,
         yml,
         data,
@@ -281,6 +291,8 @@ def gh_run_workflow(
     Starts new workflow run and returns its id.
     
     Args:
+        token:
+            Github token.
         url_base:
             E.g. `https://api.github.com/repos/ArtifexSoftware/PyMuPDF-julian`.
         yml:
@@ -296,10 +308,10 @@ def gh_run_workflow(
     
     # https://docs.github.com/en/rest/actions/workflows#create-a-workflow-dispatch-event
     #
-    run0_id = _gh_runs_newest(url_base)
+    run0_id = _gh_runs_newest(token, url_base)
     pipcl.log(f'{data=}')
     url = f'{url_base}/actions/workflows/{yml}/dispatches'
-    _gh_post(url, json=data)
+    _gh_post(token, url, json=data)
     pipcl.log(f'Have started new workflow run: {url=}')
 
     # Unfortunately `r` does not contain any information about the id of
@@ -313,7 +325,7 @@ def gh_run_workflow(
     #
     pipcl.log('Polling for first mention of the new workflow run we have just created...')
     while 1:
-        run_id = _gh_runs_newest(url_base)
+        run_id = _gh_runs_newest(token, url_base)
         pipcl.log(f'{run0_id=} {run_id=}')
         if run_id != run0_id:
             break
@@ -324,6 +336,7 @@ def gh_run_workflow(
 
         
 def gh_workflow_download(
+        token,
         url_base,
         *,
         id_='newest',
@@ -335,6 +348,8 @@ def gh_workflow_download(
     workflow's logs and artifacts.
     
     Args:
+        token:
+            Github token.
         url:
             .
         id_:
@@ -359,10 +374,10 @@ def gh_workflow_download(
             Otherwise: local download directory,
     '''
     if id_ == 'newest':
-        id_ = _gh_runs_newest(url_base)
+        id_ = _gh_runs_newest(token, url_base)
         pipcl.log(f'{id_=}')
     
-    workflow, e = gh_workflow_wait(url_base, id_=id_, block=block)
+    workflow, e = gh_workflow_wait(token, url_base, id_=id_, block=block)
     if e is None:
         # Workflow still running.
         assert not block
@@ -393,7 +408,7 @@ def gh_workflow_download(
     pipcl.log(f'    {path_logs}')
     logs_url = workflow['logs_url']
     pipcl.log(f'    {logs_url=}')
-    _gh_download(logs_url, path_logs_zip)
+    _gh_download(token, logs_url, path_logs_zip)
     _unzip(path_logs_zip, path_logs)
 
     # Get artifacts.
@@ -411,7 +426,7 @@ def gh_workflow_download(
         
     path_artifact = f'{root}_artifact'
     path_artifact_zip = f'{path_artifact}.zip'
-    r = _gh_get(workflow['artifacts_url'])
+    r = _gh_get(token, workflow['artifacts_url'])
     pipcl.log(f'{workflow.get("html_url")}: {json.dumps(r.json(), indent=4)=}')
     artifacts = r.json()['artifacts']
     if artifacts:
@@ -421,7 +436,7 @@ def gh_workflow_download(
             archive_download_url = artifact['archive_download_url']
             pipcl.log(f'{workflow.get("html_url")}: {archive_download_url=}')
             pipcl.log(f'{workflow.get("html_url")}: Downloading artifact to {path_artifact_zip=}')
-            _gh_download(archive_download_url, path_artifact_zip)
+            _gh_download(token, archive_download_url, path_artifact_zip)
             pipcl.log(f'{workflow.get("html_url")}: Extracting {path_artifact_zip=} to {path_artifact=}.')
             _unzip(path_artifact_zip, path_artifact)
     else:
@@ -443,19 +458,19 @@ def gh_workflow_download(
     return workflow, root
     
 
-def gh_workflows(url):
+def gh_workflows(token, url):
     '''
     Shows and returns available workflows.
     '''
     # Get list of available workflows.
     url = f'{url}/actions/workflows'
-    r = _gh_get(url)
+    r = _gh_get(token, url)
     response = r.json()
     pipcl.log(f'Available workflows are:\n{json.dumps(response, indent="    ")}')
     return response
 
 
-def gh_workflow_wait(url, id_, block=True):
+def gh_workflow_wait(token, url, id_, block=True):
     '''
     Waits for specified workflow run to finish. Returns (workflow, e); e is:
         None:
@@ -475,7 +490,7 @@ def gh_workflow_wait(url, id_, block=True):
         dt = max(dt, 10)
         dt = min(dt, 5*60)
         try:
-            run = _gh_workflow(url, id_)
+            run = _gh_workflow(token, url, id_)
         except Exception as e:
             pipcl.log(f'Ignoring failure to get Github workflow information: {e}')
             continue
@@ -495,18 +510,18 @@ def gh_workflow_wait(url, id_, block=True):
             return run, None
 
 
-def gh_branch_info(url, branch, verbose=True):
+def gh_branch_info(token, url, branch, verbose=True):
     '''
     Show detailed info about a github branch.
     '''
-    r = _gh_get(f'{url}/branches/{branch}')
+    r = _gh_get(token, f'{url}/branches/{branch}')
     ret = r.json()
     if verbose:
         pipcl.log(json.dumps(ret, indent='    '))
     return ret
 
 
-def gh_assert_remote_branch_identical(url, branch, local_dir, check_clean_tree=True):
+def gh_assert_remote_branch_identical(token, url, branch, local_dir, check_clean_tree=True):
     '''
     Args:
         url:
@@ -519,7 +534,7 @@ def gh_assert_remote_branch_identical(url, branch, local_dir, check_clean_tree=T
     '''
     assert url.startswith('https://api.github.com/repos/')
     pipcl.log(f'{url=}')
-    remote_sha = _gh_get(f'{url}/branches/{branch}').json()['commit']['sha']
+    remote_sha = _gh_get(token, f'{url}/branches/{branch}').json()['commit']['sha']
     pipcl.log(f'{url=} => {remote_sha=}.')
     e, text = pipcl.run(
             f'cd {local_dir} && git diff {"" if check_clean_tree else "--cached"} {remote_sha}',
@@ -533,18 +548,27 @@ def gh_assert_remote_branch_identical(url, branch, local_dir, check_clean_tree=T
         raise Exception(f'Local checkout {local_dir} differs from {url} HEAD {remote_sha=}.')
 
 
-def gh_community(url, verbose=True):
+def gh_community(token, url, verbose=True):
     '''
     Gets github community/profile info.
     '''
-    r = _gh_get(f'{url}/community/profile')
+    r = _gh_get(token, f'{url}/community/profile')
     ret = r.json()
     if verbose:
         pipcl.log(json.dumps(ret, indent='    '))
     return ret
 
 
-def gh_workflow_download_multiple(url_base, ids, download=True, extra_wheels=None, upload=''):
+def gh_workflow_download_multiple(
+        token,
+        url_base,
+        ids,
+        *,
+        download=True,
+        extra_wheels=None,
+        upload='',
+        token_pypi=None,
+        ):
     '''
     Wait for workflows to finish, downloads to local machine, uploads to
     pypi.
@@ -599,7 +623,7 @@ def gh_workflow_download_multiple(url_base, ids, download=True, extra_wheels=Non
             directory = None
             if download:
                 try:
-                    workflow, directory = gh_workflow_download(url_base, id_=id_, block=False, local_dir=local_dir)
+                    workflow, directory = gh_workflow_download(token, url_base, id_=id_, block=False, local_dir=local_dir)
                 except Exception as ee:
                     e = ee
                     text = io.StringIO()
@@ -623,7 +647,7 @@ def gh_workflow_download_multiple(url_base, ids, download=True, extra_wheels=Non
                     if num_workflows_finished == len(ids):
                         break
             else:
-                run, e = gh_workflow_wait(url_base, id_=id_, block=False)
+                run, e = gh_workflow_wait(token, url_base, id_=id_, block=False)
                 if e:
                     errors.append(e)
                 ids[i] = None
@@ -637,7 +661,7 @@ def gh_workflow_download_multiple(url_base, ids, download=True, extra_wheels=Non
     if not download:
         pipcl.log('All workflow(s) have finished. Not downloading.')
         for id_ in ids0:
-            run = _gh_workflow(url_base, id_=id_)
+            run = _gh_workflow(token, url_base, id_=id_)
             #pipcl.log(f'Info for {id_=}:\n{json.dumps(run, indent=4)}')
             pipcl.log(f'URL for {id_=}: {run.get("html_url")}')
         
@@ -679,7 +703,7 @@ def gh_workflow_download_multiple(url_base, ids, download=True, extra_wheels=Non
         pipcl.log(f'Have created pypi {local_dir_union}/simple.')
 
     if upload:
-        _upload(local_dir_union, pyodide_wheels, upload)
+        _upload(token_pypi, local_dir_union, pyodide_wheels, upload)
 
 
 def make_piprepo(wheel_dir):
@@ -836,7 +860,7 @@ def _create_download_union(leaf_to_paths, extra_wheels, local_dir_union):
     return pyodide_wheels
 
 
-def _upload(local_dir_union, pyodide_wheels, upload):
+def _upload(token_pypi, local_dir_union, pyodide_wheels, upload):
     # Upload.
     if isinstance(upload, str) and ':' in upload:
         command = f'rsync -ai {local_dir_union}/ {upload}/'
@@ -863,7 +887,7 @@ def _upload(local_dir_union, pyodide_wheels, upload):
             yes = input(f'Will upload to {upload}. Enter "yes" if you are sure... ? ')
             if yes == 'yes':
                 break
-        upload_pypi(paths, pypi_test=(upload=='test.pypi'))
+        upload_pypi(token_pypi, paths, pypi_test=(upload=='test.pypi'))
     
     if pyodide_wheels:
         pipcl.log(f'Pyodide wheel(s):')
@@ -876,7 +900,7 @@ def cpu_bits():
     return int.bit_length(sys.maxsize+1)
 
 
-def upload_pypi(paths, pypi_test: bool=False):
+def upload_pypi(token_pypi, paths, pypi_test: bool=False):
     num_tgz = 0
     num_whl = 0
     num_other = 0
@@ -916,11 +940,13 @@ def upload_pypi(paths, pypi_test: bool=False):
     command += f' --disable-progress-bar'
     if pypi_test:
         command += f' --repository testpypi'
-    if 1:
-        token_path = os.path.expanduser('~/artifex/token-pypi.org')
-        with open(token_path) as f:
-            token = f.read().strip()
-        command += f' -u __token__ -p {token}'
+    assert token_pypi
+    command += f' -u __token__ -p {token_pypi}'
+    #else:
+    #    token_path = os.path.expanduser('~/artifex/token-pypi.org')
+    #    with open(token_path) as f:
+    #        token = f.read().strip()
+    #    command += f' -u __token__ -p {token}'
     command += ' ' + ' '.join(files)
     while 1:
         pipcl.log(f'Uploading {len(files)} files to {destination}:')

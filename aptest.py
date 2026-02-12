@@ -651,6 +651,8 @@ def get_args(argv):
     state.test_gnn_out = None
     state.test_gnn_push = 0
     state.ticker = 0.5
+    state.token_github_path = None
+    state.token_pypi_path = None
     state.valgrind = False
     state.venv = 2
     state.venv_name = None
@@ -970,6 +972,12 @@ def get_args(argv):
             elif arg == '--test-gnn-push':
                 state.test_gnn_push = next(args).as_bool()
             
+            elif arg == '--token-github-path':
+                state.token_github_path = next(args).as_text()
+            
+            elif arg == '--token-pypi-path':
+                state.token_pypi_path = next(args).as_text()
+            
             elif arg == '--cibw-ignore-test-failures':
                 state.cibw_ignore_test_failures = next(args).as_bool()
 
@@ -1097,6 +1105,16 @@ def get_args(argv):
     return args, state
 
 
+def _get_token_github(state):
+    path = os.path.expanduser(state.token_github_path)
+    return pipcl.fs_read(path).strip()
+
+
+def _get_token_pypi(state):
+    path = os.path.expanduser(state.token_pypi_path)
+    return pipcl.fs_read(path).strip()
+
+
 def do_remote_github(state, argv):
     pipcl.run('pip install requests')
     if platform.system() == 'Windows':
@@ -1104,6 +1122,8 @@ def do_remote_github(state, argv):
     else:
         branch = f'aptest-{os.environ["USER"]}'    # -{time.strftime("%F-%T")}'
     pipcl.log(f'{branch=}.')
+    
+    token_github = _get_token_github(state)
 
     if state.remote_github_workflow_id:
         # Wait for existing workflow instead of creating a new one.
@@ -1150,6 +1170,7 @@ def do_remote_github(state, argv):
                     inputs[n] = v
                 data['inputs'] = inputs
             workflow_id = github.gh_run_workflow(
+                    token_github,
                     f'https://api.github.com/repos/{info["github_name"]}',
                     state.remote_github_yml,
                     data,
@@ -1166,6 +1187,7 @@ def do_remote_github(state, argv):
                     inputs = dict(args=args),
                     )
             workflow_id = github.gh_run_workflow(
+                    token_github,
                     f'https://api.github.com/repos/{info["github_name"]}',
                     'test.yml',
                     data,
@@ -1176,10 +1198,12 @@ def do_remote_github(state, argv):
     upload = 'pypi' if state.github_upload else None
     pipcl.log(f'Calling github.gh_workflow_download_multiple() with {url=} {workflow_id=} {upload=}.')
     github.gh_workflow_download_multiple(
+            token_github,
             url,
             workflow_id,
             #extra_wheels=upload_extra_wheels,
             upload=upload,
+            token_pypi=_get_token_pypi(state) if upload else None,
             )
 
 def do_remote(state, argv):
@@ -1816,7 +1840,7 @@ def do_gnn_download(state):
                 pipcl.log(f'Already exists: {path=}')
             else:
                 if state.gnn_doit:
-                    github._gh_download(url, path, gh=0)    # pylint: disable=protected-access
+                    github._gh_download(_get_token_github(state), url, path, gh=0)    # pylint: disable=protected-access
                 else:
                     assert 0, f'Would download but {state.gnn_doit=}: {url} {path=}'
         download(url_doclaynet_core_zip)
