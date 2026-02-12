@@ -555,19 +555,34 @@ Overview
 * Options and commands can be interleaved but it may be clearer to separate
   them on the command line.
 
-* Command line arguments are prepended with ``<.aptest> <APTEST_options>``, where:
+Default arguments
+^^^^^^^^^^^^^^^^^
+
+Default arguments can be set in file ``~/.aptest`` and environment variable
+``$APTEST_options``.
+
+~/.aptest
+.........
+If this file exists, its contents are inserted before the command-line arguments.
   
-  * ``<.aptest>`` is the contents of file ``~/.aptest`` if it exists.
-    
-    Lines starting with ``#`` are ignored.
-  * ``<APTEST_options>`` is the contents of environment variable ``APTEST_options`` if set.
+* Lines starting with ``#`` are ignored.
+*
+  The tilde is expanded with ``os.path.expanduser()``, so on Windows this could
+  be ``C:/Users/<username>/.aptest``.
+*
+  arguments are extracted using `shlex.split()
+  <https://docs.python.org/3/library/shlex.html#shlex.split>`__, so are
+  separated by whitespace (e.g. space and newlines characters) unless escaped
+  or inside quotes etc.
   
-  In both cases, arguments are extracted using
-  `shlex.split() <https://docs.python.org/3/library/shlex.html#shlex.split>`__,
-  so are separated by whitespace (e.g. space and newlines characters) unless
-  escaped or inside quotes etc.
-  
-  In ``~/.aptest``, lines starting with ``#`` are ignored.
+$APTEST_options
+...............
+If environmental variable ``$APTEST_options`` is set, it is added to the
+command line after any `~/.aptest`_ and before the command-line arguments.
+
+*
+  Arguments are extracted using `shlex.split()
+  <https://docs.python.org/3/library/shlex.html#shlex.split>`__.
 
 Commands
 ^^^^^^^^
@@ -1569,7 +1584,7 @@ Options
 
         --remote-prefix-default jules-asus python312
     
-    (It can be useful to put this in ``~/.aptest``.)
+    Also see `~/.aptest`_.
 
 .. _--remote-rsync-path:
 
@@ -1732,7 +1747,13 @@ Options
 ..........................
     Specify location of file containing a Github ReST token, required for ``-r @github``.
 
-    It can be convenient to add this to the ``~/.aptest`` file.
+    Also see `~/.aptest`_.
+    
+    To create a token:
+    
+    * Follow instructions for creating a "classic" token at
+      https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#creating-a-personal-access-token-classic.
+    * In ``scopes``, select just ``repo``.
     
     Also see `-r`_.
 
@@ -1743,7 +1764,7 @@ Options
 ........................
     Specify location of file pypi upload token, required for the `-u`_ option.
 
-    It can be convenient to add this to the ``~/.aptest`` file.
+    Also see `~/.aptest`_.
 
 .. _--cibw-ignore-test-failures:
 
