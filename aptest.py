@@ -843,7 +843,7 @@ def get_args(argv):
             elif arg == '--run':
                 package = next(args)
                 command = next(args)
-                state.run_commands.append((package, command))
+                state.run_commands.append((package.as_text(), command.as_text()))
 
             elif arg == '-t':
                 _names = next(args).as_text()
@@ -2604,7 +2604,8 @@ def main(argv):
 
                 elif command == 'run':
                     for package, command in state.run_commands:
-                        directory = _get_local(package, state)
+                        directory = _get_local(package, state, test=True)
+                        assert directory, f'Cannot run command within {package=} because no local directory.'
                         pipcl.run(f'cd {directory} && {command}')
 
                 elif command == 'test':
