@@ -1834,7 +1834,7 @@ Changelog
 ^^^^^^^^^^
 * Added `--token-github-path`_.
 * Added `--token-pypi-path`_.
-
+* Fixed `-r @github` on Windows.
 
 2026-02-11
 ^^^^^^^^^^
