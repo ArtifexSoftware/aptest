@@ -441,19 +441,34 @@ only setuptools<81.
 Keys/tokens
 -----------
 
+Github ReST token
+^^^^^^^^^^^^^^^^^
+* This is required for remote running on Github.
+* Specify with `--token-github-path`_.
+
+* Also see `-r`_.
+
+Pypi token
+^^^^^^^^^^
+* This is required for uploading to https://pypi.org.
+* Specify with `--token-pypi-path`_.
+
+* Also see `-u`_.
+
 Github/ArtifexSoftware ssh key
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 We allow specification of a custom ssh private key to push to and/or
-access git@github.com:PyMuPDF/PyMuPDF and repositories within
-git@github.com/ArtifexSoftware/.
+access https://github.com/PyMuPDF/PyMuPDF and repositories within
+https://github.com/ArtifexSoftware/.
 
 This key can be provided in two ways:
 
 * In file ``artifex-software-ssh-key`` in the current directory.
 * In environment variable ``ARTIFEX_SOFTWARE_SSH_KEY``.
 
-We run ssh with ``StrictHostKeyChecking=no``, which may end up writing to
+When pushing to these repositories, we run ssh with
+``StrictHostKeyChecking=no``, which may end up writing to
 ``~/.ssh/known_hosts``.
 
 Smartoffice ssh key
@@ -1710,6 +1725,26 @@ Options
     If 1, we push gnn results to
     https://github.com/ArtifexSoftware/PyMuPDF-pymupdf-results. Default is 0.
 
+
+.. _--token-github-path:
+
+--token-github-path <path>
+..........................
+    Specify location of file containing a Github ReST token, required for ``-r @github``.
+
+    It can be convenient to add this to the ``~/.aptest`` file.
+    
+    Also see `-r`_.
+
+
+.. _--token-pypi-path:
+
+--token-pypi-path <path>
+........................
+    Specify location of file pypi upload token, required for the `-u`_ option.
+
+    It can be convenient to add this to the ``~/.aptest`` file.
+
 .. _--cibw-ignore-test-failures:
 
 --cibw-ignore-test-failures 0|1
@@ -1773,6 +1808,12 @@ completion
 
 Changelog
 ---------
+
+2026-02-12
+^^^^^^^^^^
+* Added `--token-github-path`_.
+* Added `--token-pypi-path`_.
+
 
 2026-02-11
 ^^^^^^^^^^
