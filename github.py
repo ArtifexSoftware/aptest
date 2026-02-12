@@ -135,7 +135,14 @@ def ghlogs_links(root, logs):
         dst = f'{root}/{os.path.basename(p)}'
         src = p
         pipcl.fs_remove(dst)
-        os.symlink(os.path.relpath(src, os.path.dirname(dst)), dst)
+        sr2 = os.path.relpath(src, os.path.dirname(dst))
+        try:
+            os.symlink(sr2, dst)
+        except Exception as e:
+            pipcl.log(f'Warning: failed to create symlink: {e}')
+            pipcl.log(f'    {src=}')
+            pipcl.log(f'    {sr2=}')
+            pipcl.log(f'    {dst=}')
         pipcl.log(f'### {st.st_size: 12,} {dst}')
 
 
