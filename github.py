@@ -15,6 +15,7 @@ import json
 import os
 import platform
 #import requests    # Import lazily because often not present.
+import shutil
 import sys
 import tarfile
 import time
@@ -855,7 +856,12 @@ def _create_download_union(leaf_to_paths, extra_wheels, local_dir_union):
             pyodide_wheels.append((leaf, paths))
             continue
         path = paths[0]
-        pipcl.run(f'rsync -ai {path} {local_dir_union}/')
+        if platform.system() == 'Windows':
+            # rsync seems flakey on Windows, possibly because on my Windows
+            # it's provided by cygwin.
+            shutil.copy2(path, local_dir_union)
+        else:
+            pipcl.run(f'rsync -ai {path} {local_dir_union}/')
     pipcl.log(f'{local_dir_union=}')
     return pyodide_wheels
 
