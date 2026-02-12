@@ -121,6 +121,7 @@ Build/test with cibuildwheel
 
 See the `cibw`_ command.
 
+
 Cibuildwheel Python version
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -1435,6 +1436,8 @@ Options
     Set Python to use. If set we re-run ourselves using specified
     python command.
 
+.. _--release-:
+
 .. _--release-1:
 
 .. _--release-2:
@@ -1756,6 +1759,12 @@ completion
 
 Changelog
 ---------
+
+2026-02-11
+^^^^^^^^^^
+* Fixed `-u`_ upload.
+* Fixed checking of `--release-`_ options.
+* Fixed bug in `run`_ command.
 
 2026-02-10
 ^^^^^^^^^^
