@@ -31,6 +31,8 @@ class WindowsVS:
         .csc:       C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\MSBuild\Current\Bin\Roslyn\csc.exe
         .msbuild:   C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\MSBuild\Current\Bin\MSBuild.exe
         .devenv:    C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\Common7\IDE\devenv.com
+        .tools:     C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\Common7\IDE\devenv.com
+        .toolvs:    [142, 143]
 
     `.csc` is C# compiler; will be None if not found.
     '''
@@ -174,6 +176,19 @@ class WindowsVS:
                         #_log(f'{csc=}')
                         #break
 
+            # Find available build tool versions.
+            #
+            tools = list()
+            toolvs = list()
+            for p in glob.glob(f'{directory}\\VC/Auxiliary\\Build\\Microsoft.VCToolsVersion.v*.default.txt'):
+                tools.append(p)
+                leaf = os.path.basename(p)
+                pipcl.log(f'{p=}')
+                pipcl.log(f'{leaf=}')
+                m = re.match('^Microsoft.VCToolsVersion.v([0-9]+).default.txt$', leaf)
+                toolv = int(m.group(1))
+                toolvs.append(toolv)
+            
             self.cl = cl
             self.devenv = devenv
             self.directory = directory
@@ -185,6 +200,9 @@ class WindowsVS:
             self.version = version
             self.year = year
             self.cpu = cpu
+            self.tools = tools
+            self.toolvs = toolvs
+        
         except Exception as e:
             raise Exception( f'Unable to find Visual Studio {year=} {grade=} {version=} {cpu=} {directory=}') from e
 
@@ -205,6 +223,13 @@ class WindowsVS:
                 devenv:       {self.devenv}
                 cpu:          {self.cpu}
                 ''')
+        ret += 'tools:\n'
+        for p in self.tools:
+            ret += f'    {p}\n'
+        ret += 'toolvs:\n'
+        for v in self.toolvs:
+            ret += f'    {v}\n'
+            
         return textwrap.indent( ret, indent)
 
     def __repr__( self):
