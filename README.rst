@@ -555,6 +555,26 @@ Overview
 * Options and commands can be interleaved but it may be clearer to separate
   them on the command line.
 
+Option values
+.............
+Option values can be specified with ``--foo <value>`` or ``--foo=<value>``.
+
+Bool options are handled specially, they set to true by default, and can be
+set explicitly using ``--foo=<value>``:
+  
+Set to True:
+
+* --foo
+* --foo=1
+* --foo=true
+* --foo=True.
+
+Set to False:
+
+* --foo=0
+* --foo=false
+* --foo=False.
+
 Default arguments
 ^^^^^^^^^^^^^^^^^
 
@@ -564,16 +584,20 @@ Default arguments can be set in file ``~/.aptest`` and environment variable
 ~/.aptest
 .........
 If this file exists, its contents are inserted before the command-line arguments.
-  
+
+* The tilde is expanded with ``os.path.expanduser()``,
+  so on Windows this could be ``C:/Users/<username>/.aptest``.
+* The file is ignored if the environment has ``APTEST_DOT_APTEST=0``.
+
+The contents are extracted as follows:
+
 * Lines starting with ``#`` are ignored.
-*
-  The tilde is expanded with ``os.path.expanduser()``, so on Windows this could
-  be ``C:/Users/<username>/.aptest``.
-*
-  arguments are extracted using `shlex.split()
-  <https://docs.python.org/3/library/shlex.html#shlex.split>`__, so are
-  separated by whitespace (e.g. space and newlines characters) unless escaped
-  or inside quotes etc.
+* arguments are extracted using `shlex.split()
+  <https://docs.python.org/3/library/shlex.html#shlex.split>`__,
+  so are separated by whitespace
+  (e.g. space and newlines characters)
+  unless escaped or inside quotes etc.
+
   
 $APTEST_options
 ...............
@@ -764,6 +788,11 @@ test-gnn-devel
     Work in progress running gnn pymupdf4llm test, storing output in
     file with full git info of all packages.
 
+.. _windows-show-vs-instances:
+
+windows-show-vs-instances
+.........................
+    Show available Visual Studio installs.
 
 Options
 ^^^^^^^
@@ -940,6 +969,11 @@ Options
     Control which OS's we run on. If current OS is not in
     (comma-separated) list ``<os_names>``, we do nothing. ``<os_names>`` is case
     insensitive, and items should match ``linux``, ``windows`` or ``darwin``.
+    
+    Also see:
+    
+    * `--remote-github-runners`_ - this will be more efficient when running
+      on Github with ``-r @github``.
 
 .. _-p:
 
@@ -989,10 +1023,11 @@ Options
     
     * Also see:
     
+      * `--remote-github-runners`_
       * `--remote-github-workflow-id`_
       * `--remote-github-yml`_
       * `--remote-github-yml-inputs`_
-
+    
     Otherwise ``<remote>`` should specify a remote machine on which to run
     aptest:
 
@@ -1068,9 +1103,9 @@ Options
 
 .. _-u:
 
--u 0|1
-......
-    If 1 and ``-r @github`` is used, then on success we ask the user to
+-u (bool)
+.........
+    If true and ``-r @github`` is used, then on success we ask the user to
     confirm and then upload wheels to https://pypi.org.
 
 .. _-v:
@@ -1120,9 +1155,9 @@ Options
 
 .. _-VV:
 
--V 0 | 1
-........
-    Set verbose level.
+-V <verbose>
+............
+    Set verbose level. Supported values are 0 and 1.
 
 .. _--atexit:
 
@@ -1154,8 +1189,8 @@ Options
 
 .. _--cibw-pyodide:
 
---cibw-pyodide 0|1
-..................
+--cibw-pyodide
+..............
      Make the `cibw`_ command build a pyodide wheel; runs
      ``cibuildwheel --platform pyodide ...`` etc.
 
@@ -1168,11 +1203,14 @@ Options
 
 .. _--cibw-skip-add-defaults:
 
---cibw-skip-add-defaults 0|1
-............................
-    If 1 (the default) we add defaults to ``CIBW_SKIP`` such as ``pp*`` (to exclude
+--cibw-skip-add-defaults (bool)
+...............................
+    If true (the default) we add defaults to ``CIBW_SKIP`` such as ``pp*`` (to exclude
     pypy) and ``cp3??t-*`` (to exclude free-threading), which effects the `cibw`_
     command.
+    
+    Set to false with ``--cibw-skip-add-defaults=0`` or
+    ``--cibw-skip-add-defaults=false`` or ``--cibw-skip-add-defaults=False``.
 
 .. _--clean-git:
 
@@ -1210,17 +1248,17 @@ Options
 
 .. _--devel:
 
---devel 0|1
-...........
-    If 1, output extra information, including:
+--devel (bool)
+..............
+    If true, output extra information, including:
     
     * File/line information in log messages.
     * Backtraces in error messages.
 
 .. _-e:
 
---gnn-doit 0|1
-..............
+--gnn-doit (bool)
+.................
     If 0 (the default) we never download/extract DocLayNet.
 
 .. _--gnn-show-graph:
@@ -1258,11 +1296,11 @@ Options
 
 .. _--graal:
 
---graal 0|1
-...........
-    If '1' we use Graal environment.
+--graal (bool)
+..............
+    If true we use Graal environment.
 
-    As of 2025-08-04, if specified:
+    As of 2025-08-04, if true:
     
     * We assert-fail if both `cibw`_ and non-cibw commands are specified.
     * If the `cibw`_ command  is specified:
@@ -1520,12 +1558,47 @@ Options
 
 .. _--remote-do:
 
---remote-do 0|1
-...............
+--remote-do (bool)
+..................
     [For debugging.]
 
-    If 0 we don't sync to remote and we don't run any commands on
-    remote. But we do sync remote wheels to local.
+    Default is true.
+    
+    If false (``--remote-do=0``) we don't sync to remote and we don't run any
+    commands on remote. But we do sync remote wheels to local.
+
+.. _--remote-github-runners:
+
+--remote-github-runners <github-runners-modify>
+...............................................
+    Comma-separated ordered list of modifications to the list of
+    Github runners on which ``-r @github`` runs.
+
+    This list defaults to runners for Linux-x64, Windows-x64
+    and MacOS-arm64. Then for each comma-separated item in
+    ``<github-runners-modify>``:
+
+    * ``-<name>``: removes runner ``<name>`` from the list.
+    * ``+<name>`` and ``<name>``: adds runner ``<name>`` to the list.
+    * ``-`` removes all runners from the list.
+
+    In addition if the first item does not start with ``+`` or ``-`` we
+    first remove all runners from the list.
+
+    We allow aliases for Github runners names:
+    
+    * linux, linux-intel
+    * macos-intel.
+    * macos, macos-arm.
+    * windows-arm.
+    * windows, windows-intel.
+
+    For example:
+
+    * Run only on windows-arm::
+      
+        --remote-github-os -,+windows-arm
+
 
 .. _--remote-github-workflow-id:
 
@@ -1602,11 +1675,11 @@ Options
 
 .. _--remote-rsync-wsl:
 
---remote-rsync-wsl 0|1
-......................
+--remote-rsync-wsl (bool)
+.........................
     [Experimental.]
 
-    Tweak various things to cope with remote using wsl rsync.
+    If true we tweak various things to cope with remote using wsl rsync.
 
 .. _--run:
 
@@ -1617,9 +1690,9 @@ Options
 
 .. _--sdists:
 
---sdists 0|1
-............
-    If 1, the `build`_ and `cibw`_ commands will also build sdists.
+--sdists (bool)
+...............
+    If true, the `build`_ and `cibw`_ commands will also build sdists.
 
 .. _--smartoffice:
 
@@ -1653,32 +1726,32 @@ Options
 
 .. _--swig-quick:
 
---swig-quick 0|1
-................
-    If 1 and `--swig`_'s ``<swig>`` value starts with ``git:``, we do not
+--swig-quick (bool)
+...................
+    If true and `--swig`_'s ``<swig>`` value starts with ``git:``, we do not
     update/build swig if it is already present.
 
 .. _--system-packages:
 
---system-packages 0|1
-.....................
-    If 1, automatically install required system packages such as
-    Valgrind, using ``apt`` on Linux and ``brew`` on MacOS. Default is 1 if
+--system-packages (bool)
+........................
+    If true, automatically install required system packages such as
+    Valgrind, using ``apt`` on Linux and ``brew`` on MacOS. Default is true if
     running as Github action, otherwise 0.
 
 .. _--system-site-packages:
 
---system-site-packages 0|1
-..........................
-    If 1, use ``--system-site-packages`` when creating venv. Defaults is 0.
+--system-site-packages (bool)
+.............................
+    If true, use ``--system-site-packages`` when creating venv. Defaults is 0.
 
 .. _--test-extra-packages:
 
 .. _--tee-auto:
 
---tee-auto 0|1
-..............
-    If 1, we copy log output to file ``aptest-out-YYYY-mm-dd-HH-MM-SS``, and on
+--tee-auto (bool)
+.................
+    If true, we copy log output to file ``aptest-out-YYYY-mm-dd-HH-MM-SS``, and on
     exit create convenience softlink ``aptest-out``.
     
     Default is 0.
@@ -1696,9 +1769,9 @@ Options
 
 .. _--test-gnn-cache:
 
---test-gnn-cache 0|1
-....................
-    If 1, ``test-gnn*`` commands look for a matching ``test-gnn-*.json``
+--test-gnn-cache (bool)
+.......................
+    If true, ``test-gnn*`` commands look for a matching ``test-gnn-*.json``
     file. If one is found, we do not run, instead creating softlinks to
     the matching ``.json`` file.
 
@@ -1741,9 +1814,9 @@ Options
 
 .. _--test-gnn-push:
 
---test-gnn-push 0|1
-...................
-    If 1, we push gnn results to
+--test-gnn-push (bool)
+......................
+    If true, we push gnn results to
     https://github.com/ArtifexSoftware/PyMuPDF-pymupdf-results. Default is 0.
 
 
@@ -1774,9 +1847,9 @@ Options
 
 .. _--cibw-ignore-test-failures:
 
---cibw-ignore-test-failures 0|1
-...............................
-    If 1, the `cibw`_ command ignores test failures. Default is 0.
+--cibw-ignore-test-failures (bool)
+..................................
+    If true, the `cibw`_ command ignores test failures. Default is 0.
 
 .. _--ticker:
 
@@ -1809,10 +1882,10 @@ Options
 
 .. _--4llm-unified:
 
---4llm-unified 0|1
-..................
+--4llm-unified (bool)
+.....................
 
-    If 1 we assume any pymupdf4llm package has been created by merging
+    If true we assume any pymupdf4llm package has been created by merging
     pymupdf4llm into the layout git repository (ArtifexSoftware/sce on Github).
 
 Special arguments
@@ -1836,11 +1909,27 @@ completion
 Changelog
 ---------
 
+2026-02-18
+^^^^^^^^^^
+
+* New command line parser.
+
+  * Accepts ``--foo=bar`` as well as ``--foo bar``.
+  * Special case for Bool args:
+  
+    * Bools are now specified as ``--foo`` or  ``--foo=<value>``.
+    * Previous ``--foo <value>`` must be changed to ``--foo`` or ``--foo=<value>``,
+      for example in `~/.aptest`_ and `$APTEST_options`_.
+  * See `Option values`_.
+* Ignore `~/.aptest`_ if ``APTEST_DOT_APTEST=0``.
+* Added new command `windows-show-vs-instances`_.
+* Allow control over what Github runners are used with ``-r @github`` - see new option `--remote-github-runners`_.
+
 2026-02-12
 ^^^^^^^^^^
 * Added `--token-github-path`_.
 * Added `--token-pypi-path`_.
-* Fixed `-r @github` on Windows.
+* Fixed ``-r @github`` on Windows.
 
 2026-02-11
 ^^^^^^^^^^
