@@ -129,6 +129,16 @@ class WindowsVS:
             vcvars = f'{directory}\\VC\\Auxiliary\\Build\\vcvars{cpu.bits}.bat'
             assert os.path.isfile( vcvars), f'No match for: {vcvars}'
 
+            if 0:
+                # List contents of <directory>.
+                _root = f'{directory}\\VC\\Tools\\MSVC'
+                pipcl.log(f'*.exe files in {_root=}:')
+                for dirpath, _dirnames, filenames in os.walk(_root):
+                    for filename in filenames:
+                        if filename.endswith('.exe'):
+                            path = f'{dirpath}\\{filename}'
+                            pipcl.log(f'    {path}')
+            
             # Find cl.exe.
             #
             cl_pattern = f'{directory}\\VC\\Tools\\MSVC\\{version if version else "*"}\\bin\\Host{cpu.windows_name}\\{cpu.windows_name}\\cl.exe'
@@ -284,6 +294,7 @@ class WindowsCpu:
             `x64` or `Win32`, e.g. for use in `/Build Release|x64`.
         .windows_suffix
             `64` or empty string.
+    ARM members are not fixed yet.
     '''
     def __init__(self, name=None):
         if not name:
@@ -300,6 +311,20 @@ class WindowsCpu:
             self.windows_subdir = 'x64/'
             self.windows_name = 'x64'
             self.windows_config = 'x64'
+            self.windows_suffix = '64'
+        elif name == 'arm32':
+            # These are a guess.
+            self.bits = 32
+            self.windows_subdir = 'arm/'
+            self.windows_name = 'arm'
+            self.windows_config = 'arm'
+            self.windows_suffix = ''
+        elif name == 'arm64':
+            # These are a guess.
+            self.bits = 64
+            self.windows_subdir = 'arm64/'
+            self.windows_name = 'arm64'
+            self.windows_config = 'arm64'
             self.windows_suffix = '64'
         else:
             assert 0, f'Unrecognised cpu name: {name}'
@@ -433,10 +458,15 @@ class WindowsPython:
 
 def _cpu_name():
     '''
-    Returns `x32` or `x64` depending on Python build.
+    Returns `arm32`, `arm64`, `x32` or `x64` depending on Python build.
     '''
     #log(f'sys.maxsize={hex(sys.maxsize)}')
-    return f'x{32 if sys.maxsize == 2**31 - 1 else 64}'
+    #
+    bits = int.bit_length(sys.maxsize+1)
+    if platform.machine().startswith('ARM'):
+        return f'arm{bits}'
+    else:
+        return f'x{bits}'
 
 
 def _log(text='', caller=1):
