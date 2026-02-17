@@ -18,20 +18,16 @@ on:
         type: string
         default: ''
         description: 'Arguments to pass to scripts/test.py'
-
+      matrix:
+        type: string
 jobs:
 
   test:
     name: Test
     runs-on: ${{ matrix.os }}
     strategy:
-      matrix:
-        os: [
-                ubuntu-latest,
-                windows-2022,
-                macos-15-intel,
-                macos-14
-                ]
+      
+      matrix: ${{ fromJson(inputs.matrix) }}
 
       # Avoid cancelling of all runs after a single failure.
       fail-fast: false
