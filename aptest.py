@@ -1113,7 +1113,7 @@ def _get_token_github(state):
 
 
 def _get_token_pypi(state):
-    assert state.state.token_pypi_path is not None, \
+    assert state.token_pypi_path is not None, \
             f'No pypi token specified, use `--token-github-path <path>`.'
     path = os.path.expanduser(state.token_pypi_path)
     return pipcl.fs_read(path).strip()
