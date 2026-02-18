@@ -8,4 +8,7 @@ def test_doctest():
     
     for path in pipcl.git_items(root):
         if path.endswith('.py'):
-            pipcl.run(f'cd {root} && python -m doctest {path}')
+            pipcl.run(
+                    f'cd {root} && python -m doctest {path}',
+                    env_extra=dict(APTEST_DOT_APTEST='0'),
+                    )
