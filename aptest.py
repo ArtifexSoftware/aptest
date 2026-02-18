@@ -608,15 +608,16 @@ def get_args(argv):
     args_list = list()
     args_list += [argv[0]]
     
-    aptest_config_path = os.path.expanduser(f'~/.aptest')
-    if os.path.exists(aptest_config_path):
-        aptest_config = pipcl.fs_read(aptest_config_path)
-        aptest_config2 = ''
-        for line in aptest_config.split('\n'):
-            if not line.startswith('#'):
-                aptest_config2 += f'{line}\n'
-        aptest_config = shlex.split(aptest_config2)
-        args_list += aptest_config
+    if os.environ.get('APTEST_DOT_APTEST') != '0':
+        aptest_config_path = os.path.expanduser(f'~/.aptest')
+        if os.path.exists(aptest_config_path):
+            aptest_config = pipcl.fs_read(aptest_config_path)
+            aptest_config2 = ''
+            for line in aptest_config.split('\n'):
+                if not line.startswith('#'):
+                    aptest_config2 += f'{line}\n'
+            aptest_config = shlex.split(aptest_config2)
+            args_list += aptest_config
     
     APTEST_options = os.environ.get('APTEST_options', '')
     APTEST_options = shlex.split(APTEST_options)
