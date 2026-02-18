@@ -17,9 +17,9 @@ import sys
 import sysconfig
 import textwrap
 import time
-import traceback
 
 import backtrace
+import cli
 import doct
 import graph
 import github
@@ -287,6 +287,7 @@ def arg_alias(arg):
             if arg == alias:
                 return fullname
 
+
 def package_alias(package):
     '''
     Returns full name if arg is an alias.
@@ -296,12 +297,13 @@ def package_alias(package):
             return fullname
     #return package
 
+
 def package_aliases(packages):
     '''
     Returns list of full names, from list of names/aliases or string containing
     comma-separated names/aliases.
     '''
-    if isinstance(packages, Arg):
+    if isinstance(packages, cli.Arg):
         packages = packages.as_text()
     if isinstance(packages, str):
         packages = packages.split(',')
@@ -326,136 +328,45 @@ def name_info(package):
             }
     return ret
 
-class Arg:
-    '''
-    Represents an arg on aptest.py's command line. We add information about
-    failed comparisons to the Args object so that we can use them later in
-    diagnostics or arg completion.
-    '''
-    def __init__(self, args_iterator, text):
-        self.text = text
-        self.args_iterator = args_iterator
-        self.pos = args_iterator.pos
-    
-    def __repr__(self):
-        return self.text if isinstance(self.text, str) else 'StopIteration'
-        #return f'Arg:{self.text!r}' if isinstance(self.text, str) else 'Arg:StopIteration'
-    
-    def __eq__(self, rhs):
-        ret = self.text == rhs
-        if not ret:
-            # 9: <tab>  normal completion
-            # 33: ! listing alternatives on partial word completion
-            # 37: % menu completion
-            # 63: ? listing completions after successive tabs
-            # 64: @ list completions if the word is not unmodified
-            if 1: # or os.environ.get('COMP_TYPE')=='63' or isinstance(self.text, StopIteration) or rhs.startswith(self.text):
-                #pipcl.log(f'Adding suggestion {rhs=}. {COMP_TYPE=} {self.text=}')
-                self.args_iterator._add_suggestion(rhs)
-        return ret
-    
-    def startswith(self, rhs):
-        if self.text is None or isinstance(self.text, StopIteration):
-            return False
-        return self.text.startswith(rhs)
-    
-    def as_bool(self):
-        ret = None
-        if self in ('1', 'true', 'True'):
-            ret = True
-        if self in ('0', 'false', 'False'):
-            ret = False
-        if ret is None:
-            if isinstance(self.text, StopIteration):
-                raise StopIteration
-            raise Exception(f'Unrecognised bool value: {self.text!r}')
-        return ret
-    
-    def as_float(self):
-        try:
-            return float(self.text)
-        except Exception:
-            self.args_iterator._add_suggestion('<FLOAT>')   # pylint: disable=protected-access
-            raise
-    
-    def as_int(self):
-        try:
-            return int(self.text)
-        except Exception:
-            self.args_iterator._add_suggestion('<INT>') # pylint: disable=protected-access
-            raise
-    
-    def as_text(self):
-        if isinstance(self.text, str):
-            return self.text
-        else:
-            self.args_iterator._add_suggestion('<TEXT>')    # pylint: disable=protected-access
-            raise Exception(f'Expected <text>')
-                
-        
-class Args:
-    '''
-    Represents all args on aptest.py's command line, and supports iteration
-    through these args.
-    '''
-    def __init__(self, argv, pos=0):
-        self.argv = argv
-        self.pos = pos
-        self.suggestions = list()
-        self.current = None
-    
-    def __next__(self):
-        self.suggestions.clear()
-        if self.pos == len(self.argv):
-            #pipcl.log(f'Returning StopIteration()')
-            ret = StopIteration()
-        else:
-            self.suggestions.clear()
-            ret = self.argv[self.pos]
-            self.pos += 1
-        ret = Arg(self, ret)
-        self.current = ret
-        return ret
-    
-    def _add_suggestion(self, suggestion):
-        #pipcl.log(f'Adding {suggestion=}', caller=3)
-        self.suggestions.append(suggestion)
-
 
 def _test_completion(COMP_LINE):
     '''
     Internal, runs with COMP_LINE set to mimic completion request from shell.
     '''
+    pipcl.log('\n\n\n')
     os.environ['COMP_LINE'] = COMP_LINE
     os.environ['COMP_POINT'] = str(len(COMP_LINE))
     os.environ['COMP_TYPE'] = '63'
-    return main(shlex.split(COMP_LINE))
+    text = pipcl.run(COMP_LINE, capture=str, check=1)
+    print(text)
+    #return main(shlex.split(COMP_LINE))
+    #print(f'{e=}')
+    #print(f'{text=}')
+    #print(textwrap.indent(text, '    '))
+    #return text
 
 
 def dummy_completion1():
     '''
-    >>> _test_completion('./aptest/aptest.py --sdi')
-    --sdists
-    0
+    >>> _test_completion(f'{__file__} --sdi')
+        --sdists
     '''
     
 def dummy_completion2():
     '''
-    >>> _test_completion('./aptest/aptest.py --sdists')
-    1
-    true
-    True
-    0
-    false
-    False
-    0
+    >>> _test_completion(f'{__file__} --sdists=')
+        0
+        false
+        False
+        1
+        true
+        True
     '''
-    
+
 def dummy_completion3():
     '''
-    >>> _test_completion('./aptest/aptest.py -r')   # doctest: +REPORT_UDIFF +ELLIPSIS
-    <TEXT>
-    0
+    >>> _test_completion(f'{__file__} -r')   # doctest: +REPORT_UDIFF +ELLIPSIS
+        <class 'str'>
     '''
 
 
@@ -496,25 +407,22 @@ def apply_deltas(items, deltas, check=1, aliasfn=lambda name: name):
             #pipcl.log(f'{items=}')
 
     
-def add_package(state, name, location, args_pos):
-    if isinstance(name, Arg):
-        name = name.text
-    if isinstance(location, Arg):
-        if not location.text.startswith(('git:', 'pip:')):
-            # Match with local checkouts to help arg completion.
-            for path in glob.glob(f'*/.git/'):
-                #pipcl.log(f'{path=}')
-                d = path[:-6]
-                if location == d:
-                    break
-            #else:
-            #    assert 0, f'Directory does not exist: {location}'
-        location = location.text
+def add_package(state, name, location):
+    assert isinstance(name, str)
+    assert isinstance(location, cli.Arg)
+    if not location.text.startswith(('git:', 'pip:')):
+        # Match with local checkouts to help arg completion.
+        ok_locations = list()
+        for path in sorted(glob.glob(f'*/.git/')):
+            p = path[:-6]
+            #pipcl.log(f'{location.as_str()=}: Adding {p=}.')
+            ok_locations.append(p)
+        assert location in ok_locations, f'Location is not a Git checkout: {location}'
     if name in state.packages:
         pipcl.log(f'Adding second location for {name=} testing only: {location=}')
-        state.packages2[name] = (location, args_pos)
+        state.packages2[name] = (location.as_str(), location.pos)
         return
-    state.packages[name] = (location, args_pos)
+    state.packages[name] = (location.as_str(), location.pos)
     state.packages_build.append(name)
     state.packages_test.append(name)
 
@@ -537,7 +445,7 @@ def get_args(argv):
     '''
     COMP_LINE = os.environ.get('COMP_LINE')
     COMP_POINT = os.environ.get('COMP_POINT')
-    COMP_TYPE = os.environ.get('COMP_TYPE')
+    #COMP_TYPE = os.environ.get('COMP_TYPE')
     #pipcl.log(f'{COMP_LINE=}')
     #pipcl.log(f'{COMP_POINT=}')
     if COMP_LINE:
@@ -692,47 +600,43 @@ def get_args(argv):
     
     if COMP_LINE:
         line = COMP_LINE
-        if 0: # and COMP_POINT:
+        # We don't seem to need to use COMP_POINT.
+        if 0 and COMP_POINT:    # pylint: disable=condition-evals-to-constant
             COMP_POINT_int = int(COMP_POINT)
             assert COMP_POINT_int <= len(line)
             line = line[:COMP_POINT_int]
-        #pipcl.log(f'{COMP_LINE=}')
-        #pipcl.log(f'     {line=}')
         args_list += shlex.split(line)[1:]
         pipcl.log(f'     {args_list=}')
     else:
         args_list += argv[1:]
-    args = Args(args_list, 1)
+        if 0:
+            pipcl.log(f'args_list ({len(args_list)}):')
+            for i in args_list:
+                pipcl.log(f'    {i}')
+    args = cli.Args(args_list, 1)
+    #pipcl.log(f'{args.args_eq.argv=}')
     try:
         i = 0
         while 1:
-            args.suggestions.clear()
-            try:
-                arg = next(args)
-                #pipcl.log(f'{arg=}')
-            except StopIteration:
-                arg = None
-                break
-            #pipcl.log(f'{arg=} {COMP_LINE=}')
-            if isinstance(arg.text, StopIteration):
-                if COMP_LINE:
-                    pass
-                    #arg = Arg(args, None)
-                else:
-                    arg = None
-                    break
+            pos0 = args.pos # We sometimes use this below.
+            
+            # Allow `--foo=bar` here.
+            arg = args.next(spliteq=1)
+            
             #pipcl.log(f'{arg=}')
             if 0:
                 pass
 
             elif arg == '-a':
-                pos1 = args.pos - 1
+                pos1 = args.pos
+                pipcl.log(f'{pos0=}')
+                pipcl.log(f'{pos1=}')
                 _name = next(args).as_text()
                 _value = os.environ.get(_name, '')
                 pos2 = args.pos
+                pipcl.log(f'{pos2=}')
                 new_args = shlex.split(_value)
-                args.argv[pos1:pos2] = new_args
-                args.pos = pos1
+                args.args_eq.replace(pos0, pos2, new_args)
             
             elif arg == '--atexit':
                 g_atexit = next(args).as_text()
@@ -752,13 +656,13 @@ def get_args(argv):
                 state.cibw_name = next(args)
 
             elif arg == '--cibw-pyodide':
-                state.cibw_pyodide = next(args).as_bool()
+                state.cibw_pyodide = args.get_bool()
 
             elif arg == '--cibw-pyodide-version':
                 state.cibw_pyodide_version = next(args)
 
             elif arg == '--cibw-skip-add-defaults':
-                state.cibw_skip_add_defaults = next(args).as_bool()
+                state.cibw_skip_add_defaults = args.get_bool()
             
             elif arg == '--clean-git':
                 packages = package_aliases(next(args))
@@ -773,7 +677,7 @@ def get_args(argv):
                 state.clean_setup_all += packages
             
             elif arg == '--devel':
-                state.devel = next(args).as_bool()
+                state.devel = args.get_bool()
                 g_devel = state.devel
 
             elif arg == '-e':
@@ -783,7 +687,7 @@ def get_args(argv):
                 state.env_extra[_name] = _value
             
             elif arg == '--gnn-doit':
-                state.gnn_doit = next(args).as_bool()
+                state.gnn_doit = args.get_bool()
             
             elif arg == '--gnn-show-graph':
                 state.gnn_show_graph = next(args).as_text()
@@ -798,24 +702,21 @@ def get_args(argv):
                 state.gnn_show_text = next(args).as_text()
             
             elif arg == '--graal':
-                #state.graal_arg = args.pos
-                state.graal = next(args).as_bool()
-                args.argv[args.pos-1] = ''
+                state.graal = args.get_bool(overwrite=0)
 
             elif arg in ('-h', '--help'):
                 state.show_help = True
 
             elif arg == '-i':
-                _name = next(args)
-                _location = next(args)
-                add_package(state, _name, _location, args.pos - 1)
+                _name = next(args).as_str()
+                add_package(state, _name, next(args))
             
             elif package := arg_alias(arg):
-                add_package(state, package, next(args), args.pos - 1)
+                location = next(args)
+                add_package(state, package, location)
             
             elif arg == '--tee-auto':
-                tee_auto = next(args).as_bool()
-                args.argv[args.pos-1] = '0' # Disable if we rerun ourselves.
+                tee_auto = args.get_bool(overwrite=0)
                 if tee_auto:
                     pipcl.log_tee()
 
@@ -835,12 +736,10 @@ def get_args(argv):
             elif arg == '-r':
                 state.remote_arg = args.pos
                 _remote = next(args)
-                #args.argv[args.pos - 1] = ''    # So we don't recurse.
                 # Provide useful command-line completion if _remote starts with @.
                 if _remote.startswith('@'):
                     assert _remote == '@github'
                 state.remote = _remote.as_text()
-                #pipcl.log(f'Found -r: {arg=} {state.remote=}')
 
             elif arg == '--run':
                 package = next(args)
@@ -853,10 +752,10 @@ def get_args(argv):
                 apply_deltas(state.packages_test, _names, aliasfn=package_alias)
 
             elif arg == '--pybind':
-                state.pybind = next(args).as_bool()
+                state.pybind = args.get_bool()
 
             elif arg == '--4llm-unified':
-                if next(args).as_bool():
+                if args.get_bool():
                     state.pymupdf4llm_unified = True
                     g_package_info['pymupdf4llm']['github_name'] = 'ArtifexSoftware/sce'
                     g_package_info['pymupdf4llm']['git_branch'] = 'master'
@@ -878,11 +777,10 @@ def get_args(argv):
 
             elif arg.startswith('--release-'):
                 args.suggestions.clear()
-                pos = args.pos - 1
                 assert (1
-                        and pos == args_list_base_len
+                        and pos0[0] == args_list_base_len
                         and len(args.argv) == args_list_base_len + 1
-                        ), f'{args_list_base_len=} {pos=} {len(args.argv)=} args `--release-*` must be only arg.'
+                        ), f'{args_list_base_len=} {pos0[0]=} {len(args.argv)=} args `--release-*` must be only arg.'
                 if arg == '--release-1':
                     new_args = '-r @github -u 1 -p git: -P git: -l git: cibw --sdists 1'
                 elif arg == '--release-2':
@@ -896,13 +794,11 @@ def get_args(argv):
                 else:
                     assert 0, f'Unrecognised {arg=}, should be one of --release-1, --release-2, --release-3.'
                 new_args = shlex.split(new_args)
-                args.argv[pos:] = new_args
-                args.pos = pos
-                #pipcl.log(f'{args.pos=}: {args.argv=}')
+                args.args_eq.replace(arg.pos, args.pos, new_args)
                 continue
 
             elif arg == '--remote-do':
-                state.remote_do = next(args).as_bool()
+                state.remote_do = args.get_bool()
 
             elif arg == '--remote-github-workflow-id':
                 state.remote_github_workflow_id = next(args).as_text()
@@ -932,31 +828,31 @@ def get_args(argv):
                 state.remote_rsync_path = next(args).as_text()
 
             elif arg == '--remote-rsync-wsl':
-                state.remote_rsync_wsl = next(args).as_bool()
+                state.remote_rsync_wsl = args.get_bool()
 
             elif arg == '--sdists':
-                state.sdists = next(args).as_bool()
+                state.sdists = args.get_bool()
 
             elif arg == '--system-site-packages':
-                state.system_site_packages = next(args).as_bool()
+                state.system_site_packages = args.get_bool()
 
             elif arg == '--swig':
                 state.swig = next(args).as_text()
 
             elif arg == '--swig-quick':
-                state.swig_quick = next(args).as_bool()
+                state.swig_quick = args.get_bool()
 
             elif arg == '--system-packages':
                 state.system_packages = int(next(args))
 
             elif arg == '--system-site-packages':
-                state.system_site_packages = next(args).as_bool()
+                state.system_site_packages = args.get_bool()
 
             elif arg == '--test-extra-packages':
                 state.test_extra_packages += next(args).as_text().split(',')
             
             elif arg == '--test-gnn-cache':
-                state.test_gnn_cache = next(args).as_bool()
+                state.test_gnn_cache = args.get_bool()
                 
             elif arg == '--test-gnn-extra':
                 nv = next(args).as_text()
@@ -970,7 +866,7 @@ def get_args(argv):
                 state.test_gnn_out = next(args).as_text()
 
             elif arg == '--test-gnn-push':
-                state.test_gnn_push = next(args).as_bool()
+                state.test_gnn_push = args.get_bool()
             
             elif arg == '--token-github-path':
                 state.token_github_path = next(args).as_text()
@@ -979,13 +875,13 @@ def get_args(argv):
                 state.token_pypi_path = next(args).as_text()
             
             elif arg == '--cibw-ignore-test-failures':
-                state.cibw_ignore_test_failures = next(args).as_bool()
+                state.cibw_ignore_test_failures = args.get_bool()
 
             elif arg == '--ticker':
                 state.ticker = next(args).as_float()
 
             elif arg == '-u':
-                state.github_upload = next(args).as_int()
+                state.github_upload = args.get_bool()
 
             elif arg == '-v':
                 state.venv = next(args).as_int()
@@ -997,9 +893,6 @@ def get_args(argv):
             elif arg == '-V':
                 state.verbose = next(args).as_int()
                 assert state.verbose in (0, 1), f'Verbose level should be 0 or 1'
-
-            elif arg.startswith('-'):
-                assert 0, f'Unrecognised option: {arg=}.'
 
             elif arg in (
                     'build',
@@ -1016,91 +909,18 @@ def get_args(argv):
                     'test-gnn-pymupdf4llm',
                     'test-gnn-pymupdf_layout',
                     ):
-                state.commands.append(arg)
+                state.commands.append(arg.as_str())
 
             else:
-                if isinstance(arg.text, StopIteration):
+                if arg.text is StopIteration:
                     break
-                #pipcl.log(f'{arg=}')
-                #pipcl.log(f'{args.suggestions=}')
-                assert 0, f'Unrecognised command: {arg=}.'
-            
-            #pipcl.log(f'End of loop: {args.current=} {args.suggestions=}')
-            #if isinstance(args.current.text, StopIteration):
-            #    raise args.current.text
+                assert 0, f'Unrecognised argument: {arg.text!r}.'
 
-    except Exception as e:
-        # We write out detailed information about the error, including
-        # information about what args would have been valid.
-        if COMP_LINE:
-            pipcl.log(f'{backtrace.show(file=str)}')
-            pipcl.log(f'Exception: {e}')
-            pipcl.log(f'{args.argv=}')
-            pipcl.log(f'{args.pos=}')
-            pipcl.log(f'{args.suggestions=}')
-            pipcl.log(f'{arg=}')
-            pipcl.log(f'{COMP_LINE=}')
-            pipcl.log(f'{COMP_POINT=}')
-            pipcl.log(f'{COMP_TYPE=}')
-            try:
-                # COMP_TYPE
-                # 9: <tab>  normal completion
-                # 33: ! listing alternatives on partial word completion
-                # 37: % menu completion
-                # 63: ? listing completions after successive tabs
-                # 64: @ list completions if the word is not unmodified
-                #
-                for suggestion in args.suggestions:
-                    #if COMP_TYPE == '63' or suggestion.startswith(arg):
-                    if isinstance(args.current.text, StopIteration):
-                        print(suggestion)
-                    elif suggestion.startswith(args.current.text):
-                        pipcl.log(f'Writing out {suggestion=}')
-                        print(suggestion)
-                    sys.stdout.flush()
-                pipcl.log(f'Calling sys.exit()')
-                #sys.exit()
-                return None, None
-                
-            except Exception:
-                pipcl.log(f'completion: error: {traceback.format_exc()}')
-                #sys.exit(1)
-                #return 1
-            sys.exit(1)
-        
-        elif arg is not None:
-            text = ''
-            text += 'Bad command line\n'
-            for i, arg in enumerate(args.argv):
-                text += f'{" " if i else ""}{shlex.quote(arg)}'
-            text += '\n'
-            for i, arg in enumerate(args.argv):
-                if i:
-                    text += ' '
-                if not isinstance(args.current.text, StopIteration) and i+1 == args.pos:
-                    text += '^' * len(arg)
-                    break
-                text += ' ' * len(shlex.quote(arg))
-            if isinstance(args.current.text, StopIteration):
-                text += '^'
-            text += '\n'
-            
-            if isinstance(e, StopIteration):
-                text += f'Ran out of arguments.\n'
-            if args.suggestions:
-                text += f'Expected one of:\n'
-                for suggestion in args.suggestions:
-                    text += f'    {suggestion}\n'
-            raise Exception(text.strip()) from e
-        else:
-            raise
-    
-    if COMP_LINE:
-        pipcl.log(f'completion: no error. {args.suggestions=}')
-        pipcl.log(f'{argv=}')
-        for suggestion in args.suggestions:
-            print(suggestion)
-        sys.exit(1)
+    finally:
+        # cli.Args.final() will handle writing out completions if COMP_LINE is
+        # set, or writing out diagnostics if parsing the command line failed.
+        args.final()
+    #pipcl.log(f'{args.args_eq.argv=}')
     
     return args, state
 
@@ -1119,7 +939,8 @@ def _get_token_pypi(state):
     return pipcl.fs_read(path).strip()
 
 
-def do_remote_github(state, argv):
+def do_remote_github(state, args):
+    assert isinstance(args, cli.Args)
     pipcl.run('pip install requests')
     if platform.system() == 'Windows':
         branch = f'aptest-{os.environ["USERNAME"]}'
@@ -1148,10 +969,10 @@ def do_remote_github(state, argv):
                 pipcl.log(f'{package_name=}.')
                 pipcl.log(f'{info["git_remote"]=}.')
                 git_push(package_location, info["git_remote"], branch, state)
-                argv[args_pos] = f'git:-b {branch} {info["git_remote"]}'
+                args.args_eq.set(args_pos, f'git:-b {branch} {info["git_remote"]}')
 
         if state.remote_github_yml:
-            # Run .yml directly.
+            # Run specific .yml directly.
             pipcl.log(f'Running .yml instead of aptest.py: {state.remote_github_yml}')
             if not state.packages:
                 # Run on aptest.
@@ -1182,13 +1003,14 @@ def do_remote_github(state, argv):
         else:
             # Run ourselves on Github using test.yml, passing argv.
             info = name_info('aptest')
-            args = shlex.join(argv[1:])
+            args_string = shlex.join(args.args_eq.argv[1:])
             if not state.verbose:
                 # Run with verbose on Github, e.g. to show os.environ etc.
-                args += ' -V'
+                args_string += ' -V'
             data = dict(
                     ref = branch,
-                    inputs = dict(args=args),
+                    inputs = dict(args=args_string),
+                    
                     )
             workflow_id = github.gh_run_workflow(
                     token_github,
@@ -2541,9 +2363,9 @@ def main(argv):
                         )
     
     if state.remote:  # pylint: disable=too-many-nested-blocks
-        args.argv[state.remote_arg] = ''    # So we don't recurse.
+        args.args_eq.set(state.remote_arg, '')  # So we don't recurse.
         if state.remote == '@github':
-            return do_remote_github(state, args.argv)
+            return do_remote_github(state, args)
         else:
             # Use rsync/ssh to sync to/run on remote machine.
             return do_remote(state, args.argv)
@@ -2641,7 +2463,7 @@ def main(argv):
 
                 elif command == 'test':
                     do_test(state)
-
+                
                 else:
                     assert 0, f'{command=}'
     finally:
@@ -2869,8 +2691,9 @@ if __name__ == '__main__':
         try:
             sys.exit(main(sys.argv))
         except Exception as e:
-            
-            if isinstance(e, (subprocess.CalledProcessError, subprocess.TimeoutExpired)) and not g_devel:
+            if 1:
+                backtrace.show(reverse_chain=1, brief=1)
+            elif isinstance(e, (subprocess.CalledProcessError, subprocess.TimeoutExpired)) and not g_devel:
                 # Terminate quietly, because failed commands will have generated
                 # diagnostics already.
                 pass
