@@ -315,6 +315,25 @@ def package_aliases(packages):
     return ret
 
 
+def gh_runner_alias(name):
+    '''
+    Returns full name if arg is an alias for a github runner OS.
+    '''
+    runner_aliases = [
+            ('macos-14',         ['macos', 'macos-arm']),
+            ('macos-15-intel',   ['macos-intel']),
+            ('ubuntu-latest',    ['linux', 'linux-intel']),
+            ('windows-11-arm',   ['windows-arm']),
+            ('windows-2022',     ['windows', 'windows-intel']),
+            ]
+    for fullname, aliases in runner_aliases:
+        if name in [fullname] + aliases:
+            return fullname
+    
+    pipcl.log(f'Using unrecognised Github runner {name=}.')
+    return name
+
+
 def name_info(package):
     ret = g_package_info.get(package)
     if ret:
@@ -537,6 +556,13 @@ def get_args(argv):
     state.remote_arg = None
     state.remote_do = True
     state.remote_github_workflow_id = None
+    state.remote_github_runners = [
+            'macos-14',
+            #'macos-15-intel',
+            'ubuntu-latest',
+            #'windows-11-arm',
+            'windows-2022',
+            ]
     state.remote_github_yml_inputs = None
     state.remote_github_yml = None
     state.remote = None
@@ -800,6 +826,11 @@ def get_args(argv):
             elif arg == '--remote-do':
                 state.remote_do = args.get_bool()
 
+            elif arg == '--remote-github-runners':
+                _deltas = next(args).as_text()
+                _deltas = _deltas.split(',') if _deltas else list()
+                apply_deltas(state.remote_github_runners, _deltas, aliasfn=gh_runner_alias)
+
             elif arg == '--remote-github-workflow-id':
                 state.remote_github_workflow_id = next(args).as_text()
 
@@ -1008,9 +1039,16 @@ def do_remote_github(state, args):
             if not state.verbose:
                 # Run with verbose on Github, e.g. to show os.environ etc.
                 args_string += ' -V'
+            # We define the .yml's `matrix: os: ...` by passing in a dict encoded with json, as
+            # expected by test.yml's workflow_dispatch:inputs:matrix
+            assert state.remote_github_runners, f'No runner specified.'
+            matrix = {
+                    'os': state.remote_github_runners,
+                    }
+            matrix_json = json.dumps(matrix)
             data = dict(
                     ref = branch,
-                    inputs = dict(args=args_string),
+                    inputs = dict(args=args_string, matrix=matrix_json),
                     
                     )
             workflow_id = github.gh_run_workflow(
