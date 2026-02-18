@@ -808,15 +808,15 @@ def get_args(argv):
                         and len(args.argv) == args_list_base_len + 1
                         ), f'{args_list_base_len=} {pos0[0]=} {len(args.argv)=} args `--release-*` must be only arg.'
                 if arg == '--release-1':
-                    new_args = '-r @github -u 1 -p git: -P git: -l git: cibw --sdists 1'
+                    new_args = '-r @github -u -p git: -P git: -l git: cibw --sdists'
                 elif arg == '--release-2':
-                    new_args = '-r @github -u 1 -p git: -P git: -l git: cibw -o linux -e CIBW_ARCHS_LINUX=aarch64 -e "CIBW_BUILD=cp310*"'
+                    new_args = '-r @github -u -p git: -P git: -l git: cibw --remote-github-runners linux -e CIBW_ARCHS_LINUX=aarch64 -e "CIBW_BUILD=cp310*"'
                 elif arg == '--release-3':
-                    new_args = '-r @github -u 1 -p git: cibw -o windows -e CIBW_ARCHS_WINDOWS=x86 --cibw-skip-add-defaults 0'
+                    new_args = '-r @github -u -p git: cibw --remote-github-runners windows -e CIBW_ARCHS_WINDOWS=x86 --cibw-skip-add-defaults=0'
                 elif arg == '--release-4':
-                    new_args = '-r @github -u 1 -p git: cibw -o linux -e "CIBW_BUILD=cp310-musllinux_x86_64" --cibw-skip-add-defaults 0'
+                    new_args = '-r @github -u -p git: cibw --remote-github-runners linux -e "CIBW_BUILD=cp310-musllinux_x86_64" --cibw-skip-add-defaults=0'
                 elif arg == '--release-5':
-                    new_args = '-r @github -p git: cibw --cibw-pyodide 1 -o linux'
+                    new_args = '-r @github -p git: cibw --cibw-pyodide --remote-github-runners linux'
                 else:
                     assert 0, f'Unrecognised {arg=}, should be one of --release-1, --release-2, --release-3.'
                 new_args = shlex.split(new_args)
