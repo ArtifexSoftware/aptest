@@ -908,6 +908,7 @@ def get_args(argv):
                     'test-gnn-devel',
                     'test-gnn-pymupdf4llm',
                     'test-gnn-pymupdf_layout',
+                    'windows-show-vs-instances',
                     ):
                 state.commands.append(arg.as_str())
 
@@ -2464,6 +2465,11 @@ def main(argv):
                 elif command == 'test':
                     do_test(state)
                 
+                elif command == 'windows-show-vs-instances':
+                    pipcl.log(f'{command}:')
+                    for vs in pipcl.wdev.windows_vs_multiple():
+                        pipcl.log(vs.description_ml(indent='    '))
+
                 else:
                     assert 0, f'{command=}'
     finally:
