@@ -799,8 +799,9 @@ def get_args(argv):
                 assert state.pytest_wrap in ('gdb', 'valgrind', 'helgrind')
 
             elif arg == '--python':
+                pos = args.pos
                 state.python = next(args).as_text()
-                args.argv[args.pos-1] = ''  # Avoid recursion when we rerun ourselves.
+                args.args_eq.set(pos, '')   # Avoid recursion when we rerun ourselves.
 
             elif arg.startswith('--release-'):
                 args.suggestions.clear()
@@ -2273,7 +2274,7 @@ def main(argv):
             pipcl.log(f'Already running on required python. {platform.python_version_tuple()=} {python_version_tuple=}')
         else:
             pipcl.log(f'{state.python=}: rerunning because {platform.python_version_tuple()[:2]=} != {python_version_tuple[:2]=}')
-            e = pipcl.run(f'{state.python} {shlex.join(args.argv[1:])}', check=0)
+            e = pipcl.run(f'{state.python} {shlex.join(args.argv)}', check=0)
             sys.exit(e)
             
     # Rerun ourselves in a venv if necessary.
