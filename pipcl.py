@@ -3987,7 +3987,8 @@ def swig_get(swig, quick, swig_local='pipcl-swig-git'):
                         os.rename(f'{bison_version}.tar.gz-0', f'{bison_version}.tar.gz')
                     if not os.path.exists(f'{bison_version}'):
                         run(f'tar -xzf {bison_version}.tar.gz', prefix='bison extract: ')
-                    run(f'cd {bison_version} && ./configure', prefix='bison configure: ')
+                    # 2026-02-23: builds have started failing, perhaps recent compilers have extra detection?
+                    run(f'cd {bison_version} && ./configure', prefix='bison configure: ', env_extra=dict(CFLAGS='-Wno-incompatible-function-pointer-types'))
                     run(f'cd {bison_version} && make', prefix='bison make: ')
                     run(f'cd {bison_version} && sudo make install', prefix='bison make install: ')
                 
