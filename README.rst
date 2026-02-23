@@ -1909,6 +1909,10 @@ completion
 Changelog
 ---------
 
+
+* With `cibw`_ command, support `--pytest-path`_ (was previously ignored).
+
+
 2026-02-20
 ^^^^^^^^^^
 

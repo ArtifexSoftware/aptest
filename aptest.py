@@ -30,7 +30,7 @@ backtrace.exception_hook_install()
 
 g_root_abs = os.path.abspath( f'{__file__}/..')
 g_root = pipcl.relpath(g_root_abs)
-
+g_date_time = time.strftime('%F-%H-%M-%S')
 
 # With cibw we build and test Python 3.x for x in this range.
 python_versions_minor = range(10, 14+1)
@@ -979,7 +979,7 @@ def do_remote_github(state, args):
     if platform.system() == 'Windows':
         branch = f'aptest-{os.environ["USERNAME"]}'
     else:
-        branch = f'aptest-{os.environ["USER"]}'    # -{time.strftime("%F-%T")}'
+        branch = f'aptest-{os.environ["USER"]}'    # -{g_date_time}'
     pipcl.log(f'{branch=}.')
     
     token_github = _get_token_github(state)
@@ -1184,7 +1184,7 @@ def do_remote(state, argv):
         pipcl.log(f'{ssh_command=}')
 
         tee_simple = f'aptest-out-{remote}'
-        tee = f'{tee_simple}-{time.strftime("%F-%H-%M-%S")}'
+        tee = f'{tee_simple}-{g_date_time}'
         try:
             pipcl.run(
                     command,
@@ -1204,6 +1204,7 @@ def do_remote(state, argv):
         for package in state.packages_build:
             filters.append(f'--include={package}-*.whl')
             filters.append(f'--include={package}-*.tar.gz')
+            filters.append(f'--include={package}-*.xml')
         filters.append('--exclude=*')
         sync_reverse(
                 remote,
@@ -1550,10 +1551,16 @@ def do_cibw(state):
 
             # Tell cibuildwheel how to test <package>.
             if package in state.packages_test:
-                CIBW_TEST_COMMAND = f'pip install --upgrade pytest && pytest'
+                CIBW_TEST_COMMAND = f'pip install --upgrade pytest'
+                CIBW_TEST_COMMAND += f' && pytest'
+                CIBW_TEST_COMMAND += f' --junit-xml={os.path.abspath(state.wheelhouse)}/aptest-pytest-junit.xml'
                 if state.pytest_options:
                     CIBW_TEST_COMMAND += f' {state.pytest_options}'
-                CIBW_TEST_COMMAND += f' {{project}}/tests'
+                if state.pytest_paths:
+                    for path in state.pytest_paths:
+                        CIBW_TEST_COMMAND += f' {{project}}/{path}'
+                else:
+                    CIBW_TEST_COMMAND += f' {{project}}/tests'
                 if state.cibw_ignore_test_failures:
                     CIBW_TEST_COMMAND += ' || true'
                 state.env_extra['CIBW_TEST_COMMAND'] = CIBW_TEST_COMMAND
@@ -1855,7 +1862,7 @@ def do_gnn_show(state):
     if state.gnn_show_text == '':
         out_text = None
     elif state.gnn_show_text is None:
-        out_text = f'gnn-text-{time.strftime("%Y-%m-%d-%H-%M-%S")}.txt'
+        out_text = f'gnn-text-{g_date_time}.txt'
         #out_text_simple = f'gnn-text.txt'
     else:
         out_text = state.gnn_show_text
@@ -1865,7 +1872,7 @@ def do_gnn_show(state):
         out_graph = None
         out_graph_simple = None
     elif state.gnn_show_graph is None:
-        out_graph = f'gnn-graph-{time.strftime("%Y-%m-%d-%H-%M-%S")}.html'
+        out_graph = f'gnn-graph-{g_date_time}.html'
         out_graph_simple = f'gnn-graph.html'
     else:
         out_graph = state.gnn_show_graph
@@ -2041,8 +2048,7 @@ def do_test_gnn(state, command):
         if state.test_gnn_limit:
             kwargs['limit'] = state.test_gnn_limit
         
-        name_t = time.strftime('%Y-%m-%d-%H-%M-%S', time.gmtime(t_start))
-        name = f'test-gnn-pymupdf4llm-{name_t}.json'
+        name = f'test-gnn-pymupdf4llm-{g_date_time}.json'
         
         out_json = None
         if state.test_gnn_cache:
@@ -2079,8 +2085,7 @@ def do_test_gnn(state, command):
 
             pipcl.log(f'Results are:\n{json.dumps(ret, indent="    ")}')
 
-            name_t = time.strftime('%Y-%m-%d-%H-%M-%S', time.gmtime(t_start))
-            out_json = f'test-gnn-pymupdf4llm-{name_t}.json'
+            out_json = f'test-gnn-pymupdf4llm-{g_date_time}.json'
             
             with open(out_json, 'w') as f:
                 json.dump(ret, f, indent='    ', sort_keys=1)
@@ -2147,7 +2152,10 @@ def do_test(state):
                 pipcl.run(f'pip install pytest-cov')
                 e = pipcl.run(f'cd {directory} && make test', check=0)
         else:
+            #pipcl.run(f'pip install pytest-reportlog')
             command = f'pytest'
+            #command += f' --report-log=aptest-pytest.jsonl'
+            command += f' --junit-xml={os.path.abspath(state.wheelhouse)}/{package}-pytest-junit.xml'
             if state.pytest_options:
                 command += f' {state.pytest_options}'
             if state.pytest_paths:
