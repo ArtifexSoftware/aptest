@@ -3626,7 +3626,7 @@ def log_tee(path, path_simple=None):
     if path_simple:
         def final():
             fs_symlink(path_simple, path)
-    atexit.register(final)
+        atexit.register(final)
     _log_f.append(f)
 
 def _log2(text):
@@ -3909,9 +3909,13 @@ def swig_get(swig, quick, swig_local='pipcl-swig-git'):
     
     Args:
         swig:
-            If starts with 'git:', passed as <text> arg to git_get().
-            #If starts with 'pip:' we do: `pip install swig<swig[4:]>`. E.g.
-            #'pip:==4.3.1'
+            If starts with 'git:', passed as <text> arg to git_get(), and we
+            return the absolute path of the build binary. (Not windows.)
+            
+            If starts with 'pip:' we do: `pip install swig<swig[4:]>` and
+            return 'swig'. E.g. 'pip:==4.3.1'.
+            
+            Otherwise we simply return <swig>.
         quick:
             If true, we do not update/build local checkout if the binary is
             already present.
@@ -3922,7 +3926,7 @@ def swig_get(swig, quick, swig_local='pipcl-swig-git'):
         assert platform.system() != 'Windows', f'Cannot build swig on Windows.'
         # Note that {swig_local}/install/bin/swig doesn't work on MacOS because
         # {swig_local}/INSTALL is a file and the fs is case-insensitive.
-        swig_binary = f'{swig_local}/install-dir/bin/swig'
+        swig_binary = os.path.abspath(f'{swig_local}/install-dir/bin/swig')
         if quick and os.path.isfile(swig_binary):
             log1(f'{quick=} and {swig_binary=} already exists, so not downloading/building.')
         else:
@@ -4018,14 +4022,12 @@ def swig_get(swig, quick, swig_local='pipcl-swig-git'):
                     )
         assert os.path.isfile(swig_binary)
         return swig_binary
-    # Disabled support for installing a specific swig with pip, because it
-    # will be overridden by individual projects' specification of swig in
-    # get_requires_for_build_wheel() or pyproject.toml.
-    #
-    #elif swig.startswith('pip:'):
-    #    run(f'pip uninstall -y swig', check=0)
-    #    run(f'pip install swig{swig[4:]}')
-    #    return 'swig'
+    
+    elif swig and swig.startswith('pip:'):
+        run(f'pip uninstall -y swig', check=0)
+        run(f'pip install swig{swig[4:]}')
+        return 'swig'
+    
     else:
         return swig
 
