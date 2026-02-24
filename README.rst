@@ -75,13 +75,15 @@ Build/install with the `build`_ command
 
 For each package:
 
-* If a package was specified with ``pip:``
+* If package was specified with ``pip:``
   
   * A wheel will be downloaded and installed from https://pypi.org.
 
 * Otherwise:
 
-  * The package will be build locally into a wheel with ``pip wheel``.
+  * If package was specified with ``git:`` we clone/update a local checkout.
+
+  * The package is built locally into a wheel with ``pip wheel``.
   * This will typically take place in an internal pip venv.
   * The wheel is installed into the current venv.
   
@@ -132,6 +134,20 @@ Build/test with cibuildwheel
   prerequisite wheels will be installed as required.
 
 See the `cibw`_ command.
+
+
+Pytest junit .xml output
+------------------------
+
+When running pytest with the `test`_ command and `cibw`_ commands,
+we always specify ``--junit-xml=aptest-wheelhouse/<package-name>-pytest-junit.xml``,
+which generates an .xml file containing the test results.
+
+The .xml file is also copied back to local machine along with .whl files if `-r`_ is used.
+
+Also see https://docs.pytest.org/en/stable/how-to/output.html#creating-junitxml-format-files.
+
+
 
 
 Cibuildwheel Python version
@@ -194,6 +210,7 @@ and uploading to https://pypi.org (also see `Release procedure`_)::
     ./aptest/aptest.py --release-3
     ./aptest/aptest.py --release-4
     ./aptest/aptest.py --release-5
+    ./aptest/aptest.py --release-6
 
 Build/test pymupdf, pymupdfpro and pymupdf-layout using cibuildwheel,
 getting packages from different locations::
@@ -387,6 +404,14 @@ Instructions for releasing wheels for:
   Tell @jamie about the Pyodide wheel.
   
   [2026-01-30: hopefully we'll have a more official location soon.]
+
+* Build cp314t (free threading) wheel.
+
+  Run::
+  
+    ./aptest/aptest.py --release-6
+  
+  Wait for build to finish, agree to upload.
 
 * Unlock projects' branches if they were locked above:
 
@@ -906,9 +931,9 @@ Options
             
             Defaults:
             
-            * branch: hard-coded for each package (typically "master" or "main").
-            * remote: hard-coded for each package (typically a Github repository).
-            * depth: 1.
+            * ``<branch>``: hard-coded for each package (typically "master" or "main").
+            * ``<remote>``: hard-coded for each package (typically a Github repository).
+            * ``<depth>``: 1.
 
         <local-dir>
             Local directory, typically a git checkout.
@@ -1494,16 +1519,17 @@ Options
 
 --pytest <pytest-flags>
 .......................
-    Specify pytest flags used by `test`_ command; for example
+    Specify extra pytest flags used by `test`_ and `cibw`_ commands; for example
     ``--pytest '-k test_123'``.
 
 .. _--pytest-path:
 
 --pytest-path <pytest_path>
 ...........................
-    Specify a directory/file/test-function to use with the `test`_ command, relative
-    to each project root directory. Can be specified multiple times. Default is
-    ``<package_root>/tests/``.
+    Specify a directory/file/test-function to use with the `test`_ and `cibw`_ commands,
+    relative to each project root directory.
+    Can be specified multiple times.
+    Default is ``<package_root>/tests/``.
 
 .. _--pytest-wrap:
 
@@ -1520,16 +1546,6 @@ Options
 
 .. _--release-:
 
-.. _--release-1:
-
-.. _--release-2:
-
-.. _--release-3:
-
-.. _--release-4:
-
-.. _--release-5:
-
 --release-1
 ...........
 --release-2
@@ -1540,21 +1556,30 @@ Options
 ...........
 --release-5
 ...........
+--release-6
+...........
     Preset args for making releases. Only one may be specified, and it
     must be the only arg.
 
     ``aptest/aptest.py --release-1``
-        Build wheels for pymupdf, pymupdfpro and pymupdf_layout, for all
-        platforms except linux-aarch64, linux-x64-musl and win32.
+        Build+upload wheels for pymupdf, pymupdfpro and pymupdf_layout,
+        for core platforms:
+        
+        * linux-x64
+        * windows-x64
+        * macos-x64
+        * macos-arm64
     ``aptest/aptest.py --release-2``
-        Build wheels for pymupdf, pymupdfpro and pymupdf_layout, for
+        Build+upload wheels for pymupdf, pymupdfpro and pymupdf_layout, for
         linux-aarch64.
     ``aptest/aptest.py --release-3``
-        Build pymupdf wheel for win32.
+        Build+upload pymupdf-win32 wheel.
     ``aptest/aptest.py --release-4``
-        Build pymupdf wheel for linux-x64-musl.
+        Build+upload pymupdf-linux-x64-musl wheel.
     ``aptest/aptest.py --release-5``
         Build pyodide wheel.
+    ``aptest/aptest.py --release-5``
+        Build+upload pymupdf-cp314t-linux-x64 (free threading) wheel.
 
 .. _--remote-do:
 
@@ -1710,19 +1735,20 @@ Options
 
 --swig <swig>
 .............
-    Use ``<swig>`` instead of the ``swig`` command.
+    Specify what swig to use.
+    
+    * If ``pip:...`` we install using pip.
 
-    Unix only:
-        Clone/update/build swig from a git repository using 'git:' prefix.
+    * (Unix only) If ``git:...`` we clone/update/build swig from a git repository.
 
-        We default to https://github.com/swig/swig.git branch master, so these
-        are all equivalent::
+      We default to https://github.com/swig/swig.git branch master, so these
+      are all equivalent::
 
-            --swig 'git:--branch master https://github.com/swig/swig.git'
-            --swig 'git:--branch master'
-            --swig git:
-
-        2025-08-18: This fixes building with ``py_limited_api`` on python-3.13.
+          --swig 'git:--branch master https://github.com/swig/swig.git'
+          --swig 'git:--branch master'
+          --swig git:
+    
+    * Otherwise should be the swig binary to use.
 
 .. _--swig-quick:
 
@@ -1753,6 +1779,9 @@ Options
 .................
     If true, we copy log output to file ``aptest-out-YYYY-mm-dd-HH-MM-SS``, and on
     exit create convenience softlink ``aptest-out``.
+    
+    If `-r`_ is used to run on a remote machine (not ``@github`),
+    we create a second convenience softlink called ``aptest-out-<remote>``.
     
     Default is 0.
 
@@ -1910,13 +1939,17 @@ Changelog
 ---------
 
 
-* With `cibw`_ command, support `--pytest-path`_ (was previously ignored).
-
-
-2026-02-20
+2026-02-25
 ^^^^^^^^^^
 
+* With `cibw`_ command, support `--pytest-path`_ (was previously ignored).
 * Fix `--python`_.
+* Generate junit .xml file when running pytest.
+* Make `cibw`_ respect `--pytest-path`_.
+* Fix `--clean-setup`_ with pymupdf's mupdf.
+* Avoid duplicate ``aptest-out-*`` files when re-running ourselves in venv or on remote machine.
+* Add support for ``pip:...`` to `--swig`_.
+* Added `--release-6`_ for python-3.14t (free threading) wheel.
 
 
 2026-02-18
