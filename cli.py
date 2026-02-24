@@ -119,9 +119,12 @@ class ArgsEq:
         self.pos_sub = a2
     
     def set(self, pos, new_arg):
-        a1, a2 = pos
-        assert a2 == 0
-        self.argv[a1] = new_arg
+        pos, subpos = pos
+        arg = self.argv[pos]
+        arg = arg[:subpos] + new_arg
+        self.argv[pos] = arg
+        #assert a2 == 0, f'Cannot handle {self.argv[a1]!r}, use `--foo bar`.'
+        #self.argv[a1] = new_arg
     
     def set_bool(self, pos, value):
         '''
