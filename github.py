@@ -754,6 +754,8 @@ def _check_identical_wheels(leaf_to_paths):
                 elif path.endswith('.tar.gz'):
                     with tarfile.open(path) as z:
                         z.extractall(extracted_path)
+                elif path.endswith('.xml'):
+                    continue
                 else:
                     assert 0, f'Unrecognised suffix: {path=}'
                 extracted_paths.append(extracted_path)
