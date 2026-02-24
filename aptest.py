@@ -2582,11 +2582,23 @@ def _get_local(package, state, test=False):
     
     if not test:
         if package in state.clean_git:
-            pipcl.run(f'cd {directory} && git clean -fdx', prefix=f'clean_git: ')
+            pipcl.run(
+                    f'cd {directory} && git clean -fdx',
+                    prefix=f'clean_git: ',
+                    env_extra=state.env_extra,
+                    )
         if package in state.clean_setup:
-            pipcl.run(f'cd {directory} && {sys.executable} setup.py clean', prefix=f'clean_setup: ')
+            pipcl.run(
+                    f'cd {directory} && {sys.executable} setup.py clean',
+                    prefix=f'clean_setup: ',
+                    env_extra=state.env_extra,
+                    )
         if package in state.clean_setup_all:
-            pipcl.run(f'cd {directory} && {sys.executable} setup.py clean --all', prefix=f'clean_setup_all: ')
+            pipcl.run(
+                    f'cd {directory} && {sys.executable} setup.py clean --all',
+                    prefix=f'clean_setup_all: ',
+                    env_extra=state.env_extra,
+                    )
     
     # Show information about the checkout, regardless of where it came from.
     sha, comment, diff, branch = pipcl.git_info(directory)
