@@ -294,6 +294,8 @@ def gh_run_workflow(
         url_base,
         yml,
         data,
+        *,
+        doit=True,
         ):
     '''
     Starts new workflow run and returns its id.
@@ -313,6 +315,10 @@ def gh_run_workflow(
     pipcl.log(f'{url_base=}')
     pipcl.log(f'data:')
     pipcl.log(json.dumps(data, indent='    '))
+    
+    if not doit:
+        pipcl.log(f'Not starting workflow because {doit=}.')
+        return
     
     # https://docs.github.com/en/rest/actions/workflows#create-a-workflow-dispatch-event
     #
