@@ -3403,6 +3403,11 @@ def fs_find_in_paths( name, paths=None, verbose=False):
         log('Returning None because not found: {name!r}')
 
 
+def fs_symlink(from_, to_):
+    fs_remove(from_)
+    os.symlink(to_, from_)
+
+
 def _get_prerequisites(path):
     '''
     Returns list of prerequisites from Makefile-style dependency file, e.g.
@@ -3612,17 +3617,15 @@ _log_text_line_start = True
 
 _log_f = [sys.stdout]
 
-def log_tee():
+def log_tee(path, path_simple=None):
     '''
-    Copies log output to find called `aptest-out-YYYY-MM-DD-HH-MM-SS`. And on
-    exit we make a convenience symlink to this file called `aptest-out`.
+    Copies log output to <path>. If path_simple is specified, on
+    exit we make a convenience symlink from <path_simple> to <path>.
     '''
-    path = f'aptest-out-{time.strftime(f"%F-%H-%M-%S")}'
-    path2 = 'aptest-out'
     f = open(path, 'w') # pylint: disable=consider-using-with
-    def final():
-        fs_remove(path2)
-        os.symlink(path, path2)
+    if path_simple:
+        def final():
+            fs_symlink(path_simple, path)
     atexit.register(final)
     _log_f.append(f)
 
