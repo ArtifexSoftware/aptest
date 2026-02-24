@@ -5,6 +5,7 @@
 See README.rst for details.
 '''
 
+import atexit
 import glob
 import importlib.metadata
 import json
@@ -25,6 +26,7 @@ import graph
 import github
 import pipcl
 
+
 # Get improved display of exceptions and stacktraces.
 backtrace.exception_hook_install()
 
@@ -37,6 +39,12 @@ python_versions_minor = range(10, 14+1)
 
 g_devel = False
 g_atexit = None
+
+# We use APTEST_NESTED to indicate that we are being re-run inside a venv or on
+# a remote machine, by an outer aptest invocation.
+#
+APTEST_NESTED = os.environ.get('APTEST_NESTED')
+
 
 def cibw_cp(*version_minors):
     '''
@@ -578,6 +586,7 @@ def get_args(argv):
     state.swig_quick = None
     state.system_packages = True if os.environ.get('GITHUB_ACTIONS') == 'true' else False   # pylint: disable=simplifiable-if-expression
     state.system_site_packages = False
+    state.tee_auto = False
     state.test_extra_packages = list()
     state.test_gnn_cache = False
     state.test_gnn_extra = dict()
@@ -743,16 +752,20 @@ def get_args(argv):
                 add_package(state, package, location)
             
             elif arg == '--tee-auto':
-                tee_auto = args.get_bool(overwrite=0)
-                if tee_auto:
-                    pipcl.log_tee()
+                tee_auto = args.get_bool()
+                # Ignore if we are being run by an outer aptest.
+                if tee_auto and not APTEST_NESTED:
+                    state.tee_auto = tee_auto
+                    pipcl.log_tee(f'aptest-out-{g_date_time}', 'aptest-out')
 
             elif arg == '--tee-path':
+                pos = args.pos
                 path = next(args).as_text()
-                args.argv[args.pos-1] = ''
-                if path:
-                    f = open(path, 'w') # pylint:disable=consider-using-with
-                    pipcl._log_f.append(f)  # pylint:disable=protected-access
+                #args.args_eq.set(pos, '')
+                # Ignore if we are being rerun by an outer aptest.
+                if path and not APTEST_NESTED:
+                    state.tee_path = path
+                    pipcl.log_tee(state.tee_path)
 
             elif arg == '-o':
                 state.os_names += next(args).as_text().lower().split(',')
@@ -1183,26 +1196,24 @@ def do_remote(state, argv):
             remote_command += f'{remote_prefix_default} '
         elif remote and 'windows' in remote:
             remote_command += f'py '
-        remote_command += f'{os.path.basename(g_root_abs)}/aptest.py {shlex.join(argv[1:])}'
+        remote_command += f'APTEST_NESTED=1 {os.path.basename(g_root_abs)}/aptest.py {shlex.join(argv[1:])}'
 
         command = f'{ssh_command} {remote if remote else ""} {shlex.quote(remote_command)}'
         pipcl.log(f'{command=}')
         pipcl.log(f'{ssh_command=}')
 
-        tee_simple = f'aptest-out-{remote}'
-        tee = f'{tee_simple}-{g_date_time}'
-        try:
-            pipcl.run(
-                    command,
-                    prefix=f'{label}: ',
-                    out='log',
-                    tee=tee,
-                    ticker=state.ticker,
-                    )
-        finally:
-            # Update softlink after remote command has finished. Avoids
-            # continuoue updates.
-            pipcl.run(f'ln -sf {tee} {tee_simple}')
+        if state.tee_auto:
+            def make_tee_out_remote():
+                pipcl.fs_symlink(f'aptest-out-{remote}', f'aptest-out-{g_date_time}')
+            atexit.register(make_tee_out_remote)
+        
+        pipcl.run(
+                command,
+                prefix=f'{label}: ',
+                out='log',
+                #tee=tee,
+                ticker=state.ticker,
+                )
 
     if 1:
         # Copy remote wheels back to local machine.
@@ -2257,8 +2268,14 @@ def main(argv):
     # avoids recursion when we rerun ourselves on local or remote machine.
     del argv
         
-    if not state.devel:
-        # Don't output file:line etc, just output elapsed time.
+    if state.devel:
+        # Leave pipcl's default, which includes elapsed time and file:line:fn.
+        pass
+    elif APTEST_NESTED:
+        # No log prefix.
+        pipcl.g_log_format = ''
+    else:
+        # Just output elapsed time by default.
         pipcl.g_log_format = '[+%d]: '
     
     if state.show_help:
@@ -2288,7 +2305,11 @@ def main(argv):
             pipcl.log(f'Already running on required python. {platform.python_version_tuple()=} {python_version_tuple=}')
         else:
             pipcl.log(f'{state.python=}: rerunning because {platform.python_version_tuple()[:2]=} != {python_version_tuple[:2]=}')
-            e = pipcl.run(f'{state.python} {shlex.join(args.argv)}', check=0)
+            e = pipcl.run(
+                    f'{state.python} {shlex.join(args.argv)}',
+                    check=0,
+                    env_extra=dict(APTEST_NESTED='1'),
+                    )
             sys.exit(e)
             
     # Rerun ourselves in a venv if necessary.
@@ -2327,6 +2348,7 @@ def main(argv):
                     e = pipcl.run(f'. {venv_name}/bin/activate && python {shlex.join(args.argv)}',
                             check=False,
                             prefix='{venv_name}: ',
+                            env_extra=dict(APTEST_NESTED='1'),
                             )
                 else:
                     # Re-run ourselves in a Python venv.
@@ -2343,6 +2365,7 @@ def main(argv):
                             recreate=(state.venv>=2),
                             clean=(state.venv>=3),
                             makelink='venv-aptest',
+                            env_extra=dict(APTEST_NESTED='1'),
                             )
                 sys.exit(e)
     
@@ -2650,7 +2673,7 @@ def venv_in(path=None):
         return sys.prefix != sys.base_prefix
 
 
-def venv_run(args, path, recreate=True, clean=False, makelink=None):
+def venv_run(args, path, recreate=True, clean=False, makelink=None, env_extra=None):
     '''
     Runs command inside venv and returns termination code.
     
@@ -2668,6 +2691,8 @@ def venv_run(args, path, recreate=True, clean=False, makelink=None):
             If true we first delete <path>.
         makelink:
             If true, we make a softlink from <makelink> to <path>.
+        env_extra:
+            Extra environment values.
     '''
     #pipcl.log(f'{path=} {recreate=} {clean=}')
     if clean:
@@ -2697,7 +2722,7 @@ def venv_run(args, path, recreate=True, clean=False, makelink=None):
             os.symlink(path, makelink)
         except Exception as e:
             pipcl.log(f'Warning: failed to create link from {makelink=} to {path=}: {e}')
-    e = pipcl.run(command, check=0, prefix=f'{path}: ')
+    e = pipcl.run(command, check=0, prefix=f'{path}: ', env_extra=env_extra)
     return e
 
 
