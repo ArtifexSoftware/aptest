@@ -991,7 +991,7 @@ def do_remote_github(state, args):
         info = name_info(remote_github_workflow_package)
     else:
         # Push ourselves to Git.
-        git_push(g_root, 'git@github.com:ArtifexSoftware/aptest.git', branch, state)
+        git_push(g_root, 'git@github.com:ArtifexSoftware/aptest.git', branch, state, doit=state.remote_do)
 
         # Push specified local package repository to Github and update args to
         # point to new location.
@@ -1002,7 +1002,7 @@ def do_remote_github(state, args):
                 info = name_info(package_name)
                 pipcl.log(f'{package_name=}.')
                 pipcl.log(f'{info["git_remote"]=}.')
-                git_push(package_location, info["git_remote"], branch, state)
+                git_push(package_location, info["git_remote"], branch, state, doit=state.remote_do)
                 args.args_eq.set(args_pos, f'git:-b {branch} {info["git_remote"]}')
 
         if state.remote_github_yml:
@@ -1028,11 +1028,13 @@ def do_remote_github(state, args):
                         raise Exception(f'Expected <name>=<value> in {nv!r} from {state.remote_github_yml_inputs=}.') from e
                     inputs[n] = v
                 data['inputs'] = inputs
+            url = f'https://api.github.com/repos/{info["github_name"]}'
             workflow_id = github.gh_run_workflow(
                     token_github,
-                    f'https://api.github.com/repos/{info["github_name"]}',
+                    url,
                     state.remote_github_yml,
                     data,
+                    doit=state.remote_do,
                     )
         else:
             # Run ourselves on Github using test.yml, passing argv.
@@ -1053,25 +1055,29 @@ def do_remote_github(state, args):
                     inputs = dict(args=args_string, matrix=matrix_json),
                     
                     )
+            url = f'https://api.github.com/repos/{info["github_name"]}'
+            yml = 'test.yml'
             workflow_id = github.gh_run_workflow(
                     token_github,
-                    f'https://api.github.com/repos/{info["github_name"]}',
-                    'test.yml',
+                    url,
+                    yml,
                     data,
+                    doit=state.remote_do,
                     )
-
-    assert isinstance(workflow_id, str)
-    url = f'https://api.github.com/repos/{info["github_name"]}'
-    upload = 'pypi' if state.github_upload else None
-    pipcl.log(f'Calling github.gh_workflow_download_multiple() with {url=} {workflow_id=} {upload=}.')
-    github.gh_workflow_download_multiple(
-            token_github,
-            url,
-            workflow_id,
-            #extra_wheels=upload_extra_wheels,
-            upload=upload,
-            token_pypi=_get_token_pypi(state) if upload else None,
-            )
+            
+    if state.remote_do:
+        assert isinstance(workflow_id, str)
+        url = f'https://api.github.com/repos/{info["github_name"]}'
+        upload = 'pypi' if state.github_upload else None
+        pipcl.log(f'Calling github.gh_workflow_download_multiple() with {url=} {workflow_id=} {upload=}.')
+        github.gh_workflow_download_multiple(
+                token_github,
+                url,
+                workflow_id,
+                #extra_wheels=upload_extra_wheels,
+                upload=upload,
+                token_pypi=_get_token_pypi(state) if upload else None,
+                )
 
 def do_remote(state, argv):
     remote = state.remote
