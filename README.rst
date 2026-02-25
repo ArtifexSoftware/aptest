@@ -14,20 +14,15 @@ Overview of Aptest
 The ``aptest.py`` script can build, test and release (to https://pypi.org) multiple
 Python packages together.
 
-Aptest is not a Python package - there is no support for building an aptest
-wheel for example.
-
-Instead it is intended to be used directly from a Git checkout, for example::
+Aptest is intended to be used directly from a Git checkout, for example::
 
     git clone git@github.com:ArtifexSoftware/aptest.git
     
     ./aptest/aptest.py ...
 
 
-Packages
---------
-
-Supported packages are:
+Supported packages
+------------------
 
 * langchain_pymupdf_layout
 * mupdf
@@ -38,40 +33,19 @@ Supported packages are:
 * pymupdf_layout
 * pymupdfpro
 
-Packages can be in different locations:
 
-* Local checkout.
+Package locations
+-----------------
+
+* A local checkout.
 * Specific branch, tag or sha on remote git repository.
 * https://pypi.org.
 
 See the `-i`_ option.
 
 
-Use of Python venv virtual environments
----------------------------------------
-
-If we are not already running inside a Python venv, we automatically create a
-venv and re-run ourselves inside it.
-
-* The `build`_ command builds and installs into the current venv.
-* The `test`_ command tests packages that are installed in the current venv.
-
-See the `-v`_ option.
-
-
-Run remotely
-------------
-
-Aptest can transparently rerun itself in remote locations:
-
-* Remote machine (with ssh/rsync).
-* Github runner (push to unique(ish) branches and run a workflow).
-
-See the `-r`_ option.
-
-
-Build/install with the `build`_ command
----------------------------------------
+Building packages
+-----------------
 
 For each package:
 
@@ -100,18 +74,10 @@ For each package:
 See the `build`_ command.
 
 
-Cleaning packages
------------------
+Testing packages
+----------------
 
-Packages can be cleaned before building or when populating.
-
-See the `--clean-git`_, `--clean-setup`_ and `--clean-setup-all`_ options.
-
-
-Running tests
--------------
-
-* We run tests in the current venv for each package, using pytest.
+* We run tests for each package, using pytest.
 * Packages on https://pypi.org do not contain test suites, but one can specify a second
   package location to be used for testing, for example a local checkout or
   remote git repository.
@@ -126,7 +92,7 @@ See the `test`_ command.
 Build/test with cibuildwheel
 ----------------------------
 
-* The `cibw`_ command runs ``cibuildwheel`` on each package.
+* Instead of separately building and testing packages, Aptest can use `cibuildwheel <https://cibuildwheel.pypa.io/en/stable/>`__.
 * This builds a wheel, and runs tests using pytest.
 * We add each wheel to our internal package repository.
 * We set ``PIP_EXTRA_INDEX_URL`` to point to our internal package repository.
@@ -134,70 +100,6 @@ Build/test with cibuildwheel
   prerequisite wheels will be installed as required.
 
 See the `cibw`_ command.
-
-
-Pytest junit .xml output
-------------------------
-
-When running pytest with the `test`_ command and `cibw`_ commands,
-we always specify ``--junit-xml=aptest-wheelhouse/<package-name>-pytest-junit.xml``,
-which generates an .xml file containing the test results.
-
-The .xml file is also copied back to local machine along with .whl files if `-r`_ is used.
-
-Also see https://docs.pytest.org/en/stable/how-to/output.html#creating-junitxml-format-files.
-
-
-
-
-Cibuildwheel Python version
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-Cibuildwheel needs system install of required python version(s).
-
-On Macos:
-
-* Installing python versions with brew does not seem to work - cibuildwheel
-  cannot find it.
-
-* What does work is to use the official installers at https://python.org::
-
-    wget https://www.python.org/ftp/python/3.10.11/python-3.10.11-macos11.pkg && sudo installer -pkg python-3.10.11-macos11.pkg -target /
-    wget https://www.python.org/ftp/python/3.11.9/python-3.11.9-macos11.pkg && sudo installer -pkg python-3.11.9-macos11.pkg -target /
-    wget https://www.python.org/ftp/python/3.12.10/python-3.12.10-macos11.pkg && sudo installer -pkg python-3.12.10-macos11.pkg -target /
-    wget https://www.python.org/ftp/python/3.13.12/python-3.13.12-macos11.pkg && sudo installer -pkg python-3.13.12-macos11.pkg -target /
-    wget https://www.python.org/ftp/python/3.14.3/python-3.14.3-macos11.pkg && sudo installer -pkg python-3.14.3-macos11.pkg -target /
-    
-  These commands install the latest builds of Python as of 2026-02-25.
-
-* To install python-3.14t:
-  
-  * Run::
-  
-      wget https://www.python.org/ftp/python/3.14.0/python-3.14.0-macos11.pkg
-  
-  * Create a file called ``choicechanges.plist`` containing::
-  
-      <?xml version="1.0" encoding="UTF-8"?>
-      <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-      <plist version="1.0">
-      <array>
-              <dict>
-                      <key>attributeSetting</key>
-                      <integer>1</integer>
-                      <key>choiceAttribute</key>
-                      <string>selected</string>
-                      <key>choiceIdentifier</key>
-                      <string>org.python.Python.PythonTFramework-3.14</string>
-              </dict>
-      </array>
-      </plist>
-  
-  * Run::
-  
-      sudo installer -pkg python-3.14.0-macos11.pkg -applyChoiceChangesXML choicechanges.plist -target /
-  
-  * Also see: https://docs.python.org/3/using/mac.html.
 
 
 Examples
@@ -252,6 +154,7 @@ Download wheels from a previous Aptest Github workflow run::
 Test aptest itself::
 
     ./aptest/aptest.py --aptest aptest test
+
 
 Release procedure
 -----------------
@@ -446,11 +349,107 @@ Instructions for releasing wheels for:
     (This is required for tests to pass.)
 
 
+Details
+-------
+
+Run remotely
+^^^^^^^^^^^^
+
+Aptest can transparently rerun itself in remote locations:
+
+* Remote machine (with ssh/rsync).
+* Github runner (push to unique(ish) branches and run a workflow).
+
+See the `-r`_ option.
+
+
+Use of Python venv virtual environments
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+If Aptest is not already running inside a Python venv, it automatically creates a
+venv and re-run itself inside it.
+
+* The `build`_ command builds and installs into the current venv.
+* The `test`_ command tests packages that are installed in the current venv.
+
+See the `-v`_ option.
+
+
+Pytest junit .xml output
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+When running pytest with the `test`_ and `cibw`_ commands,
+Aptest always specifies ``--junit-xml=aptest-wheelhouse/<package-name>-pytest-junit.xml``,
+which generates an .xml file containing the test results.
+
+The .xml file is also copied back to local machine along with .whl files if `-r`_ is used.
+
+Also see https://docs.pytest.org/en/stable/how-to/output.html#creating-junitxml-format-files.
+
+
+Cleaning packages
+^^^^^^^^^^^^^^^^^
+
+Packages can be cleaned before building or when populating.
+
+See the `--clean-git`_, `--clean-setup`_ and `--clean-setup-all`_ options.
+
+
+Cibuildwheel Python versions
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Cibuildwheel needs a system install of required python version(s).
+
+On Macos:
+
+* Installing python versions with brew does not seem to work - cibuildwheel
+  cannot find it.
+
+* What does work is to use the official installers at https://python.org.
+
+  These commands install the latest builds of Python as of 2026-02-25::
+
+    wget https://www.python.org/ftp/python/3.10.11/python-3.10.11-macos11.pkg && sudo installer -pkg python-3.10.11-macos11.pkg -target /
+    wget https://www.python.org/ftp/python/3.11.9/python-3.11.9-macos11.pkg && sudo installer -pkg python-3.11.9-macos11.pkg -target /
+    wget https://www.python.org/ftp/python/3.12.10/python-3.12.10-macos11.pkg && sudo installer -pkg python-3.12.10-macos11.pkg -target /
+    wget https://www.python.org/ftp/python/3.13.12/python-3.13.12-macos11.pkg && sudo installer -pkg python-3.13.12-macos11.pkg -target /
+    wget https://www.python.org/ftp/python/3.14.3/python-3.14.3-macos11.pkg && sudo installer -pkg python-3.14.3-macos11.pkg -target /
+
+* To install python-3.14t:
+  
+  * Run::
+  
+      wget https://www.python.org/ftp/python/3.14.0/python-3.14.0-macos11.pkg
+  
+  * Create a file called ``choicechanges.plist`` containing::
+  
+      <?xml version="1.0" encoding="UTF-8"?>
+      <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+      <plist version="1.0">
+      <array>
+              <dict>
+                      <key>attributeSetting</key>
+                      <integer>1</integer>
+                      <key>choiceAttribute</key>
+                      <string>selected</string>
+                      <key>choiceIdentifier</key>
+                      <string>org.python.Python.PythonTFramework-3.14</string>
+              </dict>
+      </array>
+      </plist>
+  
+  * Run::
+  
+      sudo installer -pkg python-3.14.0-macos11.pkg -applyChoiceChangesXML choicechanges.plist -target /
+  
+  * Also see: https://docs.python.org/3/using/mac.html.
+
+
 Workarounds
------------
+^^^^^^^^^^^
 
 (2026-02-06) With `cibw`_ we do not test with python-3.14 on Windows
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+....................................................................
 
     When cibuildwheel internally attempts to install packages with ``pip
     install`` (with ``PIP_EXTRA_INDEX_URL`` pointing to our piprepo wrapping of
@@ -467,30 +466,30 @@ Workarounds
     This failure does not happen with python-3.10-3.13.
 
 (2026-02-08) Use of setuptools<81 for piprepo
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.............................................
 
     Package piprepo requires pkg_resources, which is part of setuptools, but
     only setuptools<81.
 
 Keys/tokens
------------
+^^^^^^^^^^^
 
 Github ReST token
-^^^^^^^^^^^^^^^^^
+.................
 * This is required for remote running on Github.
 * Specify with `--token-github-path`_.
 
 * Also see `-r`_.
 
 Pypi token
-^^^^^^^^^^
+..........
 * This is required for uploading to https://pypi.org.
 * Specify with `--token-pypi-path`_.
 
 * Also see `-u`_.
 
 Github/ArtifexSoftware ssh key
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..............................
 
 We allow specification of a custom ssh private key to push to and/or
 access https://github.com/PyMuPDF/PyMuPDF and repositories within
@@ -506,7 +505,7 @@ When pushing to these repositories, we run ssh with
 ``~/.ssh/known_hosts``.
 
 Smartoffice ssh key
-^^^^^^^^^^^^^^^^^^^
+...................
 
 We allow specification of a custom ssh private key that allows access to the
 SmartOffice repository; this is required when PyMuPDFPro builds SmartOffice
@@ -516,13 +515,13 @@ because of how the SmartOffice build system works.
   current directory.
 
 Huggingface token
-^^^^^^^^^^^^^^^^^
+.................
 
 If required, this token should be provided in file ``huggingface-key`` in the
 current directory.
 
 Use of keys with remote runs
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+............................
 
 * If the `-r`_ option is used to defer to a remote machine, the key files are
   copied to the remote machine. This obviously has security implications.
@@ -533,7 +532,7 @@ Use of keys with remote runs
 
 
 Using DocLayNet dataset
------------------------
+.......................
 
 The `gnn-download`_ command downloads/extracts the DocLayNet dataset as described in
 https://github.com/ArtifexSoftware/sce/wiki/How-to-train-GNN.
@@ -550,7 +549,7 @@ dataset:
 
 
 Argument completion with Bash
------------------------------
+.............................
 
 ``aptest/aptest.py completion`` writes a bash completion script for aptest to
 stdout.
@@ -581,6 +580,8 @@ Command-line arguments
 Overview
 ^^^^^^^^
 
+Commands and options
+....................
 * Command line arguments are called options if they start with ``-``,
   otherwise they are called commands.
 * Options are evaluated first in the order that they were specified.
@@ -592,6 +593,9 @@ Overview
 Option values
 .............
 Option values can be specified with ``--foo <value>`` or ``--foo=<value>``.
+
+Bool options
+............
 
 Bool options are handled specially, they set to true by default, and can be
 set explicitly using ``--foo=<value>``:
@@ -609,14 +613,10 @@ Set to False:
 * --foo=false
 * --foo=False.
 
-Default arguments
-^^^^^^^^^^^^^^^^^
+.. _~/.aptest:
 
-Default arguments can be set in file ``~/.aptest`` and environment variable
-``$APTEST_options``.
-
-~/.aptest
-.........
+Default arguments in file ~/.aptest
+...................................
 If this file exists, its contents are inserted before the command-line arguments.
 
 * The tilde is expanded with ``os.path.expanduser()``,
@@ -626,21 +626,25 @@ If this file exists, its contents are inserted before the command-line arguments
 The contents are extracted as follows:
 
 * Lines starting with ``#`` are ignored.
-* arguments are extracted using `shlex.split()
+* Arguments are extracted using `shlex.split()
   <https://docs.python.org/3/library/shlex.html#shlex.split>`__,
   so are separated by whitespace
   (e.g. space and newlines characters)
   unless escaped or inside quotes etc.
 
+
+.. _$APTEST_options:
   
-$APTEST_options
-...............
+Default arguments in $APTEST_options
+....................................
+
 If environmental variable ``$APTEST_options`` is set, it is added to the
 command line after any `~/.aptest`_ and before the command-line arguments.
 
 *
   Arguments are extracted using `shlex.split()
   <https://docs.python.org/3/library/shlex.html#shlex.split>`__.
+
 
 Commands
 ^^^^^^^^
@@ -1931,9 +1935,7 @@ completion
 Changelog
 ---------
 
-
-2026-02-25
-^^^^^^^^^^
+**2026-02-25**
 
 * With `cibw`_ command, support `--pytest-path`_ (was previously ignored).
 * Fix `--python`_.
@@ -1945,8 +1947,7 @@ Changelog
 * Added `docs`_ command.
 
 
-2026-02-18
-^^^^^^^^^^
+**2026-02-18**
 
 * New command line parser.
 
@@ -1961,20 +1962,20 @@ Changelog
 * Added new command `windows-show-vs-instances`_.
 * Allow control over what Github runners are used with ``-r @github`` - see new option `--remote-github-runners`_.
 
-2026-02-12
-^^^^^^^^^^
+**2026-02-12**
+
 * Added `--token-github-path`_.
 * Added `--token-pypi-path`_.
 * Fixed ``-r @github`` on Windows.
 
-2026-02-11
-^^^^^^^^^^
+**2026-02-11**
+
 * Fixed `-u`_ upload.
 * Fixed checking of `--release-`_ options.
 * Fixed bug in `run`_ command.
 
-2026-02-10
-^^^^^^^^^^
+**2026-02-10**
+
 * Improved output after downloading from Github.
 * Added `--cibw-ignore-test-failures`_.
 * Renamed ``--log-tee`` to `--tee-auto`_.
@@ -1983,8 +1984,8 @@ Changelog
 * Added support for ``pdf2docx`` - see `--pdf2docx`_.
 
 
-2026-02-09
-^^^^^^^^^^
+**2026-02-09**
+
 * Changed `-V <-VV_>`__ to take the verbose level (0 or 1) instead of incrementing it.
 * Changed default verbose level to 1.
 * Show git sha and diff of aptest itself on startup if verbose.
@@ -1995,8 +1996,8 @@ Changelog
 * Improved clean options.
 
 
-2026-02-05
-^^^^^^^^^^
+**2026-02-05**
+
 * Added `--atexit`_
 * Fix `--smartoffice`_ to use ``thirdparty-so-key``.
 * Optionally copy output to date-stamped file. See ``--log-tee``.
@@ -2009,21 +2010,21 @@ Changelog
 * In ``~/.aptest``, ignore lines starting with ``#``.
 
 
-2026-01-31
-^^^^^^^^^^
+**2026-01-31**
+
 * Update tests to use mupdf 1.27.x branch.
 * Added experimental support for unified 4llm+layout package; see `--4llm-unified`_.
 
 
-2026-01-30
-^^^^^^^^^^
+**2026-01-30**
+
 * Allow testing of aptest itself.
 * Added `--release-5`_ for building pyodide pymupdf wheel.
 * Avoid remaining potential for ``build`` command to end up installing incorrect package versions.
 
 
-2026-01-15
-^^^^^^^^^^
+**2026-01-15**
+
 * Fix potentially incorrect package versions if ``pip:`` is used.
 * Fix flake8 errors.
 * Fix codespell errors.
