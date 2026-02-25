@@ -951,6 +951,7 @@ def get_args(argv):
             elif arg in (
                     'build',
                     'cibw',
+                    'docs',
                     'gnn-download',
                     'gnn-show',
                     'gnn-select-show',
@@ -2512,6 +2513,18 @@ def main(argv):
 
                 elif command == 'cibw':
                     do_cibw(state)
+                
+                elif command == 'docs':
+                    pipcl.run('pip install docutils')
+                    out = f'{g_root}/README.rst.html'
+                    # -s Include a "View document source" link.
+                    # -d Include the date at the end of the document (UTC).
+                    # -t Include the time & date (UTC).
+                    # -v Report all system messages.  (Same as "--report=1".)
+                    # --pep-references Recognize and link to standalone PEP references (like "PEP 258").
+                    #
+                    pipcl.run(f'docutils -s -d -t --pep-references {g_root}/README.rst {out}')
+                    pipcl.log(f'Have created: {out}')
 
                 elif command == 'gnn-download':
                     do_gnn_download(state)
@@ -2680,7 +2693,7 @@ def venv_in(path=None):
         return sys.prefix != sys.base_prefix
 
 
-def venv_run(args, path, recreate=True, clean=False, makelink=None, env_extra=None):
+def venv_run(args, path, *, recreate=True, clean=False, makelink=None, env_extra=None):
     '''
     Runs command inside venv and returns termination code.
     
