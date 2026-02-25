@@ -159,6 +159,17 @@ On Macos:
 
 * Installing python versions with brew does not seem to work - cibuildwheel
   cannot find it.
+
+* What does work is to use the official installers at https://python.org::
+
+    wget https://www.python.org/ftp/python/3.10.11/python-3.10.11-macos11.pkg && sudo installer -pkg python-3.10.11-macos11.pkg -target /
+    wget https://www.python.org/ftp/python/3.11.9/python-3.11.9-macos11.pkg && sudo installer -pkg python-3.11.9-macos11.pkg -target /
+    wget https://www.python.org/ftp/python/3.12.10/python-3.12.10-macos11.pkg && sudo installer -pkg python-3.12.10-macos11.pkg -target /
+    wget https://www.python.org/ftp/python/3.13.12/python-3.13.12-macos11.pkg && sudo installer -pkg python-3.13.12-macos11.pkg -target /
+    wget https://www.python.org/ftp/python/3.14.3/python-3.14.3-macos11.pkg && sudo installer -pkg python-3.14.3-macos11.pkg -target /
+    
+  These commands install the latest builds of Python as of 2026-02-25.
+
 * To install python-3.14t:
   
   * Run::
@@ -399,9 +410,9 @@ Instructions for releasing wheels for:
   
     ./aptest/aptest.py --release-5
 
-  Upload the resulting pyodide wheel to julian@ghostscript.com:public_html/pyodide/.
+  Upload the resulting pyodide wheel to ``julian@ghostscript.com:public_html/pyodide/``.
   
-  Tell @jamie about the Pyodide wheel.
+  Tell ``@jamie`` about the Pyodide wheel.
   
   [2026-01-30: hopefully we'll have a more official location soon.]
 
@@ -415,7 +426,7 @@ Instructions for releasing wheels for:
 
 * Unlock projects' branches if they were locked above:
 
-  Github settings/Branches/main/Edit/Lock branch - uncheck.
+  Github repository: settings/Branches/main/Edit/Lock branch - uncheck.
 
 * Post-release changes for all projects.
   
@@ -438,30 +449,28 @@ Instructions for releasing wheels for:
 Workarounds
 -----------
 
-With `cibw`_ we do not test with python-3.14 on Windows.
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-**2026-02-06**
+(2026-02-06) With `cibw`_ we do not test with python-3.14 on Windows
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-When cibuildwheel internally attempts to install packages with ``pip
-install`` (with ``PIP_EXTRA_INDEX_URL`` pointing to our piprepo wrapping of
-aptest-wheelhouse), pip complains::
+    When cibuildwheel internally attempts to install packages with ``pip
+    install`` (with ``PIP_EXTRA_INDEX_URL`` pointing to our piprepo wrapping of
+    aptest-wheelhouse), pip complains::
 
-    WARNING: Location 'file://D:/a/aptest/aptest/aptest-wheelhouse/simple/pymupdf/' is ignored: it is neither a file nor a directory.
-    INFO: pip is looking at multiple versions of pymupdfpro to determine which version is compatible with other requirements. This could take a while.
-    ERROR: Could not find a version that satisfies the requirement PyMuPDF==1.27.1 (from pymupdfpro) (from versions: ...)
-    ERROR: No matching distribution found for PyMuPDF==1.27.1
+        WARNING: Location 'file://D:/a/aptest/aptest/aptest-wheelhouse/simple/pymupdf/' is ignored: it is neither a file nor a directory.
+        INFO: pip is looking at multiple versions of pymupdfpro to determine which version is compatible with other requirements. This could take a while.
+        ERROR: Could not find a version that satisfies the requirement PyMuPDF==1.27.1 (from pymupdfpro) (from versions: ...)
+        ERROR: No matching distribution found for PyMuPDF==1.27.1
 
-I.e. preprequsite packages are not found, despite being in
-``aptest-wheelhouse``.
+    I.e. preprequsite packages are not found, despite being in
+    ``aptest-wheelhouse``.
 
-This failure does not happen with python-3.10-3.13.
+    This failure does not happen with python-3.10-3.13.
 
-Use of setuptools<81 for piprepo
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-**2026-02-08**
+(2026-02-08) Use of setuptools<81 for piprepo
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Package piprepo requires pkg_resources, which is part of setuptools, but
-only setuptools<81.
+    Package piprepo requires pkg_resources, which is part of setuptools, but
+    only setuptools<81.
 
 Keys/tokens
 -----------
@@ -1170,8 +1179,8 @@ Options
     
     For example:
     
-    * `--atexit 'printf "\\a"'`
-    * `--atexit beep`
+    * ``--atexit 'printf "\\a"'``
+    * ``--atexit beep``
 
 
 --build-type debug | memento | release
@@ -1495,8 +1504,12 @@ Options
 
 --pytest <pytest-flags>
 .......................
-    Specify extra pytest flags used by `test`_ and `cibw`_ commands; for example
-    ``--pytest '-k test_123'``.
+    Specify extra pytest flags used by `test`_ and `cibw`_ commands.
+    
+    For example:
+    
+    * ``--pytest '-k test_123'``
+    * ``--pytest '-v -k "test_123 or test_246"'``
 
 .. _--pytest-path:
 
@@ -1590,11 +1603,11 @@ Options
 
     We allow aliases for Github runners names:
     
-    * linux, linux-intel
-    * macos-intel.
-    * macos, macos-arm.
-    * windows-arm.
-    * windows, windows-intel.
+    * ``linux``, ``linux-intel``.
+    * ``macos-intel``.
+    * ``macos``, ``macos-arm``.
+    * ``windows-arm``.
+    * ``windows``, ``windows-intel``.
 
     For example:
 
@@ -1609,7 +1622,7 @@ Options
 .........................................
     Changes the behaviour of ``-r @github``. Don't start a new run on Github,
     instead continue from a previous ``-r @github`` invocation by waiting for
-    ``<workflow_id>`` to finish and then downloading logs and wheels etc to the
+    ``<workflow_id>`` to finish and downloading logs and wheels etc to the
     local machine.
     
     * One still needs to specify ``-r @github``.
@@ -1654,7 +1667,7 @@ Options
 
 --remote-prefix <remote_prefix>
 ...............................
-    Run remote using specified Python command. Ignored by ``-r @github``.
+    Run remote using specified (Python) command. Ignored by ``-r @github``.
 
 .. _--remote-prefix-default:
 
@@ -1741,13 +1754,13 @@ Options
 ........................
     If true, automatically install required system packages such as
     Valgrind, using ``apt`` on Linux and ``brew`` on MacOS. Default is true if
-    running as Github action, otherwise 0.
+    running as Github action, otherwise false.
 
 .. _--system-site-packages:
 
 --system-site-packages (bool)
 .............................
-    If true, use ``--system-site-packages`` when creating venv. Defaults is 0.
+    If true, use ``--system-site-packages`` when creating venv. Defaults is false.
 
 .. _--test-extra-packages:
 
@@ -1761,13 +1774,17 @@ Options
     If `-r`_ is used to run on a remote machine (not ``@github`),
     we create a second convenience softlink called ``aptest-out-<remote>``.
     
-    Default is 0.
+    Default is false.
+    
+    Can be useful to put this in `~/.aptest`_.
 
 .. _--tee-path:
 
 --tee-path <path>
 .................
     Copy log output to file ``<path>``.
+    
+    Can be useful to put this in `~/.aptest`_.
 
 --test-extra-packages <names>
 .............................
@@ -1824,7 +1841,7 @@ Options
 --test-gnn-push (bool)
 ......................
     If true, we push gnn results to
-    https://github.com/ArtifexSoftware/PyMuPDF-pymupdf-results. Default is 0.
+    https://github.com/ArtifexSoftware/PyMuPDF-pymupdf-results. Default is false.
 
 
 .. _--token-github-path:
@@ -1856,7 +1873,7 @@ Options
 
 --cibw-ignore-test-failures (bool)
 ..................................
-    If true, the `cibw`_ command ignores test failures. Default is 0.
+    If true, the `cibw`_ command ignores test failures. Default is false.
 
 .. _--ticker:
 
@@ -1903,7 +1920,7 @@ completion
     Must be the only arg. Prints a bash completion script for
     aptest.py, to stdout.
 
-    The script works by using aptest.py itself to write valid
+    The script works by using ``aptest.py`` itself to write valid
     completions to stdout (which it does if environment variable
     ``COMP_LINE`` is defined).
 
