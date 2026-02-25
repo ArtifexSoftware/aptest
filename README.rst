@@ -8,8 +8,8 @@ Artifex Packages build/test
     :backlinks: entry
     :depth: 2
 
-Overview
---------
+Overview of Aptest
+------------------
 
 The ``aptest.py`` script can build, test and release (to https://pypi.org) multiple
 Python packages together.
@@ -92,7 +92,7 @@ For each package:
     
     If you need a more portable wheel, see the `cibw`_ command.
   
-* The wheel is added to a local pypi-style PEP-503 package repository.
+* The wheel is added to a local pypi-style PEP 503 package repository.
 * We use pip's ``--extra-index-url`` option to refer to our internal package
   repository.
 * Thus pip will use previously built package wheels as prerequisites, as required.
@@ -108,8 +108,8 @@ Packages can be cleaned before building or when populating.
 See the `--clean-git`_, `--clean-setup`_ and `--clean-setup-all`_ options.
 
 
-Test
-----
+Running tests
+-------------
 
 * We run tests in the current venv for each package, using pytest.
 * Packages on https://pypi.org do not contain test suites, but one can specify a second
@@ -636,8 +636,6 @@ command line after any `~/.aptest`_ and before the command-line arguments.
 Commands
 ^^^^^^^^
 
-.. _build:
-
 build
 .....
     Builds and installs packages specified by `-i`_ into venv. Wheels
@@ -650,8 +648,6 @@ build
     * `--clean-git`_
     * `--clean-setup`_
     * `--clean-setup-all`_
-
-.. _cibw:
 
 cibw
 ....
@@ -677,14 +673,16 @@ cibw
     * `--cibw-pyodide-version`_
     * `--cibw-skip-add-defaults`_
 
-.. _gnn-download:
+docs
+....
+    Convert `<README.rst>`__ into `<README.rst.html>`__.
+    
+    Currently uses `docutils <https://pypi.org/project/docutils/>`__.
 
 gnn-download
 ............
     Download and extract dataset for pymupdf_layout GNN model. Does not
     do unnecessary downloads or extracts.
-
-.. _gnn-show:
 
 gnn-show
 ........
@@ -706,13 +704,9 @@ gnn-show
     * `--gnn-show-text`_
     * `--gnn-show-select`_
 
-.. _gnn-train:
-
 gnn-train
 .........
     Trains pymupdf_layout. Not tested.
-
-.. _populate:
 
 populate
 ........
@@ -727,13 +721,9 @@ populate
     * `--clean-setup`_
     * `--clean-setup-all`_
 
-.. _run:
-
 run
 ...
     Runs commands specified by `--run`_ within checkouts.
-
-.. _test:
 
 test
 ....
@@ -747,22 +737,16 @@ test
     * `-t`_
     * `--test-extra-packages`_
 
-.. _test-gnn:
-
 test-gnn
 ........
 
     [untested]
     Test GNN model.
 
-.. _test-gnn-pymupdf_layout:
-
 test-gnn-pymupdf_layout
 .......................
     [untested]
     Test GNN model via pymupdf_layout.
-
-.. _test-gnn-pymupdf4llm:
 
 test-gnn-pymupdf4llm
 ....................
@@ -806,14 +790,10 @@ test-gnn-pymupdf4llm
     * `--test-gnn-push`_
 
 
-.. _test-gnn-devel:
-
 test-gnn-devel
 ..............
     Work in progress running gnn pymupdf4llm test, storing output in
     file with full git info of all packages.
-
-.. _windows-show-vs-instances:
 
 windows-show-vs-instances
 .........................
@@ -876,8 +856,6 @@ Options
     Set specified environment variable.
 
 .. _--gnn-doit:
-
-.. _-h:
 
 -h
 ..
@@ -1214,8 +1192,8 @@ Options
 
 .. _--cibw-pyodide:
 
---cibw-pyodide
-..............
+--cibw-pyodide (bool)
+.....................
      Make the `cibw`_ command build a pyodide wheel; runs
      ``cibuildwheel --platform pyodide ...`` etc.
 
@@ -1315,6 +1293,8 @@ Options
     
         --gnn-show-select "'environ' in results and results.environ.USER=='jules' and results.python['platform.system()']=='Windows' and  results.state.get('limit')==5
 
+.. _--gnn-show-text:
+
 --gnn-show-text <path>
 ......................
     Override default filename of `gnn-show`_ text output.
@@ -1343,10 +1323,6 @@ Options
 
     [After the first time, suggest ``-v 1`` to avoid delay from
     updating/building pyenv and recreating the graal venv.]
-
-.. _--gnn-show-text:
-
-.. _--help:
 
 --help
 ......
@@ -1411,8 +1387,6 @@ Options
     * `-i`_.
     * `-m`_.
 
-.. _--pdf_feature_inspector:
-
 .. _--pdf2docx:
 
 --pdf2docx <pdf2docx-location>
@@ -1425,8 +1399,10 @@ Options
     
     * `-i`_.
 
---pdf_feature_inspector
-.......................
+.. _--pdf_feature_inspector:
+
+--pdf_feature_inspector <pdf_feature_inspector-location>
+........................................................
     Specify location of pdf_feature_inspector.
     
     Alias for ``-i pdf_feature_inspector <pdf_feature_inspector-location>``.
@@ -1459,7 +1435,7 @@ Options
     
     Also see:
     
-    * `-P <-PP_>`_.
+    * `-P <-PP_>`__.
     * `--pymupdfpro`_.
 
 .. _--pymupdf:
@@ -1486,7 +1462,7 @@ Options
     Also see:
     
     * `--pro`_.
-    * `-P <-PP_>`_.
+    * `-P <-PP_>`__.
 
 .. _--pymupdf4llm:
 
@@ -1580,6 +1556,8 @@ Options
         Build pyodide wheel.
     ``aptest/aptest.py --release-5``
         Build+upload pymupdf-cp314t-linux-x64 (free threading) wheel.
+    
+    Also see: `Release procedure`_
 
 .. _--remote-do:
 
@@ -1721,8 +1699,8 @@ Options
 
 .. _--smartoffice:
 
---smartoffice
-.............
+--smartoffice <smartoffice-location>
+....................................
     Specify location of smartoffice.
     
     Alias for ``-i smartoffice <smartoffice-location>``.
@@ -1920,8 +1898,6 @@ Options
 Special arguments
 ^^^^^^^^^^^^^^^^^
 
-.. _completion:
-
 completion
 ..........
     Must be the only arg. Prints a bash completion script for
@@ -1945,11 +1921,11 @@ Changelog
 * With `cibw`_ command, support `--pytest-path`_ (was previously ignored).
 * Fix `--python`_.
 * Generate junit .xml file when running pytest.
-* Make `cibw`_ respect `--pytest-path`_.
 * Fix `--clean-setup`_ with pymupdf's mupdf.
 * Avoid duplicate ``aptest-out-*`` files when re-running ourselves in venv or on remote machine.
 * Add support for ``pip:...`` to `--swig`_.
 * Added `--release-6`_ for python-3.14t (free threading) wheel.
+* Added `docs`_ command.
 
 
 2026-02-18
@@ -1992,7 +1968,7 @@ Changelog
 
 2026-02-09
 ^^^^^^^^^^
-* Changed `-V <-VV_>`_ to take the verbose level (0 or 1) instead of incrementing it.
+* Changed `-V <-VV_>`__ to take the verbose level (0 or 1) instead of incrementing it.
 * Changed default verbose level to 1.
 * Show git sha and diff of aptest itself on startup if verbose.
 * `cibw`_: don't attempt to build/test layout on macos-intel-python3.14
