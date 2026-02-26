@@ -24,14 +24,14 @@ Aptest is intended to be used directly from a Git checkout, for example::
 Supported packages
 ------------------
 
-* langchain_pymupdf_layout
-* mupdf
-* pdf2docx
-* pdf_feature_inspector
-* pymupdf
-* pymupdf4llm
-* pymupdf_layout
-* pymupdfpro
+* ``langchain_pymupdf_layout``
+* ``mupdf``
+* ``pdf2docx``
+* ``pdf_feature_inspector``
+* ``pymupdf``
+* ``pymupdf4llm``
+* ``pymupdf_layout``
+* ``pymupdfpro``
 
 
 Package locations
@@ -77,7 +77,7 @@ See the `build`_ command.
 Testing packages
 ----------------
 
-* We run tests for each package, using pytest.
+* We run tests for each package, using `pytest <https://docs.pytest.org>`_.
 * Packages on https://pypi.org do not contain test suites, but one can specify a second
   package location to be used for testing, for example a local checkout or
   remote git repository.
@@ -93,7 +93,7 @@ Build/test with cibuildwheel
 ----------------------------
 
 * Instead of separately building and testing packages, Aptest can use `cibuildwheel <https://cibuildwheel.pypa.io/en/stable/>`__.
-* This builds a wheel, and runs tests using pytest.
+* This builds a wheel, and runs tests using `pytest <https://docs.pytest.org>`_.
 * We add each wheel to our internal package repository.
 * We set ``PIP_EXTRA_INDEX_URL`` to point to our internal package repository.
 * cibuildwheel uses pip internally so this ensures that previously-built
@@ -161,9 +161,9 @@ Release procedure
 
 Instructions for releasing wheels for:
 
-    * pymupdf
-    * pymupdfpro
-    * pymupdf_layout
+    * ``pymupdf``
+    * ``pymupdfpro``
+    * ``pymupdf_layout``
 
 
 * Get local checkout of latest version of each package, corresponding to what will be released.
@@ -198,7 +198,7 @@ Instructions for releasing wheels for:
 
   On each Github repository go to: ``Settings/Branches/main/Edit/Lock branch``.
 
-* Build and release the main wheels::
+* Build and release the main wheels and sdists::
 
       aptest/aptest.py --release-1
 
@@ -378,7 +378,7 @@ See the `-v`_ option.
 Pytest junit .xml output
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-When running pytest with the `test`_ and `cibw`_ commands,
+When running `pytest <https://docs.pytest.org>`_ with the `test`_ and `cibw`_ commands,
 Aptest always specifies ``--junit-xml=aptest-wheelhouse/<package-name>-pytest-junit.xml``,
 which generates an .xml file containing the test results.
 
@@ -460,7 +460,7 @@ Workarounds
         ERROR: Could not find a version that satisfies the requirement PyMuPDF==1.27.1 (from pymupdfpro) (from versions: ...)
         ERROR: No matching distribution found for PyMuPDF==1.27.1
 
-    I.e. preprequsite packages are not found, despite being in
+    I.e. prerequisite packages are not found, despite being in
     ``aptest-wheelhouse``.
 
     This failure does not happen with python-3.10-3.13.
@@ -541,12 +541,15 @@ https://github.com/ArtifexSoftware/sce/wiki/How-to-train-GNN.
 * Downloading and extracting is tracked using marker files, to avoid running
   unnecessarily more than once.
 
-The ``test-gnn*`` commands run pymupdf_layout's test scripts on the DocLayNet
-dataset:
+The `test-gnn`_ command runs pymupdf_layout tests on the DocLayNet dataset, depending
+on the `--test-gnn-det` value:
 
-* 'test-gnn' command runs ``sce:eval/eval_gnn.py``.
-* 'test-gnn-pymupdf_layout' command runs ``sce:eval/eval_pymupdf_layout.py``.
-* 'test-gnn-pymupdf4llm' command runs ``sce:eval/eval_pymupdf4llm.py``.
+* ``eval_gnn`` - use ``sce:eval/eval_gnn.py:det_func()``.
+* ``eval_oracle_gnn`` - use ``sce:eval/eval_oracle_gnn.py:det_func()``.
+* ``eval_pymupdf4llm`` - use ``sce:eval/eval_pymupdf4llm.py:det_func()``.
+* ``eval_pymupdf_layout`` - use ``sce:eval/eval_pymupdf_layout.py:det_func()``.
+
+The ``pymupdf_layout`` package must have been built/installed.
 
 
 Argument completion with Bash
@@ -695,12 +698,12 @@ docs
 
 gnn-download
 ............
-    Download and extract dataset for pymupdf_layout GNN model. Does not
+    Download and extract dataset for the ``pymupdf_layout`` GNN model. Does not
     do unnecessary downloads or extracts.
 
 gnn-show
 ........
-    Generate graph showing results from previous runs of ``test-gnn*``.
+    Generate graph showing results from previous runs of `test-gnn`_.
 
     For example::
 
@@ -720,7 +723,7 @@ gnn-show
 
 gnn-train
 .........
-    Trains pymupdf_layout. Not tested.
+    Trains ``pymupdf_layout``. Not tested.
 
 populate
 ........
@@ -741,7 +744,7 @@ run
 
 test
 ....
-    Runs pytest tests.
+    Runs `pytest <https://docs.pytest.org>`_ tests.
 
     Also see:
 
@@ -751,22 +754,13 @@ test
     * `-t`_
     * `--test-extra-packages`_
 
+
 test-gnn
-........
-
-    [untested]
-    Test GNN model.
-
-test-gnn-pymupdf_layout
-.......................
-    [untested]
-    Test GNN model via pymupdf_layout.
-
-test-gnn-pymupdf4llm
 ....................
 
-    * Test GNN model via pymupdf4llm.
-    * Writes results to test-gnn-pymupdf4llm-YYYY-mm-dd-HH-MM-SS.json.
+    * Test GNN model
+    * Writes results to ``test-gnn-results/test-gnn-YYYY-mm-dd-HH-MM-SS.json``.
+    * Requires `--test-gnn-det`_.
 
     Results are a dict with this structure:
 
@@ -798,16 +792,12 @@ test-gnn-pymupdf4llm
     Also see:
 
     * `--test-gnn-cache`_
+    * `--test-gnn-det`_
     * `--test-gnn-extra`_
     * `--test-gnn-limit`_
     * `--test-gnn-out`_
     * `--test-gnn-push`_
 
-
-test-gnn-devel
-..............
-    Work in progress running gnn pymupdf4llm test, storing output in
-    file with full git info of all packages.
 
 windows-show-vs-instances
 .........................
@@ -1077,8 +1067,7 @@ Options
       * Wheels are copied back into local directory
         ``aptest-wheelhouse/``.
 
-      * Files matching ``test-gnn-*.json`` are copied back into the
-        current directory.
+      * `test-gnn`_ results directory ``test-gnn-results/`` is synced to local machine.
     
     * Also see:
     
@@ -1510,7 +1499,7 @@ Options
 
 --pytest <pytest-flags>
 .......................
-    Specify extra pytest flags used by `test`_ and `cibw`_ commands.
+    Specify extra `pytest <https://docs.pytest.org>`_ flags used by `test`_ and `cibw`_ commands.
     
     For example:
     
@@ -1521,8 +1510,11 @@ Options
 
 --pytest-path <pytest_path>
 ...........................
-    Specify a directory/file/test-function to use with the `test`_ and `cibw`_ commands,
+    Specify a directory/file/test-function to be used by
+    `pytest <https://docs.pytest.org>`_
+    with the `test`_ and `cibw`_ commands,
     relative to each project root directory.
+    
     Can be specified multiple times.
     Default is ``<package_root>/tests/``.
 
@@ -1530,7 +1522,7 @@ Options
 
 --pytest-wrap gdb | valgrind | helgrind
 .......................................
-    Makes `test`_ command run tests under specified tool.
+    Makes `test`_ command run `pytest <https://docs.pytest.org>`_ under specified tool.
 
 .. _--python:
 
@@ -1564,6 +1556,8 @@ Options
         * windows-x64
         * macos-x64
         * macos-arm64
+        
+        Also builds sdists.
     ``aptest/aptest.py --release-2``
         Build+upload wheels for pymupdf, pymupdfpro and pymupdf_layout, for
         linux-aarch64.
@@ -1715,6 +1709,13 @@ Options
 --sdists (bool)
 ...............
     If true, the `build`_ and `cibw`_ commands will also build sdists.
+    
+    We only build sdists for these packages:
+    * ``pymupdf``
+    * ``pymupdf4llm``
+    * ``pdf2docx``
+    
+    With `cibw`_, we only build sdists if on Linux.
 
 .. _--smartoffice:
 
@@ -1728,10 +1729,10 @@ Options
     
     * `-i`_.
 
-.. _--swig:
+.. _--set-swig:
 
---swig <swig>
-.............
+--set-swig <swig>
+.................
     Specify what swig to use.
     
     * If ``pip:...`` we install using pip.
@@ -1741,17 +1742,17 @@ Options
       We default to https://github.com/swig/swig.git branch master, so these
       are all equivalent::
 
-          --swig 'git:--branch master https://github.com/swig/swig.git'
-          --swig 'git:--branch master'
-          --swig git:
+          --set-swig 'git:--branch master https://github.com/swig/swig.git'
+          --set-swig 'git:--branch master'
+          --set-swig git:
     
     * Otherwise should be the swig binary to use.
 
-.. _--swig-quick:
+.. _--set-swig-quick:
 
---swig-quick (bool)
-...................
-    If true and `--swig`_'s ``<swig>`` value starts with ``git:``, we do not
+--set-swig-quick (bool)
+.......................
+    If true and `--set-swig`_'s ``<swig>`` value starts with ``git:``, we do not
     update/build swig if it is already present.
 
 .. _--system-packages:
@@ -1822,31 +1823,47 @@ Options
     * https://pypi.org version numbers for Artifex packages specified with ``pip:...``.
     * Any `--test-gnn-limit`_ value.
 
+.. _--test-gnn-det:
+
+--test-gnn-det <gnn_det>
+........................
+    This is required by `test-gnn`_.
+    
+    Sets the Python file to be run, relative to the root of the pymupdf_layout
+    checkout. Valid values are:
+    
+    * ``eval/eval_docling.py``
+    * ``eval/eval_gnn.py``
+    * ``eval/eval_oracle_gnn.py``
+    * ``eval/eval_pymupdf4llm.py``
+    * ``eval/eval_pymupdf_layout.py``
+
+
 .. _--test-gnn-extra:
 
 --test-gnn-extra <key>=<value>
 ..............................
     Adds specified ``key=value`` pair to the root of the results dict
-    created by ``test-gnn*`` commands.
+    created by `test-gnn`_.
 
 .. _--test-gnn-limit:
 
 --test-gnn-limit <limit>
 ........................
-    Set number of gnn files to test. Default is all.
+    Set number of gnn files to tested by `test-gnn`_. Default is all.
 
 .. _--test-gnn-out:
 
 --test-gnn-out <path>
 .....................
-    Where to write json data containing test details. Default is a filename
-    containing the current date and time.
+    Where to write json data containing test details from `test-gnn`_. Default
+    is a filename containing the current date and time.
 
 .. _--test-gnn-push:
 
 --test-gnn-push (bool)
 ......................
-    If true, we push gnn results to
+    If true, we push gnn results from `test-gnn`_ to
     https://github.com/ArtifexSoftware/PyMuPDF-pymupdf-results. Default is false.
 
 
@@ -1915,8 +1932,11 @@ Options
 --4llm-unified (bool)
 .....................
 
-    If true we assume any pymupdf4llm package has been created by merging
-    pymupdf4llm into the layout git repository (ArtifexSoftware/sce on Github).
+    If true:
+    
+    * We assume package ``pymupdf4llm`` has been updated to contain ``pymupdf_layout``.
+    * Package ``pymupdf_layout`` is not built, but is expected to contain tests.
+
 
 Special arguments
 ^^^^^^^^^^^^^^^^^
@@ -1937,6 +1957,26 @@ completion
 Changelog
 ---------
 
+**2026-03-04**
+
+* Renamed ``--swig`` and ``--swig-quick`` to `--set-swig`_ and `--set-swig-quick`_.
+* Added support for package ``swig``.
+* Changes to `test-gnn`_.
+* `--4llm-unified`_ now expects layout to be in 4llm
+  (previously 4llm was moved into layout).
+* Fixed handling of ``pymupdf4llm``.
+* Also build sdists for ``pymupdf4llm`` and ``pdf2docx`` (as well as ``pymupdf``).
+* Added pymupdf4llm to `--release-1`_.
+* Allow trailing `/` in local package checkout paths.
+* Run ``git`` with ``-no-pager`` to attempt to avoid long delays on Windows.
+
+
+**2026-02-26**
+
+* Fixed build of ``pymupdf-cp314t`` wheel in  `--release-6`_ command.
+* Use stylesheet in `docs`_ command when producing `<README.rst.html>`__.
+
+
 **2026-02-25**
 
 * With `cibw`_ command, support `--pytest-path`_ (was previously ignored).
@@ -1944,7 +1984,7 @@ Changelog
 * Generate junit .xml file when running pytest.
 * Fix `--clean-setup`_ with pymupdf's mupdf.
 * Avoid duplicate ``aptest-out-*`` files when re-running ourselves in venv or on remote machine.
-* Add support for ``pip:...`` to `--swig`_.
+* Add support for ``pip:...`` to ``--swig``.
 * Added `--release-6`_ for python-3.14t (free threading) wheel.
 * Added `docs`_ command.
 
@@ -2030,4 +2070,4 @@ Changelog
 * Fix potentially incorrect package versions if ``pip:`` is used.
 * Fix flake8 errors.
 * Fix codespell errors.
-* All docs are now in ``README.rst``.
+* All docs are now in `<README.rst>`__.
