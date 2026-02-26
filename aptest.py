@@ -839,7 +839,12 @@ def get_args(argv):
                     new_args = '-r @github -p git: cibw --cibw-pyodide --remote-github-runners linux'
                 elif arg == '--release-6':
                     # Build for cp314t.
-                    new_args = '-r @github -u -p git: cibw --remote-github-runners linux --cibw-skip-add-defaults=0 -e CIBW_BUILD="cp314t*" -e CIBW_SKIP="*musllinux*"'
+                    #
+                    # We use PYMUPDF_SETUP_PY_LIMITED_API=0 because
+                    # py_limited_api and Py_GIL_DISABLED are not supported
+                    # together as of 2026-02-20, e.g. see PEP 803 and PEP 809.
+                    #
+                    new_args = '-r @github -u -p git: cibw --remote-github-runners linux --cibw-skip-add-defaults=0 -e CIBW_BUILD="cp314t*" -e CIBW_SKIP="*musllinux*" -e PYMUPDF_SETUP_PY_LIMITED_API=0'
                 else:
                     assert 0, f'Unrecognised {arg=}, should be one of --release-1, --release-2, --release-3.'
                 new_args = shlex.split(new_args)
