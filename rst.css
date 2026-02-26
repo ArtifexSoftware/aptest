@@ -1,0 +1,9 @@
+pre.literal-block {
+    color: #AA4400;
+}
+
+span.docutils.literal {
+    color: #AA4400;
+    font-family: monospace;
+    font-weight: bold;
+}
