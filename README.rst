@@ -1,8 +1,8 @@
 .. section-numbering::
     :depth: 2
 
-Artifex Packages build/test
-===========================
+Aptest - artifex python packages build/test system
+==================================================
 
 .. contents::
     :backlinks: entry
@@ -18,7 +18,7 @@ Aptest is intended to be used directly from a Git checkout, for example::
 
     git clone git@github.com:ArtifexSoftware/aptest.git
     
-    ./aptest/aptest.py ...
+    aptest/aptest.py ...
 
 
 Supported packages
@@ -108,52 +108,52 @@ Examples
 Build, install and test pymupdf, pymupdfpro and pymupdf_layout using
 local checkouts::
 
-    ./aptest/aptest.py -p PyMuPDF --pro PyMuPDFPro -m mupdf --layout sce build test
+    aptest/aptest.py -p PyMuPDF --pro PyMuPDFPro -m mupdf --layout sce build test
 
 Build, install and test pymupdf, pymupdfpro and pymupdf_layout using
 central git repositories::
 
-    ./aptest/aptest.py -p git: --pro git: --layout git: build test
+    aptest/aptest.py -p git: --pro git: --layout git: build test
 
 Make release, building/testing on Github, downloading to local machine,
 and uploading to https://pypi.org (also see `Release procedure`_)::
 
-    ./aptest/aptest.py --release-1
-    ./aptest/aptest.py --release-2
-    ./aptest/aptest.py --release-3
-    ./aptest/aptest.py --release-4
-    ./aptest/aptest.py --release-5
-    ./aptest/aptest.py --release-6
+    aptest/aptest.py --release-1
+    aptest/aptest.py --release-2
+    aptest/aptest.py --release-3
+    aptest/aptest.py --release-4
+    aptest/aptest.py --release-5
+    aptest/aptest.py --release-6
 
 Build/test pymupdf, pymupdfpro and pymupdf-layout using cibuildwheel,
 getting packages from different locations::
 
-    ./aptest/aptest.py -r @github -p pip: --pro PyMuPDFPlus --layout git: cibw
+    aptest/aptest.py -r @github -p pip: --pro PyMuPDFPlus --layout git: cibw
 
 Test current pymupdf release with latest test suite in central git::
 
-    ./aptest/aptest.py -r macmini -p pip: -p git: build test
+    aptest/aptest.py -r macmini -p pip: -p git: build test
 
 Test current pymupdf release with test suite in local checkout::
 
-    ./aptest/aptest.py -r macmini -p pip: -p PyMuPDF build test
+    aptest/aptest.py -r macmini -p pip: -p PyMuPDF build test
 
 Runs specific Github workflow PyMuPDFPlus/.github/workflows/test_multiple.yml, on windows only::
 
-    ./aptest/aptest.py -r @github --remote-github-yml test_multiple.yml --pro PyMuPDFPlus --remote-github-yml-inputs 'args=-o windows'
+    aptest/aptest.py -r @github --remote-github-yml test_multiple.yml --pro PyMuPDFPlus --remote-github-yml-inputs 'args=-o windows'
 
 Tests https://pypi.org's pymupdf, pymupdfpro and pymupdf_layout with the test
 suites on central git::
 
-    ./aptest/aptest.py -r @github -p pip: --pro pip: --layout pip: -p git: --pro git: --layout git: build test
+    aptest/aptest.py -r @github -p pip: --pro pip: --layout pip: -p git: --pro git: --layout git: build test
 
 Download wheels from a previous Aptest Github workflow run::
 
-    ./aptest/aptest.py -r @github --aptest aptest --remote-github-workflow-id 21760695687
+    aptest/aptest.py -r @github --aptest aptest --remote-github-workflow-id 21760695687
 
-Test aptest itself::
+Test Aptest itself::
 
-    ./aptest/aptest.py --aptest aptest test
+    aptest/aptest.py --aptest aptest test
 
 
 Release procedure
@@ -311,7 +311,7 @@ Instructions for releasing wheels for:
 
   Run::
   
-    ./aptest/aptest.py --release-5
+    aptest/aptest.py --release-5
 
   Upload the resulting pyodide wheel to ``julian@ghostscript.com:public_html/pyodide/``.
   
@@ -323,7 +323,7 @@ Instructions for releasing wheels for:
 
   Run::
   
-    ./aptest/aptest.py --release-6
+    aptest/aptest.py --release-6
   
   Wait for build to finish, agree to upload.
 
@@ -403,11 +403,11 @@ Cibuildwheel needs a system install of required python version(s).
 On Macos:
 
 * Installing python versions with brew does not seem to work - cibuildwheel
-  cannot find it.
+  cannot find them.
 
 * What does work is to use the official installers at https://python.org.
 
-  These commands install the latest builds of Python as of 2026-02-25::
+  These commands install the latest builds of Python, as of 2026-02-25::
 
     wget https://www.python.org/ftp/python/3.10.11/python-3.10.11-macos11.pkg && sudo installer -pkg python-3.10.11-macos11.pkg -target /
     wget https://www.python.org/ftp/python/3.11.9/python-3.11.9-macos11.pkg && sudo installer -pkg python-3.11.9-macos11.pkg -target /
@@ -468,8 +468,9 @@ Workarounds
 (2026-02-08) Use of setuptools<81 for piprepo
 .............................................
 
-    Package piprepo requires pkg_resources, which is part of setuptools, but
-    only setuptools<81.
+    Package piprepo requires package ``pkg_resources``,
+    which is part of setuptools,
+    but only setuptools<81.
 
 Keys/tokens
 ^^^^^^^^^^^
@@ -551,20 +552,20 @@ dataset:
 Argument completion with Bash
 .............................
 
-``aptest/aptest.py completion`` writes a bash completion script for aptest to
+``aptest/aptest.py completion`` writes a bash completion script for Aptest to
 stdout.
 
-* Add argument completion for aptest.py to the current Bash session with::
+* Add argument completion for Aptest to the current Bash session with::
 
     source <(aptest/aptest.py completion)
 
-  Subsequently when entering an aptest.py command, bash will respond to ``<tab>``
+  Subsequently when entering an Aptest command, bash will respond to ``<tab>``
   by completing and/or showing valid args.
 
 * Or write into relevant files with one of::
 
-  ./aptest/aptest.py completion > /etc/bash_completion.d/aptest.py.bash_completion
-  ./aptest/aptest.py completion >> ~/.bash_completion
+    aptest/aptest.py completion > /etc/bash_completion.d/aptest.py.bash_completion
+    aptest/aptest.py completion >> ~/.bash_completion
 
   See Bash's ``help complete`` for more information.
 
@@ -703,7 +704,7 @@ gnn-show
 
     For example::
 
-        ./aptest/aptest.py gnn-show --gnn-show-select \
+        aptest/aptest.py gnn-show --gnn-show-select \
                 " \
                 'environ' in results \
                 and results['environ']['USER']=='jules' \
@@ -939,7 +940,8 @@ Options
         ``aptest.py -i pymupdf pip: -i pymupdf git: build test``
             Test current pymupdf release with testsuite in current git.
 
-    Also see:
+    
+    Various convenience options and shortened aliases are provided:
     
     * `--langchain-pymupdf-layout`_ and alias `--langchain`_.
     * `--mupdf`_ and alias `-m`_.
@@ -1128,9 +1130,11 @@ Options
 
 -v <venv>
 .........
-    Changes how we run ourselves in a venv when required.
+    Changes how we rerun ourselves in a venv when required.
 
-    0 - Never use a venv.
+    0 - Never rerun inside a venv.
+    
+        For example one could use this if already in a venv.
 
     1 - Use a venv but without recreating it if the directory already exists.
         We assume any existing directory was created
@@ -1139,13 +1143,11 @@ Options
 
         Otherwise we create it with ``python -m venv ...``.
 
-    2 - Use a venv.
+    2 - (This is the default) Use a venv.
         Always (re)create it with ``python -m venv ...``.
 
     3 - Use a clean venv.
         Delete it if it already exists, then run ``python -m venv ...``.
-
-    The default is 2.
 
     The venv will be called ``venv-aptest-<pthonversion>-<wordsize>``, for
     example ``venv-aptest-3.13.5-64``.
