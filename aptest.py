@@ -273,7 +273,13 @@ g_package_info = {
                 'git_branch': 'main',
                 'aliases':  list(),
                 'order': 4,
-            }
+            },
+        
+        'swig':
+            {
+                'github_name': None,
+                'order': -1,
+            },
         }
 
 for name, value in g_package_info.items():
@@ -290,7 +296,7 @@ def arg_alias(arg):
     Returns full name if arg is --<alias>.
     '''
     for fullname, info in g_package_info.items():
-        for alias in [fullname] + info['aliases']:
+        for alias in [fullname] + info.get('aliases', list()):
             alias = f'-{alias}' if len(alias) == 1 else f'--{alias}'
             if arg == alias:
                 return fullname
@@ -318,7 +324,7 @@ def package_aliases(packages):
     ret = list()
     for package in packages:
         for fullname, info in g_package_info.items():
-            if package in [fullname] + info['aliases']:
+            if package in [fullname] + info.get('aliases', list()):
                 ret.append(fullname)
     return ret
 
@@ -895,10 +901,11 @@ def get_args(argv):
             elif arg == '--system-site-packages':
                 state.system_site_packages = args.get_bool()
 
-            elif arg == '--swig':
+            elif arg == '--set-swig':
                 state.swig = next(args).as_text()
+                pipcl.log(f'{state.swig=}')
 
-            elif arg == '--swig-quick':
+            elif arg == '--set-swig-quick':
                 state.swig_quick = args.get_bool()
 
             elif arg == '--system-packages':
@@ -1203,6 +1210,7 @@ def do_remote(state, argv):
         for git_path in git_paths:
             # We exclude *.tar.gz to avoid pymupdf re-downloading mupdf .tar.gz file.
             remote_command += f'(cd {git_path} && git clean -e "*.tar.gz" -f) && '
+        remote_command += f'APTEST_NESTED=1 '
         if state.remote_prefix:
             remote_command += f'{state.remote_prefix} '
         elif (remote_prefix_default := state.remote_prefix_default.get(state.remote)) is not None:
@@ -1210,7 +1218,7 @@ def do_remote(state, argv):
             remote_command += f'{remote_prefix_default} '
         elif remote and 'windows' in remote:
             remote_command += f'py '
-        remote_command += f'APTEST_NESTED=1 {os.path.basename(g_root_abs)}/aptest.py {shlex.join(argv[1:])}'
+        remote_command += f'{os.path.basename(g_root_abs)}/aptest.py {shlex.join(argv[1:])}'
 
         command = f'{ssh_command} {remote if remote else ""} {shlex.quote(remote_command)}'
         pipcl.log(f'{command=}')
@@ -1334,6 +1342,24 @@ def do_build(state):
                 # We don't build smartoffice here, instead we tell pymupdfpro
                 # where the local smartoffice checkout is.
                 state.env_extra['PYMUPDFPRO_SETUP_SOT'] = directory_abs
+            elif package == 'swig':
+                swig_env_extra = dict()
+                pipcl.swig_prepare_build(swig_env_extra)
+                if 1: pipcl.run(
+                        f'cd {directory} && ./autogen.sh --prefix install',
+                        env_extra=swig_env_extra,
+                        prefix='{directory} autogen.sh: ',
+                        )
+                pipcl.run(
+                        f'cd {directory} && mkdir -p build/build && cd build/build && ../../configure',
+                        env_extra=swig_env_extra,
+                        prefix='{directory} configure: ',
+                        )
+                pipcl.run(
+                        f'cd {directory}/build/build && make',
+                        env_extra=swig_env_extra,
+                        prefix='{directory} make: ',
+                        )
             else:
                 if package:
                     pipcl.run(f'pip uninstall -y {package}')
@@ -2182,6 +2208,8 @@ def do_test(state):
             else:
                 pipcl.run(f'pip install pytest-cov')
                 e = pipcl.run(f'cd {directory} && make test', check=0)
+        elif package == 'swig':
+            e = pipcl.run(f'cd {directory}/build/build && make check-python-test-suite', check=0)
         else:
             #pipcl.run(f'pip install pytest-reportlog')
             command = f'pytest'
@@ -2469,7 +2497,8 @@ def main(argv):
         pipcl.log(f'## Warning, --run was specified but no `run` command.')
     
     # Clone/update/build swig if specified.
-    swig_binary = pipcl.swig_get(state.swig, state.swig_quick)
+    with pipcl.LogPrefix('--set-swig: '):
+        swig_binary = pipcl.swig_get(state.swig, state.swig_quick)
     #pipcl.log(f'{state.swig=}')
     #pipcl.log(f'{swig_binary=}')
     if swig_binary:
