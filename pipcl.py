@@ -3896,6 +3896,73 @@ class NewFiles:
         return ret
 
 
+def swig_prepare_build(swig_env_extra, *, do_bison=True):
+    '''
+    Builds required tools for building swig (not Windows).
+    
+    Adds to swig_env_extra['PATH'].
+    '''
+    if darwin():
+        run(f'brew install automake')
+        run(f'brew install pcre2')
+        run(f'brew install bison')
+        # Default bison doesn't work, and Brew's bison is not added to $PATH.
+        #
+        # > bison is keg-only, which means it was not symlinked into /opt/homebrew,
+        # > because macOS already provides this software and installing another version in
+        # > parallel can cause all kinds of trouble.
+        # >
+        # > If you need to have bison first in your PATH, run:
+        # >   echo 'export PATH="/opt/homebrew/opt/bison/bin:$PATH"' >> ~/.zshrc
+        #
+        macos_add_brew_path('bison', swig_env_extra)
+        run(f'which bison')
+        run(f'which bison', env_extra=swig_env_extra)
+
+    # Building swig requires bison>=3.5.
+    bison_ok = 0
+    e, text = run(f'bison --version', capture=1, check=0, env_extra=swig_env_extra)
+    if not e:
+        log(textwrap.indent(text, '    '))
+        m = re.search('bison (GNU Bison) ([0-9]+)[.]([0-9]+)', text)
+        if m:
+            assert m, f'Unexpected output from `bison --version`: {text!r}'
+            version_tuple = int(m.group(1)), int(m.group2())
+            if version_tuple >= (3, 5):
+                bison_ok = 1
+    if not bison_ok:
+        if 0:
+            # Use git checkout. Fails to find scan-code.c. Presumably
+            # something wrong with ./bootstrap?
+            log(f'Cloning/fetching/build/installing bison.')
+            bison_git = git_get(
+                    'pipcl-bison-git',
+                    remote='https://git.savannah.gnu.org/git/bison.git',
+                    #branch='master',
+                    tag='v3.5.4',
+                    submodules=0, # recursive update fails.
+                    )
+            run(f'cd {bison_git} && git submodule update --init', prefix='bison git submodule update --init: ')
+            run(f'cd {bison_git} && ./bootstrap', prefix='bison bootstrap: ')
+            run(f'cd {bison_git} && ./configure', prefix='bison configure: ')
+            run(f'cd {bison_git} && make', prefix='bison make: ')
+            run(f'cd {bison_git} && sudo make install', prefix='bison make install: ')
+        else:
+            bison_version = 'bison-3.5.4'
+            if not os.path.exists(f'{bison_version}.tar.gz'):
+                run(
+                        f'wget -O {bison_version}.tar.gz-0 http://www.mirrorservice.org/sites/ftp.gnu.org/gnu/bison/{bison_version}.tar.gz',
+                        prefix='bison wget: ',
+                        )
+                os.rename(f'{bison_version}.tar.gz-0', f'{bison_version}.tar.gz')
+            if not os.path.exists(f'{bison_version}'):
+                run(f'tar -xzf {bison_version}.tar.gz', prefix='bison extract: ')
+            # 2026-02-23: builds have started failing, perhaps recent compilers have extra detection?
+            run(f'cd {bison_version} && ./configure', prefix='bison configure: ', env_extra=dict(CFLAGS='-Wno-incompatible-function-pointer-types'))
+            run(f'cd {bison_version} && make', prefix='bison make: ')
+            run(f'cd {bison_version} && sudo make install', prefix='bison make install: ')
+
+
 def swig_get(swig, quick, swig_local='pipcl-swig-git'):
     '''
     Returns <swig> or a new swig binary.
@@ -3922,6 +3989,7 @@ def swig_get(swig, quick, swig_local='pipcl-swig-git'):
         swig_local:
             path to use for checkout.
     '''
+    log(f'{swig=}')
     if swig and swig.startswith('git:'):
         assert platform.system() != 'Windows', f'Cannot build swig on Windows.'
         # Note that {swig_local}/install/bin/swig doesn't work on MacOS because
@@ -3938,66 +4006,8 @@ def swig_get(swig, quick, swig_local='pipcl-swig-git'):
                     remote='https://github.com/swig/swig.git',
                     branch='master',
                     )
-            if darwin():
-                run(f'brew install automake')
-                run(f'brew install pcre2')
-                run(f'brew install bison')
-                # Default bison doesn't work, and Brew's bison is not added to $PATH.
-                #
-                # > bison is keg-only, which means it was not symlinked into /opt/homebrew,
-                # > because macOS already provides this software and installing another version in
-                # > parallel can cause all kinds of trouble.
-                # >
-                # > If you need to have bison first in your PATH, run:
-                # >   echo 'export PATH="/opt/homebrew/opt/bison/bin:$PATH"' >> ~/.zshrc
-                #
-                swig_env_extra = dict()
-                macos_add_brew_path('bison', swig_env_extra)
-                run(f'which bison')
-                run(f'which bison', env_extra=swig_env_extra)
             
-            # Building swig requires bison>=3.5.
-            bison_ok = 0
-            e, text = run(f'bison --version', capture=1, check=0, env_extra=swig_env_extra)
-            if not e:
-                log(textwrap.indent(text, '    '))
-                m = re.search('bison (GNU Bison) ([0-9]+)[.]([0-9]+)', text)
-                if m:
-                    assert m, f'Unexpected output from `bison --version`: {text!r}'
-                    version_tuple = int(m.group(1)), int(m.group2())
-                    if version_tuple >= (3, 5):
-                        bison_ok = 1
-            if not bison_ok:
-                if 0:
-                    # Use git checkout. Fails to find scan-code.c. Presumably
-                    # something wrong with ./bootstrap?
-                    log(f'Cloning/fetching/build/installing bison.')
-                    bison_git = git_get(
-                            'pipcl-bison-git',
-                            remote='https://git.savannah.gnu.org/git/bison.git',
-                            #branch='master',
-                            tag='v3.5.4',
-                            submodules=0, # recursive update fails.
-                            )
-                    run(f'cd {bison_git} && git submodule update --init', prefix='bison git submodule update --init: ')
-                    run(f'cd {bison_git} && ./bootstrap', prefix='bison bootstrap: ')
-                    run(f'cd {bison_git} && ./configure', prefix='bison configure: ')
-                    run(f'cd {bison_git} && make', prefix='bison make: ')
-                    run(f'cd {bison_git} && sudo make install', prefix='bison make install: ')
-                else:
-                    bison_version = 'bison-3.5.4'
-                    if not os.path.exists(f'{bison_version}.tar.gz'):
-                        run(
-                                f'wget -O {bison_version}.tar.gz-0 http://www.mirrorservice.org/sites/ftp.gnu.org/gnu/bison/{bison_version}.tar.gz',
-                                prefix='bison wget: ',
-                                )
-                        os.rename(f'{bison_version}.tar.gz-0', f'{bison_version}.tar.gz')
-                    if not os.path.exists(f'{bison_version}'):
-                        run(f'tar -xzf {bison_version}.tar.gz', prefix='bison extract: ')
-                    # 2026-02-23: builds have started failing, perhaps recent compilers have extra detection?
-                    run(f'cd {bison_version} && ./configure', prefix='bison configure: ', env_extra=dict(CFLAGS='-Wno-incompatible-function-pointer-types'))
-                    run(f'cd {bison_version} && make', prefix='bison make: ')
-                    run(f'cd {bison_version} && sudo make install', prefix='bison make install: ')
+            swig_prepare_build(swig_env_extra)
                 
             # Build swig.
             run(f'cd {swig_local} && ./autogen.sh',
