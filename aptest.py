@@ -181,7 +181,7 @@ def sync(remote, remote_dir, path, ssh_command, verbose, state):    # pylint: di
             # Sync the file or directory directly.
             pipcl.log(f'syncing: {path}')
             command += f'{path} :{remote_dir}/'
-        pipcl.run(command, prefix=f'sync {path}: ', out='log', ticker=0.5)
+        pipcl.run(command, prefix=f'sync {path}: ', out='log', ticker=state.ticker)
     finally:
         if filenames_path:
             pipcl.fs_remove(filenames_path)
@@ -600,7 +600,7 @@ def get_args(argv):
     state.test_gnn_limit = None
     state.test_gnn_out = None
     state.test_gnn_push = 0
-    state.ticker = 0.5
+    state.ticker = 0
     state.token_github_path = None
     state.token_pypi_path = None
     state.valgrind = False
@@ -924,10 +924,10 @@ def get_args(argv):
             elif arg == '--test-gnn-det':
                 test_gnn_det = next(args)
                 assert test_gnn_det in (
-                        'eval_gnn',
-                        'eval_oracle_gnn',
-                        'eval_pymupdf4llm',
-                        'eval_pymupdf_layout',
+                        'eval/eval_gnn.py',
+                        'eval/eval_oracle_gnn.py',
+                        'eval/eval_pymupdf4llm.py',
+                        'eval/eval_pymupdf_layout.py',
                         )
                 state.test_gnn_det = test_gnn_det.as_str()
                 
@@ -1262,14 +1262,14 @@ def do_remote(state, argv):
                 filters=filters,
                 )
     if 1:
-        # Copy test-gnn-*.json back to local machine.
+        # Copy test-gnn-results/ back to local machine.
         sync_reverse(
                 remote,
                 remote_dir,
-                './',
-                './',
+                'test-gnn-results/',
+                'test-gnn-results/',
                 ssh_command=ssh_command,
-                filters = '"--include=test-gnn-*.json" "--exclude=*"',
+                #filters = '"--include=test-gnn-*.json" "--exclude=*"',
                 )
 
 
@@ -1990,199 +1990,159 @@ if 0:
     pipcl.log(f'{dicts_equal(a, b)=}')
         
 
-def do_test_gnn(state, command):
+def do_test_gnn(state):
     layout_location = _get_local('pymupdf_layout', state)
 
-    def run(command):
-        t = time.time()
-        try:
-            pipcl.run(command)
-        finally:
-            t = time.time() - t
-            pipcl.log(f'Command took {pipcl._duration(t)}.')    # pylint: disable=protected-access
-
-    if 0:
-        pass
-    #elif command == 'test-gnn':
-    #    run(f'cd {layout_location} && {sys.executable} eval/eval_gnn.py --pdf_dir ../datasets/DocLayNet/PDF')
+    pipcl.run(f'pip install tqdm')
+    out_dir = 'test-gnn-devel'
+    pdf_dir = 'datasets/DocLayNet/PDF'
     
-    #elif command == 'test-gnn-pymupdf_layout':
-    #    run(f'cd {layout_location} && {sys.executable} eval/eval_pymupdf_layout.py --pdf_dir ../datasets/DocLayNet/PDF')
+    ret = dict()
 
-    elif command == 'test-gnn':
-        pipcl.run(f'pip install tqdm')
-        sys.path.insert(0, f'{layout_location}')
-        sys.path.insert(0, f'{layout_location}/eval')
-        try:
-            # pylint: disable=import-error
-            import eval_util
-            import eval_gnn
-            import eval_oracle_gnn
-            import eval_pymupdf4llm
-            import eval_pymupdf_layout
-        finally:
-            del sys.path[0:2]
-        out_dir = 'test-gnn-devel'
-        pipcl.fs_ensure_empty_dir(out_dir)
-        vis_pdf_dir = f'{out_dir}/vis'
-        pipcl.fs_ensure_empty_dir(vis_pdf_dir)
-        result_csv_path = f'{out_dir}/result.csv'
-        pdf_dirs = ['datasets/DocLayNet/PDF']
-        gt_dir = f'{layout_location}/eval/resources/gt'
-        pipcl.log(f'{state.test_gnn_det=}')
-        if 0:
-                pipcl.log(f'{globals().get("os")=}')
-                pipcl.log(f'{locals().get("eval_gnn")=}')
-        det_func = locals().get(state.test_gnn_det).det_func
+    ret['python'] = dict()
+    ret['python']['platform.machine()'] = platform.machine()
+    ret['python']['platform.system()'] = platform.system()
+    ret['python']['platform.python_implementation()'] = platform.python_implementation()
+    ret['python']['platform.python_version()'] = platform.python_version()
+    ret['python']['platform.uname()'] = list(platform.uname())
+    ret['python']['platform.system()'] = platform.system()
+    ret['python']['sys.version'] = sys.version
+    ret['python']['sys.version_info'] = list(sys.version_info)
 
-        ret = dict()
+    ret['wordsize'] = sys.maxsize.bit_length() + 1
 
-        ret['python'] = dict()
-        ret['python']['platform.machine()'] = platform.machine()
-        ret['python']['platform.system()'] = platform.system()
-        ret['python']['platform.python_implementation()'] = platform.python_implementation()
-        ret['python']['platform.python_version()'] = platform.python_version()
-        ret['python']['platform.uname()'] = list(platform.uname())
-        ret['python']['platform.system()'] = platform.system()
-        ret['python']['sys.version'] = sys.version
-        ret['python']['sys.version_info'] = list(sys.version_info)
+    ret['environ'] = dict()
+    ret['environ']['USER'] = os.environ.get('USER')
 
-        ret['wordsize'] = sys.maxsize.bit_length() + 1
+    ret['state'] = dict()
+    ret['state']['test_gnn_det'] = state.test_gnn_det
+    ret['state']['pdf_dir'] = pdf_dir
+    ret['state']['limit'] = state.test_gnn_limit
 
-        ret['environ'] = dict()
-        ret['environ']['USER'] = os.environ.get('USER')
+    for n, v in state.test_gnn_extra.items():
+        ret[n] = v
 
-        ret['state'] = dict()
-        ret['state']['test_gnn_det'] = state.test_gnn_det
-        ret['state']['det_func'] = dict()
-        ret['state']['det_func']['__name__'] = det_func.__name__
-        ret['state']['det_func']['__module__'] = det_func.__module__
-        ret['state']['pdf_dirs'] = pdf_dirs
-        ret['state']['gt_dir'] = gt_dir
-        ret['state']['limit'] = state.test_gnn_limit
-        
-        for n, v in state.test_gnn_extra.items():
-            ret[n] = v
-
-        ret['packages'] = dict()
-        for package, (location, _) in state.packages.items():
+    ret['packages'] = dict()
+    for package, (location, _) in state.packages.items():
+        if package == 'mupdf':
+            # There is no mupdf package - it's only part of pymupdf.
+            directory = None
+            metadata_version = None
+        else:
             directory = _get_local(package, state)
             metadata_version = importlib.metadata.version(package)
-            ret['packages'][package] = dict()
-            ret['packages'][package]['location'] = location
-            ret['packages'][package]['directory'] = directory
-            ret['packages'][package]['metadata_version'] = metadata_version
-            if directory:
-                sha, comment, diff, branch = pipcl.git_info(directory)
-                author_date = pipcl.git_info_author_date(directory)
-                committer_date = pipcl.git_info_committer_date(directory)
-                ret['packages'][package]['gitinfo'] = dict(
-                        sha=sha,
-                        comment=comment,
-                        diff=diff,
-                        branch=branch,
-                        author_date=author_date,
-                        committer_date=committer_date,
-                        )
+        ret['packages'][package] = dict()
+        ret['packages'][package]['location'] = location
+        ret['packages'][package]['directory'] = directory
+        ret['packages'][package]['metadata_version'] = metadata_version
+        if directory:
+            sha, comment, diff, branch = pipcl.git_info(directory)
+            author_date = pipcl.git_info_author_date(directory)
+            committer_date = pipcl.git_info_committer_date(directory)
+            ret['packages'][package]['gitinfo'] = dict(
+                    sha=sha,
+                    comment=comment,
+                    diff=diff,
+                    branch=branch,
+                    author_date=author_date,
+                    committer_date=committer_date,
+                    )
 
-        # Provide version info for all installed packages. This
-        # is helpful if for example pymupdf was not specified -
-        # in this case the latest version on pypi will have been
-        # installed as a prerequisite by pip.
-        text = pipcl.run(f'pip list --format json', capture=1)
-        pip_list_packages = json.loads(text)
-        ret['pip-list'] = pip_list_packages
-        
-        # Check <ret> only contains simple types. Otherwise comparisons can
-        # show spurious differences.
-        def check(d):
-            if isinstance(d, dict):
-                for k, v in d.items():
-                    assert isinstance(k, str)
-                    check(v)
-            elif isinstance(d, list):
-                for v in d:
-                    check(v)
-            elif d is None:
-                pass
-            elif isinstance(d, (str, int, float)):
-                pass
-            else:
-                assert 0, f'Unrecognised item {type(d)=}: {d=}'
-        check(ret)
+    # Provide version info for all installed packages. This
+    # is helpful if for example pymupdf was not specified -
+    # in this case the latest version on pypi will have been
+    # installed as a prerequisite by pip.
+    text = pipcl.run(f'pip list --format json', capture=1)
+    pip_list_packages = json.loads(text)
+    ret['pip-list'] = pip_list_packages
 
-        t_start = time.time()
-        # Older pymupdf_layout's eval_util.evaluate_detection()
-        # does not have <limit> arg, so we are careful to not pass
-        # in <limit> if not specified.
-        kwargs = dict(
-                pdf_dirs=pdf_dirs,
-                result_csv_path=result_csv_path,
-                gt_dir=gt_dir,
-                vis_error_count=0,
-                vis_pdf_dir=vis_pdf_dir,
-                )
-        if state.test_gnn_limit:
-            kwargs['limit'] = state.test_gnn_limit
-        
-        name = f'test-gnn-{g_date_time}.json'
-        
-        out_json = None
-        if state.test_gnn_cache:
-            # See whether an identical run has already been done.
-            import copy
-            ret0 = copy.deepcopy(ret)
-            ignore_keys = ('results', 't_start', 't_duration', 'pip-list')
+    # Check <ret> only contains simple types. Otherwise comparisons can
+    # show spurious differences.
+    def check(d):
+        if isinstance(d, dict):
+            for k, v in d.items():
+                assert isinstance(k, str)
+                check(v)
+        elif isinstance(d, list):
+            for v in d:
+                check(v)
+        elif d is None:
+            pass
+        elif isinstance(d, (str, int, float)):
+            pass
+        else:
+            assert 0, f'Unrecognised item {type(d)=}: {d=}'
+    check(ret)
+
+    t_start = time.time()
+
+    name = f'test-gnn-{g_date_time}.json'
+
+    out_json = None
+    if state.test_gnn_cache:
+        # See whether an identical run has already been done.
+        import copy
+        ret0 = copy.deepcopy(ret)
+        ignore_keys = ('results', 't_start', 't_duration', 'pip-list')
+        for key in ignore_keys:
+            ret0.pop(key, None)
+        for path in glob.glob(f'test-gnn-results/test-gnn-*.json'):
+            if path.endswith('-raw.json'):
+                continue
+            with open(path) as f:
+                r = json.load(f)
             for key in ignore_keys:
-                ret0.pop(key, None)
-            for path in glob.glob(f'test-gnn-*.json'):
-                with open(path) as f:
-                    r = json.load(f)
-                for key in ignore_keys:
-                    r.pop(key, None)
-                pipcl.log(f'Comparing with {path=}.')
-                equal = dicts_equal(r, ret0)
-                if equal:
-                    pipcl.log(f'Found matching previous run: {path=}.')
-                    #os.symlink(path, name)
-                    out_json = path
-                    break
-            if not out_json:
-                pipcl.log(f'Did not find any matching previous run.')
-
+                r.pop(key, None)
+            pipcl.log(f'Comparing with {path=}.')
+            equal = dicts_equal(r, ret0)
+            if equal:
+                pipcl.log(f'Found matching previous run: {path=}.')
+                #os.symlink(path, name)
+                out_json = path
+                break
         if not out_json:
-            # Run the test.
-            results = eval_util.evaluate_detection(det_func, **kwargs)
-            t_duration = time.time() - t_start
-            assert len(results) == 1
-            results = results[0]
-
-            ret['results'] = results
-            ret['t_start'] = t_start
-            ret['t_duration'] = t_duration
-
-            pipcl.log(f'Results are:\n{json.dumps(ret, indent="    ")}')
-
-            out_json = f'test-gnn-{g_date_time}.json'
-            
-            with open(out_json, 'w') as f:
-                json.dump(ret, f, indent='    ', sort_keys=1)
-            pipcl.log(f'Have written results to {out_json=}.')
-
-            if state.test_gnn_push:
-                push_results(name, state.env_extra)
-            else:
-                pipcl.log(f'Not pushing results to PyMuPDF-performance-results: {name=}')
-        
-        out_json_simple = 'test-gnn.json'
-        pipcl.fs_remove(out_json_simple)
-        os.symlink(out_json, out_json_simple)
-        if state.test_gnn_out:
-            pipcl.fs_remove(state.test_gnn_out)
-            os.symlink(out_json, state.test_gnn_out)
-
+            pipcl.log(f'Did not find any matching previous run.')
+    
+    if out_json:
+        with open(out_json) as f:
+            results = json.load(f)
     else:
-        assert 0, f'Unrecognised command: {command=}'
+        # Run the test.
+        out_csv = f'test-gnn-{g_date_time}.csv'
+        out_json = f'test-gnn-results/test-gnn-{g_date_time}.json'
+        out_json_raw = f'test-gnn-results/test-gnn-{g_date_time}-raw.json'
+        pipcl.fs_ensure_dir('test-gnn-results')
+        
+        command = textwrap.dedent(f'''
+                cd {layout_location}
+                && python {state.test_gnn_det}
+                    --pdf_dir {os.path.abspath(pdf_dir)}
+                    --result_csv_path {os.path.abspath(out_csv)}
+                    --result_json_path {os.path.abspath(out_json_raw)}
+                    --limit {state.test_gnn_limit}
+                 ''')
+        ret['t_start'] = time.time()
+        
+        pipcl.run(command)
+        
+        ret['t_duration'] = time.time() - ret['t_start']
+        with open(out_json_raw) as f:
+            ret['results'] = json.load(f)
+        ret['results_csv'] = pipcl.fs_read(out_csv)
+        
+        with open(out_json, 'w') as f:
+            json.dump(ret, f, indent='    ', sort_keys=1)
+        
+        if state.test_gnn_push:
+            push_results(out_json, state.env_extra)
+        else:
+            pipcl.log(f'Not pushing results to PyMuPDF-performance-results: {out_json=}')
+    
+    out_json_simple = 'test-gnn.json'
+    pipcl.fs_symlink(out_json_simple, out_json)
+    
+    if state.test_gnn_out:
+        pipcl.fs_symlink(state.test_gnn_out, out_json)
 
 
 def do_test(state):
@@ -2607,7 +2567,7 @@ def main(argv):
                                 pipcl.log(f'Local directory for {package=} is: {directory!r}')
 
                 elif command.startswith('test-gnn'):
-                    do_test_gnn(state, command)
+                    do_test_gnn(state)
 
                 elif command == 'run':
                     for package, command in state.run_commands:
