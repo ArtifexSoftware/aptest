@@ -2081,10 +2081,14 @@ def fs_ensure_empty_dir(path):
     fs_remove_dir_contents( path)
 
 
+def fs_ensure_dir(path):
+    os.makedirs(path, exist_ok=True)
+
+
 def fs_ensure_parent_dir(path):
     parent = os.path.dirname(path)
     if parent:
-        os.makedirs(parent, exist_ok=True)
+        fs_ensure_dir(parent)
 
 
 def fs_filesize( filename, default=0):
