@@ -595,6 +595,7 @@ def get_args(argv):
     state.tee_auto = False
     state.test_extra_packages = list()
     state.test_gnn_cache = False
+    state.test_gnn_det = None
     state.test_gnn_extra = dict()
     state.test_gnn_limit = None
     state.test_gnn_out = None
@@ -919,6 +920,16 @@ def get_args(argv):
             
             elif arg == '--test-gnn-cache':
                 state.test_gnn_cache = args.get_bool()
+            
+            elif arg == '--test-gnn-det':
+                test_gnn_det = next(args)
+                assert test_gnn_det in (
+                        'eval_gnn',
+                        'eval_oracle_gnn',
+                        'eval_pymupdf4llm',
+                        'eval_pymupdf_layout',
+                        )
+                state.test_gnn_det = test_gnn_det.as_str()
                 
             elif arg == '--test-gnn-extra':
                 nv = next(args).as_text()
@@ -972,9 +983,6 @@ def get_args(argv):
                     'populate',
                     'test',
                     'test-gnn',
-                    'test-gnn-devel',
-                    'test-gnn-pymupdf4llm',
-                    'test-gnn-pymupdf_layout',
                     'windows-show-vs-instances',
                     ):
                 state.commands.append(arg.as_str())
@@ -1993,20 +2001,27 @@ def do_test_gnn(state, command):
             t = time.time() - t
             pipcl.log(f'Command took {pipcl._duration(t)}.')    # pylint: disable=protected-access
 
-    if command == 'test-gnn':
-        run(f'cd {layout_location} && {sys.executable} eval/eval_gnn.py --pdf_dir ../datasets/DocLayNet/PDF')
+    if 0:
+        pass
+    #elif command == 'test-gnn':
+    #    run(f'cd {layout_location} && {sys.executable} eval/eval_gnn.py --pdf_dir ../datasets/DocLayNet/PDF')
+    
+    #elif command == 'test-gnn-pymupdf_layout':
+    #    run(f'cd {layout_location} && {sys.executable} eval/eval_pymupdf_layout.py --pdf_dir ../datasets/DocLayNet/PDF')
 
-    elif command == 'test-gnn-pymupdf_layout':
-        run(f'cd {layout_location} && {sys.executable} eval/eval_pymupdf_layout.py --pdf_dir ../datasets/DocLayNet/PDF')
-
-    elif command == 'test-gnn-pymupdf4llm':
+    elif command == 'test-gnn':
         pipcl.run(f'pip install tqdm')
+        sys.path.insert(0, f'{layout_location}')
         sys.path.insert(0, f'{layout_location}/eval')
         try:
-            import eval_util    # pylint: disable=import-error
-            import eval_pymupdf4llm # pylint: disable=import-error
+            # pylint: disable=import-error
+            import eval_util
+            import eval_gnn
+            import eval_oracle_gnn
+            import eval_pymupdf4llm
+            import eval_pymupdf_layout
         finally:
-            del sys.path[0]
+            del sys.path[0:2]
         out_dir = 'test-gnn-devel'
         pipcl.fs_ensure_empty_dir(out_dir)
         vis_pdf_dir = f'{out_dir}/vis'
@@ -2014,7 +2029,11 @@ def do_test_gnn(state, command):
         result_csv_path = f'{out_dir}/result.csv'
         pdf_dirs = ['datasets/DocLayNet/PDF']
         gt_dir = f'{layout_location}/eval/resources/gt'
-        det_func = eval_pymupdf4llm.det_func
+        pipcl.log(f'{state.test_gnn_det=}')
+        if 0:
+                pipcl.log(f'{globals().get("os")=}')
+                pipcl.log(f'{locals().get("eval_gnn")=}')
+        det_func = locals().get(state.test_gnn_det).det_func
 
         ret = dict()
 
@@ -2034,6 +2053,7 @@ def do_test_gnn(state, command):
         ret['environ']['USER'] = os.environ.get('USER')
 
         ret['state'] = dict()
+        ret['state']['test_gnn_det'] = state.test_gnn_det
         ret['state']['det_func'] = dict()
         ret['state']['det_func']['__name__'] = det_func.__name__
         ret['state']['det_func']['__module__'] = det_func.__module__
@@ -2105,7 +2125,7 @@ def do_test_gnn(state, command):
         if state.test_gnn_limit:
             kwargs['limit'] = state.test_gnn_limit
         
-        name = f'test-gnn-pymupdf4llm-{g_date_time}.json'
+        name = f'test-gnn-{g_date_time}.json'
         
         out_json = None
         if state.test_gnn_cache:
@@ -2131,6 +2151,7 @@ def do_test_gnn(state, command):
                 pipcl.log(f'Did not find any matching previous run.')
 
         if not out_json:
+            # Run the test.
             results = eval_util.evaluate_detection(det_func, **kwargs)
             t_duration = time.time() - t_start
             assert len(results) == 1
@@ -2142,7 +2163,7 @@ def do_test_gnn(state, command):
 
             pipcl.log(f'Results are:\n{json.dumps(ret, indent="    ")}')
 
-            out_json = f'test-gnn-pymupdf4llm-{g_date_time}.json'
+            out_json = f'test-gnn-{g_date_time}.json'
             
             with open(out_json, 'w') as f:
                 json.dump(ret, f, indent='    ', sort_keys=1)
