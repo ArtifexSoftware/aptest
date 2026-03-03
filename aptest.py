@@ -597,7 +597,7 @@ def get_args(argv):
     state.test_gnn_cache = False
     state.test_gnn_det = None
     state.test_gnn_extra = dict()
-    state.test_gnn_limit = None
+    state.test_gnn_limit = 0
     state.test_gnn_out = None
     state.test_gnn_push = 0
     state.ticker = 0
@@ -802,11 +802,7 @@ def get_args(argv):
                 state.pybind = args.get_bool()
 
             elif arg == '--4llm-unified':
-                if args.get_bool():
-                    state.pymupdf4llm_unified = True
-                    g_package_info['pymupdf4llm']['github_name'] = 'ArtifexSoftware/sce'
-                    g_package_info['pymupdf4llm']['git_branch'] = 'master'
-                    g_package_info['pymupdf4llm']['submodules'] = False
+                state.pymupdf4llm_unified = args.get_bool()
             
             elif arg == '--pytest':
                 state.pytest_options = next(args).as_text()
@@ -1368,6 +1364,10 @@ def do_build(state):
                         env_extra=swig_env_extra,
                         prefix='{directory} make: ',
                         )
+            elif state.pymupdf4llm_unified and package == 'pymupdf_layout':
+                # pymupdf_layout is now purely for testing the gnn aspects of
+                # the unified 4llm+layout.
+                pipcl.log(f'Not building {package=} because {state.pymupdf4llm_unified=}.')
             else:
                 if package:
                     pipcl.run(f'pip uninstall -y {package}')
@@ -2218,12 +2218,11 @@ def do_test(state):
                 command += f' {directory}/tests'
             
             if package == 'pymupdf4llm' and state.pymupdf4llm_unified:
-                # Extra requirements for testing unified pymupdf4llm+layout. We
-                # before this unification we didn't use pytest to run 4llm
-                # tests..
+                # Extra requirements for testing unified
+                # pymupdf4llm+layout. Layout requires extra packages.
                 pipcl.run(f'pip install llama_index')
                 pipcl.run(f'pip install pytest-asyncio')
-                
+            
             if state.pytest_wrap in ('valgrind', 'helgrind'):
                 if not state.pytest_options:
                     command += ' -sv'
