@@ -2024,7 +2024,7 @@ def do_test_gnn(state):
 
     ret['packages'] = dict()
     for package, (location, _) in state.packages.items():
-        if package == 'mupdf':
+        if package == 'mupdf' or (state.pymupdf4llm_unified and package == 'pymupdf_layout'):
             # There is no mupdf package - it's only part of pymupdf.
             directory = None
             metadata_version = None
@@ -2358,7 +2358,8 @@ def main(argv):
                     os.environ['PIPCL_GRAAL_PYTHON'] = sys.executable
                     
                     if state.venv >= 3:
-                        shutil.rmtree(venv_name, ignore_errors=1)
+                        assert venv_name.startswith('venv-')
+                        pipcl.fs_remove(venv_name)
                     if state.venv == 1 and os.path.exists(pyenv_dir) and os.path.exists(venv_name):
                         pipcl.log(f'{state.venv=} and {venv_name=} already exists so not building pyenv or creating venv.')
                     else:
@@ -2733,7 +2734,7 @@ def venv_run(args, path, *, recreate=True, clean=False, makelink=None, env_extra
     if clean:
         pipcl.log(f'Removing any existing venv {path}.')
         assert path.startswith('venv-')
-        shutil.rmtree(path, ignore_errors=1)
+        pipcl.fs_remove(path)
     if recreate or not os.path.isdir(path):
         if platform.system() == 'Windows':
             pipcl.run(f'"{sys.executable}" -m venv {path}')
