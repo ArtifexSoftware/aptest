@@ -2108,7 +2108,7 @@ def do_test_gnn(state):
             results = json.load(f)
     else:
         # Run the test.
-        out_csv = f'test-gnn-{g_date_time}.csv'
+        out_csv = f'test-gnn-results/test-gnn-{g_date_time}.csv'
         out_json = f'test-gnn-results/test-gnn-{g_date_time}.json'
         out_json_raw = f'test-gnn-results/test-gnn-{g_date_time}-raw.json'
         pipcl.fs_ensure_dir('test-gnn-results')
