@@ -203,7 +203,7 @@ class Arg:
     
     def __repr__(self):
         #return f'{self.text=} {self.pos=} {self.completions=}.'
-        return f'{self.text=} {self.pos=}.'
+        return f'{self.text=} {self.pos=}'
     
     def _as_bool(self):
         '''
