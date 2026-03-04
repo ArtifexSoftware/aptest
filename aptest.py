@@ -2190,6 +2190,9 @@ def do_test_single(state, package, failed_packages):
         #pipcl.run(f'pip install pytest-reportlog')
         # Change directory into package checkout, otherwise on Github pytest
         # can use aptest's pytest.ini, and not find any matching test files.
+        if package == 'aptest':
+            pipcl.run(f'pip install swig')
+        
         command = f'cd {directory} && pytest'
         #command += f' --report-log=aptest-pytest.jsonl'
         command += f' --junit-xml={os.path.abspath(state.wheelhouse)}/{package}-pytest-junit.xml'
