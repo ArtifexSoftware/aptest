@@ -2492,7 +2492,7 @@ def git_get(
 
         # Show sha of checkout.
         run(
-                f'cd {local} && git log -1 --pretty=oneline|head -n 1',
+                f'cd {local} && git --no-pager log -1 --pretty=oneline',
                 check=False,
                 prefix='git show: ',
                 )
