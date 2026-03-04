@@ -961,24 +961,10 @@ Options
     * `--pdf_feature_inspector`_ and alias `--pfi`_.
     * `--pymupdf4llm`_ and alias `--4llm`_.
     * `--pymupdf`_ and alias `-p`_ .
-    * `--pymupdf_layout`_ and aliases `--layout`_, `-l`_.
-    * `--pymupdfpro`_ and aliases `--pro`_, `-P <-PP_>`_.
-    * `--smartoffice`_ and aliases `-s`, `--sot`_.
-    * `--smartoffice-neo`_ and alias `--sot-neo`_.
-
-.. _-l:
-
--l <pymupdf_layout-location>
-............................
-    Specify location of pymupdf_layout.
-    
-    Alias for ``-i pymupdf_layout <pymupdf_layout-location>``.
-    
-    Also see:
-    
-    * `-i`_.
-    * `--layout`_.
-    * `--pymupdf_layout`_.
+    * `--pymupdf_layout`_ and alias `--layout`_.
+    * `--pymupdfpro`_ and alias `--pro`_.
+    * `--smartoffice`_ and alias `--sot`_.
+    * `--smartoffice-neo`_ and aliases `--sot-neo`_, `--neoso`_.
 
 .. _-m:
 
@@ -1169,19 +1155,6 @@ Options
     Also see:
     
     * `--venv-name`_
-
-.. _-PP:
-
--P <pymupdfpro-location>
-........................
-    Specify location of pymupdfpro.
-    
-    Alias for ``-i pymupdfpro <pymupdfpro-location>``.
-    
-    Also see:
-    
-    * `--pro`_.
-    * `--pymupdfpro`_.
 
 .. _-VV:
 
@@ -1398,7 +1371,6 @@ Options
     Also see:
     
     * `-i`_.
-    * `-l`_.
     * `--pymupdf_layout`_.
 
 .. _--mupdf:
@@ -1413,6 +1385,21 @@ Options
     
     * `-i`_.
     * `-m`_.
+
+.. _--neoso:
+
+--neoso <smartoffice-neo-location>
+....................................
+
+    Specify location of smartoffice-neo.
+    
+    Alias for ``-i smartoffice-neo <smartoffice-neo-location>``.
+    
+    Also see:
+    
+    * `--smartoffice-neo`_.
+    * `--sot-neo`_.
+
 
 .. _--pdf2docx:
 
@@ -1462,7 +1449,6 @@ Options
     
     Also see:
     
-    * `-P <-PP_>`__.
     * `--pymupdfpro`_.
 
 .. _--pymupdf:
@@ -1489,7 +1475,6 @@ Options
     Also see:
     
     * `--pro`_.
-    * `-P <-PP_>`__.
 
 .. _--pymupdf4llm:
 
@@ -1515,7 +1500,6 @@ Options
     Also see:
     
     * `-i`_.
-    * `-l`_.
     * `--layout`_.
 
 .. _--pytest:
@@ -1790,6 +1774,7 @@ Options
     Also see:
     
     * `-i`_.
+    * `--neoso`_.
     * `--sot-neo`_.
 
 .. _--sot:
@@ -1817,6 +1802,7 @@ Options
     Also see:
     
     * `--smartoffice-neo`_.
+    * `--neoso`_.
 
 .. _--system-packages:
 
@@ -2022,10 +2008,15 @@ Changelog
 
 **2026-03-04**
 
+* Removed aliases ``-l``, ``-s``, ``-P``.
+* Internal fix to not use ``|head -n 1`` with ``git log -1``.
+* Added `--neoso`_ alias for `--smartoffice-neo`_.
+
+**2026-03-04**
+
 * Avoid git delays on Windows - use ``git log -1`` instead of ``git show``.
 * Added ``smartoffice-neo`` package, an alternative to ``smartoffice``.
   See `--smartoffice-neo`_.
-
 
 **2026-03-04**
 
