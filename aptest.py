@@ -2138,7 +2138,7 @@ def do_test_gnn(state):
         else:
             pipcl.log(f'Not pushing results to PyMuPDF-performance-results: {out_json=}')
     
-    out_json_simple = 'test-gnn.json'
+    out_json_simple = 'test-gnn-results/test-gnn.json'
     pipcl.fs_symlink(out_json_simple, out_json)
     
     if state.test_gnn_out:
@@ -2146,7 +2146,6 @@ def do_test_gnn(state):
 
 
 def do_test_single(state, package, failed_packages):
-
     location, _ = state.packages[package]
     if not location:
         return
@@ -2177,14 +2176,16 @@ def do_test_single(state, package, failed_packages):
         e = pipcl.run(f'cd {directory}/build/build && make check-python-test-suite', check=0)
     else:
         #pipcl.run(f'pip install pytest-reportlog')
-        command = f'pytest'
+        # Change directory into package checkout, otherwise on Github pytest
+        # can use aptest's pytest.ini, and not find any matching test files.
+        command = f'cd {directory} && pytest'
         #command += f' --report-log=aptest-pytest.jsonl'
         command += f' --junit-xml={os.path.abspath(state.wheelhouse)}/{package}-pytest-junit.xml'
         if state.pytest_options:
             command += f' {state.pytest_options}'
         if state.pytest_paths:
             for path in state.pytest_paths:
-                command += f' {directory}/{path}'
+                command += f' {path}'
         else:
             # We need to somehow limit things to {package}/tests/
             # because otherwise pytest can recurse into other
@@ -2199,14 +2200,14 @@ def do_test_single(state, package, failed_packages):
             # pytest` - i.e. running pytest on current directory
             # without specifying any location.
             #
-            command += f' {directory}/tests'
-
-        if package == 'pymupdf4llm' and state.pymupdf4llm_unified:
-            # Extra requirements for testing unified
-            # pymupdf4llm+layout. Layout requires extra packages.
-            pipcl.run(f'pip install llama_index')
-            pipcl.run(f'pip install pytest-asyncio')
-
+            command += f' tests'
+            if package == 'pymupdf4llm' and not state.pymupdf4llm_unified:
+                command += '/pymupdf4llm/llama_index'
+        if package == 'pymupdf4llm':
+                # Testing requires extra packages.
+                pipcl.run(f'pip install llama_index')
+                pipcl.run(f'pip install pytest-asyncio')
+        
         if state.pytest_wrap in ('valgrind', 'helgrind'):
             if not state.pytest_options:
                 command += ' -sv'
