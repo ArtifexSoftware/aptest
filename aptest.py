@@ -1600,7 +1600,7 @@ def do_cibw(state):
             # fixme: be able to set to '' for system install?
             continue
         
-        if package == 'pdf2docx':
+        if 0 and package == 'pdf2docx':
             pipcl.log(f'Not using cibuildwheel for {package=} because does not support pure python wheels.')
             PIP_EXTRA_INDEX_URL = f'file://{os.path.abspath(state.wheelhouse)}/simple'.replace('\\', '/')
             new_files = pipcl.NewFiles(f'{state.wheelhouse}/{package}-*.whl')
@@ -1617,6 +1617,14 @@ def do_cibw(state):
             else:
                 pipcl.run(f'pip install pytest-cov')
                 pipcl.run(f'cd {directory_abs} && make test')
+        
+        if package in ('pdf2docx', 'pymupdf4llm'):
+            # pipcl.log(f'Not using cibuildwheel for {package=} because does not support pure python wheels.')
+            wheel = do_build_single(state, package)
+            failed_packages = list()
+            do_test_single(state, package, failed_packages)
+            if failed_packages:
+                raise Exception(f'Test failed for {package=}.')
         else:
             if state.sdists and platform.system() == 'Linux':
                 build_sdist(state, package, directory)
