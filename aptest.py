@@ -97,6 +97,8 @@ def sync_reverse(
         filters=None,
         verbose=1,
         doit=1,
+        extra=None,
+        check=1,
         ):
     '''
     Uses rsync to copy from remote machine to local.
@@ -113,6 +115,8 @@ def sync_reverse(
         List of rsync filter args, e.g. ['--include=foo.*txt',
         'exclude=*']. They should not be escaped for the shell - we use shlex
         to quote each filter.
+    extra:
+        Extra rsync args, for example --ignore-missing-args.
     '''
     ssh_command2 = ssh_command
     if remote:
@@ -122,6 +126,8 @@ def sync_reverse(
         command += ' -n'
     if verbose:
         command += ' --stats'
+    if extra:
+        command += f' {extra}'
     command += f' --rsh {shlex.quote(ssh_command2)}'
     if filters:
         if isinstance(filters, str):
@@ -132,7 +138,7 @@ def sync_reverse(
     command += (
             f' :{remote_dir}/{path_remote} {path_local}'
             )
-    pipcl.run(command, prefix=f'reverse sync {path_remote} => {path_local}: ', log=1)
+    return pipcl.run(command, prefix=f'reverse sync {path_remote} => {path_local}: ', log=1, check=check)
         
 
 def sync(remote, remote_dir, path, ssh_command, verbose, state):    # pylint: disable=too-many-positional-arguments
@@ -1278,15 +1284,19 @@ def do_remote(state, argv):
                 filters=filters,
                 )
     if 1:
-        # Copy test-gnn-results/ back to local machine.
-        sync_reverse(
+        # Copy test-gnn-results/ back to local machine. Macmini's rsync appears
+        # too old for `--ignore-missing-args` so we ignore any error.
+        e = sync_reverse(
                 remote,
                 remote_dir,
                 'test-gnn-results/',
                 'test-gnn-results/',
                 ssh_command=ssh_command,
-                #filters = '"--include=test-gnn-*.json" "--exclude=*"',
+                extra='--ignore-missing-args',
+                check=0,
                 )
+        if e:
+            pipcl.log(f'Warning, ignoring failed of reverse rsync: {e=}.')
 
 
 def build_sdist(state, package, directory):
@@ -1623,21 +1633,33 @@ def do_cibw(state):
             # fixme: be able to set to '' for system install?
             continue
         
+        if state.sdists and platform.system() == 'Linux':
+            build_sdist(state, package, directory)
+
         if package in ('pdf2docx', 'pymupdf4llm'):
             # Build/test directly.
             pipcl.log(f'Not using cibuildwheel for {package=} because does not support pure python wheels.')
+            
+            new_files = pipcl.NewFiles(f'{state.wheelhouse}/*.whl')
             do_build_single(state, package)
             failed_packages = list()
             do_test_single(state, package, failed_packages)
+            
+            # Delete any new prerequisite wheels that are not for <package>, so
+            # we behave like cibuildwheels.
+            new_wheels = new_files.get()
+            for wheel_path in new_wheels:
+                assert wheel_path.endswith('.whl')
+                if not os.path.basename(wheel_path).startswith(f'{package}-'):
+                    pipcl.log(f'Deleting {wheel_path=}.')
+                    pipcl.fs_remove(wheel_path)
+            
             if failed_packages:
                 raise Exception(f'Test failed for {package=}.')
         
         else:
             # Run cibuildwheeel.
             
-            if state.sdists and platform.system() == 'Linux':
-                build_sdist(state, package, directory)
-
             # Tell cibuildwheel how to test <package>.
             if package in state.packages_test:
                 CIBW_TEST_COMMAND = f'pip install --upgrade pytest'
