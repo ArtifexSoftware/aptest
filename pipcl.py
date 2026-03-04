@@ -2145,12 +2145,17 @@ def git_info( directory):
     def run_git(command):
         return run(command, capture=1, check=0, verbose=0, env_extra=dict(PAGER=''))
     
-    e, out = run_git(f'cd {directory} && git show --pretty=oneline')
+    # We are careful to run git with `--no-pager` to avoid problems on Windows where
+    # Defender appears to cause problems. See:
+    #   https://www.reddit.com/r/sysadmin/comments/1msxc9o/git_commands_freezing_for_210_seconds_on_windows/
+    #
+    
+    e, out = run_git(f'cd {directory} && git --no-pager show --pretty=oneline')
     if not e:
         line, _ = out.split('\n', 1)
         sha, comment = line.split(' ', 1)
     
-    if platform.system() == 'Windows':
+    if 0 and platform.system() == 'Windows':    # pylint: disable=condition-evals-to-constant
         # Have seen `git diff` sometimes hang when using a rsync'd
         # checkout. But it seems to work ok if we first diff a single file.
         #log(f'Doing dummy `git diff` of a single file, to avoid potential hang in later `git diff` on Windows.')
@@ -2159,11 +2164,11 @@ def git_info( directory):
         path0 = text.split('\n', 1)[0].strip()
         run_git(f'cd {directory} && git diff {path0}')
         
-    e, out = run_git(f'cd {directory} && git diff')
+    e, out = run_git(f'cd {directory} && git --no-pager diff')
     if not e:
         diff = out
     
-    e, out = run_git(f'cd {directory} && git rev-parse --abbrev-ref HEAD')
+    e, out = run_git(f'cd {directory} && git --no-pager rev-parse --abbrev-ref HEAD')
     if not e:
         branch = out.strip()
     
@@ -2494,11 +2499,11 @@ def git_get(
         if 0:
             # Some extra checking that what we're doing is correct.
             if tag:
-                diff = run(f'cd {local} && git diff {tag}', capture=1)
+                diff = run(f'cd {local} && git --no-pager diff {tag}', capture=1)
             if branch:
-                diff = run(f'cd {local} && git diff {branch}', capture=1)
+                diff = run(f'cd {local} && git --no-pager diff {branch}', capture=1)
             if sha:
-                diff = run(f'cd {local} && git diff {sha}', capture=1)
+                diff = run(f'cd {local} && git --no-pager diff {sha}', capture=1)
             log(f'{diff=}')
             diff = diff.strip()
             assert not diff, f'Diff is not empty:\n{textwrap.indent(diff, "    ")}'
