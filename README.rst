@@ -25,13 +25,17 @@ Supported packages
 ------------------
 
 * ``langchain_pymupdf_layout``
-* ``mupdf``
+* ``mupdf`` (built by pymupdf's setup.py)
 * ``pdf2docx``
 * ``pdf_feature_inspector``
 * ``pymupdf``
 * ``pymupdf4llm``
 * ``pymupdf_layout``
 * ``pymupdfpro``
+* ``smartoffice`` (build by pymupdfpro's setup.py)
+* ``smartoffice-seo`` (build by pymupdfpro's setup.py)
+
+Only one of ``smartoffice`` and ``smartoffice-seo`` can be specified.
 
 
 Package locations
@@ -72,6 +76,18 @@ For each package:
 * Thus pip will use previously built package wheels as prerequisites, as required.
 
 See the `build`_ command.
+
+
+Pseudo packages
+---------------
+
+Some packages are not built by Aptest:
+
+* ``mupdf`` - built by pymupdf's setup.py, communicated by environment variable.
+* ``smartoffice`` - built by pymupdfpro's setup.py, communicated by environment variable.
+* ``smartoffice-neo`` - built by pymupdfpro's setup.py, communicated by environment variable.
+
+One only one of ``smartoffice`` and ``smartoffice-neo`` can be specified.
 
 
 Testing packages
@@ -154,6 +170,10 @@ Download wheels from a previous Aptest Github workflow run::
 Test Aptest itself::
 
     aptest/aptest.py --aptest aptest test
+
+Build pymupdfpro with alternative smartoffice-neo:
+
+    aptest/aptest.py --smartoffice-neo git: --pro git: build test
 
 
 Release procedure
@@ -509,7 +529,8 @@ Smartoffice ssh key
 ...................
 
 We allow specification of a custom ssh private key that allows access to the
-SmartOffice repository; this is required when PyMuPDFPro builds SmartOffice
+smartoffice/smartoffice-neo repositories;
+this is required when PyMuPDFPro builds SmartOffice
 because of how the SmartOffice build system works.
 
 * If required, this key should be provided in file ``thirdparty-so-key`` in the
@@ -889,6 +910,7 @@ Options
             pymupdf_layout
             pymupdfpro
             smartoffice
+            smartoffice-neo
         
         (or their aliases.)
 
@@ -941,7 +963,8 @@ Options
     * `--pymupdf`_ and alias `-p`_ .
     * `--pymupdf_layout`_ and aliases `--layout`_, `-l`_.
     * `--pymupdfpro`_ and aliases `--pro`_, `-P <-PP_>`_.
-    * `--smartoffice`_.
+    * `--smartoffice`_ and aliases `-s`, `--sot`_.
+    * `--smartoffice-neo`_ and alias `--sot-neo`_.
 
 .. _-l:
 
@@ -1717,18 +1740,6 @@ Options
     
     With `cibw`_, we only build sdists if on Linux.
 
-.. _--smartoffice:
-
---smartoffice <smartoffice-location>
-....................................
-    Specify location of smartoffice.
-    
-    Alias for ``-i smartoffice <smartoffice-location>``.
-    
-    Also see:
-    
-    * `-i`_.
-
 .. _--set-swig:
 
 --set-swig <swig>
@@ -1754,6 +1765,58 @@ Options
 .......................
     If true and `--set-swig`_'s ``<swig>`` value starts with ``git:``, we do not
     update/build swig if it is already present.
+
+.. _--smartoffice:
+
+--smartoffice <smartoffice-location>
+....................................
+    Specify location of smartoffice.
+    
+    Alias for ``-i smartoffice <smartoffice-location>``.
+    
+    Also see:
+    
+    * `-i`_.
+    * `--sot`_.
+
+.. _--smartoffice-neo:
+
+--smartoffice-neo <smartoffice-neo-location>
+............................................
+    Specify location of smartoffice-neo, an alternative to `--smartoffice`_.
+    
+    Alias for ``-i smartoffice-neo <smartoffice-neo-location>``.
+    
+    Also see:
+    
+    * `-i`_.
+    * `--sot-neo`_.
+
+.. _--sot:
+
+--sot <smartoffice-location>
+............................
+
+    Specify location of smartoffice.
+    
+    Alias for ``-i smartoffice <smartoffice-location>``.
+    
+    Also see:
+    
+    * `--smartoffice`_.
+
+.. _--sot-neo:
+
+--sot-neo <smartoffice-neo-location>
+....................................
+
+    Specify location of smartoffice-neo.
+    
+    Alias for ``-i smartoffice-neo <smartoffice-neo-location>``.
+    
+    Also see:
+    
+    * `--smartoffice-neo`_.
 
 .. _--system-packages:
 
@@ -1956,6 +2019,13 @@ completion
 
 Changelog
 ---------
+
+**2026-03-04**
+
+* Avoid git delays on Windows - use ``git log -1`` instead of ``git show``.
+* Added ``smartoffice-neo`` package, an alternative to ``smartoffice``.
+  See `--smartoffice-neo`_.
+
 
 **2026-03-04**
 
