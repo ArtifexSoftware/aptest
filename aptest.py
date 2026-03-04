@@ -447,10 +447,16 @@ def add_package(state, name, location):
         # Match with local checkouts to help arg completion.
         ok_locations = list()
         for path in sorted(glob.glob(f'*/.git/')):
-            p = path[:-6]
-            #pipcl.log(f'{location.as_str()=}: Adding {p=}.')
-            ok_locations.append(p)
-        assert location in ok_locations, f'Location is not a Git checkout: {location}'
+            #ok_locations.append(path[:-5])  # With trailing `/`.
+            ok_locations.append(path[:-6])
+        ok_locations.sort()
+        if location not in ok_locations:
+            if os.environ.get('COMP_LINE'):
+                # Raise exception to force listing of available checkouts.
+                assert location in ok_locations, f'Location is not a Git checkout in current directory: {location}'
+            else:
+                # Just output a warning.
+                pipcl.log(f'Warning, location is not a Git checkout in current directory: {location=}')
     if name in state.packages:
         pipcl.log(f'Adding second location for {name=} testing only: {location=}')
         state.packages2[name] = (location.as_str(), location.pos)
