@@ -827,7 +827,9 @@ def get_args(argv):
                         ), f'{args_list_base_len=} {pos0[0]=} {len(args.argv)=} args `--release-*` must be only arg.'
                 if arg == '--release-1':
                     # Build core wheels and sdist.
-                    new_args = '-r @github -u -p git: -P git: -l git: cibw --sdists'
+                    # [pymupdf4llm is pure python so doesn't need to be
+                    # mentioned in other --release-* options.]
+                    new_args = '-r @github -u -p=git: --pro=git: --layout=git: --4llm=git: cibw --sdists'
                 elif arg == '--release-2':
                     # Build for linux-aarch64 (just cp310 because testing other python versions too slow).
                     new_args = '-r @github -u -p git: -P git: -l git: cibw --remote-github-runners linux -e CIBW_ARCHS_LINUX=aarch64 -e "CIBW_BUILD=cp310*"'
@@ -849,7 +851,7 @@ def get_args(argv):
                     #
                     new_args = '-r @github -u -p git: cibw --remote-github-runners linux --cibw-skip-add-defaults=0 -e CIBW_BUILD="cp314t*" -e CIBW_SKIP="*musllinux*" -e PYMUPDF_SETUP_PY_LIMITED_API=0'
                 else:
-                    assert 0, f'Unrecognised {arg=}, should be one of --release-1, --release-2, --release-3.'
+                    assert 0, f'Unrecognised {arg=}.'
                 new_args = shlex.split(new_args)
                 args.args_eq.replace(arg.pos, args.pos, new_args)
                 continue
