@@ -1354,7 +1354,7 @@ def do_build_single(state, package):
         elif package == 'swig':
             swig_env_extra = dict()
             pipcl.swig_prepare_build(swig_env_extra)
-            if 1: pipcl.run(
+            pipcl.run(
                     f'cd {directory} && ./autogen.sh --prefix install',
                     env_extra=swig_env_extra,
                     prefix='{directory} autogen.sh: ',
@@ -1614,14 +1614,14 @@ def do_cibw(state):
         if package in ('pdf2docx', 'pymupdf4llm'):
             # Build/test directly.
             pipcl.log(f'Not using cibuildwheel for {package=} because does not support pure python wheels.')
-            wheel = do_build_single(state, package)
+            do_build_single(state, package)
             failed_packages = list()
             do_test_single(state, package, failed_packages)
             if failed_packages:
                 raise Exception(f'Test failed for {package=}.')
         
         else:
-            ## Run cibuildwheeel.
+            # Run cibuildwheeel.
             
             if state.sdists and platform.system() == 'Linux':
                 build_sdist(state, package, directory)
@@ -2006,7 +2006,6 @@ def do_test_gnn(state):
     layout_location = _get_local('pymupdf_layout', state)
 
     pipcl.run(f'pip install tqdm')
-    out_dir = 'test-gnn-devel'
     pdf_dir = 'datasets/DocLayNet/PDF'
     
     ret = dict()
@@ -2086,10 +2085,6 @@ def do_test_gnn(state):
             assert 0, f'Unrecognised item {type(d)=}: {d=}'
     check(ret)
 
-    t_start = time.time()
-
-    name = f'test-gnn-{g_date_time}.json'
-
     out_json = None
     if state.test_gnn_cache:
         # See whether an identical run has already been done.
@@ -2109,15 +2104,16 @@ def do_test_gnn(state):
             equal = dicts_equal(r, ret0)
             if equal:
                 pipcl.log(f'Found matching previous run: {path=}.')
-                #os.symlink(path, name)
                 out_json = path
                 break
         if not out_json:
             pipcl.log(f'Did not find any matching previous run.')
     
     if out_json:
-        with open(out_json) as f:
-            results = json.load(f)
+        # Nothing to do.
+        pass
+        #with open(out_json) as f:
+        #    results = json.load(f)
     else:
         # Run the test.
         out_csv = f'test-gnn-results/test-gnn-{g_date_time}.csv'
@@ -2219,9 +2215,9 @@ def do_test_single(state, package, failed_packages):
             if package == 'pymupdf4llm' and not state.pymupdf4llm_unified:
                 command += '/pymupdf4llm/llama_index'
         if package == 'pymupdf4llm':
-                # Testing requires extra packages.
-                pipcl.run(f'pip install llama_index')
-                pipcl.run(f'pip install pytest-asyncio')
+            # Testing requires extra packages.
+            pipcl.run(f'pip install llama_index')
+            pipcl.run(f'pip install pytest-asyncio')
         
         if state.pytest_wrap in ('valgrind', 'helgrind'):
             if not state.pytest_options:
