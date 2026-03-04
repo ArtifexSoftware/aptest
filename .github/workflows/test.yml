@@ -35,6 +35,14 @@ jobs:
     steps:
 
       - uses: actions/checkout@v4
+        with:
+          # Checkout into aptest/.git/ etc instead of ./.git/ so that we are
+          # above the aptest checkout and invoke Aptest with `aptest/aptest.py
+          # ...` instead of `./aptest.py`.
+          #
+          # Otherwise pytest will pick up aptest's pytest.ini file if a package
+          # does not define one itself.
+          path: aptest
 
       - uses: actions/setup-python@v5
         with:
@@ -60,7 +68,7 @@ jobs:
           ARTIFEX_SOFTWARE_SSH_KEY: ${{secrets.ARTIFEX_SOFTWARE_SSH_KEY}}
           PYMUPDFPRO_SETUP_SOT_KEY: ${{secrets.PYMUPDFPRO_SETUP_SOT_KEY}}
         run:
-          python aptest.py -a APTEST_args
+          python aptest/aptest.py -a APTEST_args
       
       # Upload generated wheels, to be accessible from github Actions page.
       #
