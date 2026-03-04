@@ -3900,7 +3900,7 @@ class NewFiles:
         return ret
 
 
-def swig_prepare_build(swig_env_extra, *, do_bison=True):
+def swig_prepare_build(swig_env_extra):
     '''
     Builds required tools for building swig (not Windows).
     
