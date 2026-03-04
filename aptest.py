@@ -1270,11 +1270,14 @@ def do_remote(state, argv):
 
 
 def build_sdist(state, package, directory):
-    if package == 'pymupdf':
+    '''
+    Build sdist if <package> is allowed to have a sdist.
+    '''
+    if package in ('pymupdf', 'pymupdf4llm', 'pdf2docx'):
+        # pymupdf4llm's setup.py requires `-d` is after `sdist`.
         pipcl.run(
-                f'cd {directory}'
-                    f' && python setup.py -d {os.path.abspath(state.wheelhouse)} sdist',
-                prefix='sdist {package}: ',
+                f'cd {directory} && python setup.py sdist -d {os.path.abspath(state.wheelhouse)}',
+                prefix=f'sdist {package}: ',
                 )
 
 
@@ -1600,32 +1603,18 @@ def do_cibw(state):
             # fixme: be able to set to '' for system install?
             continue
         
-        if 0 and package == 'pdf2docx':
-            pipcl.log(f'Not using cibuildwheel for {package=} because does not support pure python wheels.')
-            PIP_EXTRA_INDEX_URL = f'file://{os.path.abspath(state.wheelhouse)}/simple'.replace('\\', '/')
-            new_files = pipcl.NewFiles(f'{state.wheelhouse}/{package}-*.whl')
-            pipcl.run(
-                    f'pip wheel -v --extra-index-url {PIP_EXTRA_INDEX_URL} -w {state.wheelhouse} {directory_abs}',
-                    env_extra=state.env_extra,
-                    )
-            wheel = new_files.get_one()
-            pipcl.run(f'pip uninstall -y {package}')
-            pipcl.run(f'pip install -v {wheel}')
-            
-            if platform.system() == 'Windows':
-                pipcl.log(f'Not testing {package=} on Windows because needs make.')
-            else:
-                pipcl.run(f'pip install pytest-cov')
-                pipcl.run(f'cd {directory_abs} && make test')
-        
         if package in ('pdf2docx', 'pymupdf4llm'):
-            # pipcl.log(f'Not using cibuildwheel for {package=} because does not support pure python wheels.')
+            # Build/test directly.
+            pipcl.log(f'Not using cibuildwheel for {package=} because does not support pure python wheels.')
             wheel = do_build_single(state, package)
             failed_packages = list()
             do_test_single(state, package, failed_packages)
             if failed_packages:
                 raise Exception(f'Test failed for {package=}.')
+        
         else:
+            ## Run cibuildwheeel.
+            
             if state.sdists and platform.system() == 'Linux':
                 build_sdist(state, package, directory)
 
