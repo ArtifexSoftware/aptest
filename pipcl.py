@@ -2150,7 +2150,7 @@ def git_info( directory):
     #   https://www.reddit.com/r/sysadmin/comments/1msxc9o/git_commands_freezing_for_210_seconds_on_windows/
     #
     
-    e, out = run_git(f'cd {directory} && git --no-pager show --pretty=oneline')
+    e, out = run_git(f'cd {directory} && git --no-pager log -1 --pretty=oneline')
     if not e:
         line, _ = out.split('\n', 1)
         sha, comment = line.split(' ', 1)
@@ -2492,7 +2492,7 @@ def git_get(
 
         # Show sha of checkout.
         run(
-                f'cd {local} && git show --pretty=oneline|head -n 1',
+                f'cd {local} && git log -1 --pretty=oneline|head -n 1',
                 check=False,
                 prefix='git show: ',
                 )
