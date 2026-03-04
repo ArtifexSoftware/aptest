@@ -2008,6 +2008,11 @@ Changelog
 
 **2026-03-04**
 
+* Avoid problems on Github caused by pytest searching for a pytest.ini file.
+* With `cibw`_, avoid extra prerequisite wheels for pure-python packages in aptest-wheelhouse.
+
+**2026-03-04**
+
 * Removed aliases ``-l``, ``-s``, ``-P``.
 * Internal fix to not use ``|head -n 1`` with ``git log -1``.
 * Added `--neoso`_ alias for `--smartoffice-neo`_.
