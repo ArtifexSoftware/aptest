@@ -1278,14 +1278,163 @@ def build_sdist(state, package, directory):
                 )
 
 
-def do_build(state):
+def do_build_single(state, package):
+    '''
+    Build and install <package>.
+    '''
+    
     # We use `pip --extra-index-url {pip_index_url}` so that pip
     # finds prerequisite wheels in state.wheelhouse.
     pip_index_url = f'file://{os.path.abspath(state.wheelhouse)}/simple'
+    
     # pip fails if pip_index_url contains back-slashes, with
     # `ERROR: Could not install packages due to an OSError: [Errno
     # 13] Permission denied:...`.
     pip_index_url = pip_index_url.replace('\\', '/')
+    
+    ret_wheel = None
+    location, _args_pos = state.packages[package]
+    if not location:
+        return ret_wheel
+    if package == 'aptest':
+        return ret_wheel
+
+    new_files = pipcl.NewFiles(f'{state.wheelhouse}/{package}*.whl')
+
+    if location.startswith('pip:'):
+        assert package != 'mupdf', f'Not a package on pypi.org: {package}'
+        name = location[4:]
+        if not name.endswith(('.whl', '.tar.gz')):
+            name = f'{package}{name}'
+        # Get wheel from pypi.org and put into our wheelhouse
+        # so it is available for later builds. Then install;
+        # pip uses a cache so will not download twice.
+        #
+        # We need to know the name of the wheel file (we return it). This
+        # is calculated using pipcl.NewFiles so we need to force download
+        # so wheel file is new. We do this by first removing matching
+        # wheels from pip cache and wheelhouse.
+        #
+        pipcl.run(f'pip cache list')
+        pipcl.run(f'pip cache remove {name}')
+        pipcl.run(f'pip cache list')
+        for p in glob.glob(f'{state.wheelhouse}/{package}-*.whl'):
+            pipcl.log(f'Removing: {p}')
+            pipcl.fs_remove(p)
+        pipcl.run(f'pip wheel --no-cache-dir -w {state.wheelhouse} {name}')
+        ret_wheel = new_files.get_one()
+        pipcl.run(f'pip uninstall -y {name}')
+        pipcl.run(f'pip install -v {name}')
+    else:
+        directory = _get_local(package, state)
+
+        if package == 'pymupdf4llm' and not state.pymupdf4llm_unified:
+            # setup.py is in subdirectory pymupdf4llm/.
+            directory += '/pymupdf4llm'
+        directory_abs = os.path.abspath(directory)
+        pipcl.log(f'{package=} {directory=}')
+        if package == 'mupdf':
+            state.env_extra['PYMUPDF_SETUP_MUPDF_BUILD'] = directory_abs
+            # fixme: be able to set to '' for system install?
+        elif package == 'smartoffice':
+            # We don't build smartoffice here, instead we tell pymupdfpro
+            # where the local smartoffice checkout is.
+            state.env_extra['PYMUPDFPRO_SETUP_SOT'] = directory_abs
+        elif package == 'swig':
+            swig_env_extra = dict()
+            pipcl.swig_prepare_build(swig_env_extra)
+            if 1: pipcl.run(
+                    f'cd {directory} && ./autogen.sh --prefix install',
+                    env_extra=swig_env_extra,
+                    prefix='{directory} autogen.sh: ',
+                    )
+            pipcl.run(
+                    f'cd {directory} && mkdir -p build/build && cd build/build && ../../configure',
+                    env_extra=swig_env_extra,
+                    prefix='{directory} configure: ',
+                    )
+            pipcl.run(
+                    f'cd {directory}/build/build && make',
+                    env_extra=swig_env_extra,
+                    prefix='{directory} make: ',
+                    )
+        elif state.pymupdf4llm_unified and package == 'pymupdf_layout':
+            # pymupdf_layout is now purely for testing the gnn aspects of
+            # the unified 4llm+layout.
+            pipcl.log(f'Not building {package=} because {state.pymupdf4llm_unified=}.')
+        else:
+            if package:
+                pipcl.run(f'pip uninstall -y {package}')
+
+            if state.sdists:
+                build_sdist(state, package, directory)
+
+            if (package == 'pymupdf'
+                    and state.graal
+                    and (
+                        'pymupdfpro' in state.packages_build
+                        or 'pymupdf_layout' in state.packages_build
+                        )
+                    ):
+                # As of 2025-08-07, pipcl does graal builds by
+                # running a non-graal build with graal python's
+                # include and library paths.
+                #
+                # In the non-graal build, out setup.py will
+                # still want to do `import pymupdf`, so we
+                # prepare a non-graal venv containing its own
+                # build of the specified pymupdf, and tell
+                # pipcl to use it when it does the non-graal
+                # build. Thus pymupdfpro's setup.py will be
+                # able to do `import pymupdf` etc.
+                #
+                native_python = os.environ['PIPCL_GRAAL_PYTHON']
+                assert native_python
+                venv_native = 'venv-aptest-graal-native'
+                pipcl.run(f'{native_python} -m venv {venv_native}')
+                pipcl.run(
+                        f'. {venv_native}/bin/activate && pip install -v {directory_abs}',
+                        env_extra=state.env_extra,
+                        prefix='PyMuPDFPro/scripts/test.py install PyMuPDF graal native python: ',
+                        )
+                # Tell pipcl to use <venv_native> when it
+                # builds pymupdfpro/layout later on.
+                state.env_extra['PIPCL_GRAAL_NATIVE_VENV'] = os.path.abspath(venv_native)
+
+            if state.build_type:
+                if package == 'pymupdf':
+                    state.env_extra['PYMUPDF_SETUP_MUPDF_BUILD_TYPE'] = state.build_type
+                if package == 'pymupdfpro':
+                    state.env_extra['PYMUPDFPRO_SETUP_BUILD_TYPE'] = state.build_type
+                if package == 'pymupdf_layout':
+                    state.env_extra['PYMUPDF_LAYOUT_SETUP_BUILD_TYPE'] = state.build_type
+
+            pipcl.run(
+                    #f'pip wheel -v --extra-index-url {pip_index_url} --no-cache-dir -w {state.wheelhouse} {directory_abs}',
+                    f'pip wheel -v --extra-index-url {pip_index_url} -w {state.wheelhouse} {directory_abs}',
+                    env_extra=state.env_extra,
+                    prefix=f'build {package}: ',
+                    )
+            ret_wheel = new_files.get_one()
+
+            pipcl.run(
+                    #f'pip install -v --extra-index-url {pip_index_url} --no-cache-dir {wheel}',
+                    f'pip install -v --extra-index-url {pip_index_url} {ret_wheel}',
+                    env_extra=state.env_extra,
+                    prefix=f'install {package}: ',
+                    )
+
+    if package == 'pymupdf':
+        # Set PYMUPDF_SETUP_VERSION so subsequent builds are configured
+        # for the PyMuPDF we have just built.
+        PYMUPDF_SETUP_VERSION = importlib.metadata.version('pymupdf')
+        state.env_extra['PYMUPDF_SETUP_VERSION'] = PYMUPDF_SETUP_VERSION
+        pipcl.log(f'### Have set {PYMUPDF_SETUP_VERSION=}')
+
+    return ret_wheel
+
+
+def do_build(state):
     if 'mupdf' in state.packages:
         directory = _get_local('mupdf', state)
         if directory:
@@ -1297,148 +1446,6 @@ def do_build(state):
     
     package_to_wheel = dict()
     
-    def do_package(package):
-        ret_wheel = None
-        location, _args_pos = state.packages[package]
-        if not location:
-            return ret_wheel
-        if package == 'aptest':
-            return ret_wheel
-
-        new_files = pipcl.NewFiles(f'{state.wheelhouse}/{package}*.whl')
-        
-        if location.startswith('pip:'):
-            assert package != 'mupdf', f'Not a package on pypi.org: {package}'
-            name = location[4:]
-            if not name.endswith(('.whl', '.tar.gz')):
-                name = f'{package}{name}'
-            # Get wheel from pypi.org and put into our wheelhouse
-            # so it is available for later builds. Then install;
-            # pip uses a cache so will not download twice.
-            #
-            # We need to know the name of the wheel file (we return it). This
-            # is calculated using pipcl.NewFiles so we need to force download
-            # so wheel file is new. We do this by first removing matching
-            # wheels from pip cache and wheelhouse.
-            #
-            pipcl.run(f'pip cache list')
-            pipcl.run(f'pip cache remove {name}')
-            pipcl.run(f'pip cache list')
-            for p in glob.glob(f'{state.wheelhouse}/{package}-*.whl'):
-                pipcl.log(f'Removing: {p}')
-                pipcl.fs_remove(p)
-            pipcl.run(f'pip wheel --no-cache-dir -w {state.wheelhouse} {name}')
-            ret_wheel = new_files.get_one()
-            pipcl.run(f'pip uninstall -y {name}')
-            pipcl.run(f'pip install -v {name}')
-        else:
-            directory = _get_local(package, state)
-
-            if package == 'pymupdf4llm' and not state.pymupdf4llm_unified:
-                # setup.py is in subdirectory pymupdf4llm/.
-                directory += '/pymupdf4llm'
-            directory_abs = os.path.abspath(directory)
-            pipcl.log(f'{package=} {directory=}')
-            if package == 'mupdf':
-                state.env_extra['PYMUPDF_SETUP_MUPDF_BUILD'] = directory_abs
-                # fixme: be able to set to '' for system install?
-            elif package == 'smartoffice':
-                # We don't build smartoffice here, instead we tell pymupdfpro
-                # where the local smartoffice checkout is.
-                state.env_extra['PYMUPDFPRO_SETUP_SOT'] = directory_abs
-            elif package == 'swig':
-                swig_env_extra = dict()
-                pipcl.swig_prepare_build(swig_env_extra)
-                if 1: pipcl.run(
-                        f'cd {directory} && ./autogen.sh --prefix install',
-                        env_extra=swig_env_extra,
-                        prefix='{directory} autogen.sh: ',
-                        )
-                pipcl.run(
-                        f'cd {directory} && mkdir -p build/build && cd build/build && ../../configure',
-                        env_extra=swig_env_extra,
-                        prefix='{directory} configure: ',
-                        )
-                pipcl.run(
-                        f'cd {directory}/build/build && make',
-                        env_extra=swig_env_extra,
-                        prefix='{directory} make: ',
-                        )
-            elif state.pymupdf4llm_unified and package == 'pymupdf_layout':
-                # pymupdf_layout is now purely for testing the gnn aspects of
-                # the unified 4llm+layout.
-                pipcl.log(f'Not building {package=} because {state.pymupdf4llm_unified=}.')
-            else:
-                if package:
-                    pipcl.run(f'pip uninstall -y {package}')
-
-                if state.sdists:
-                    build_sdist(state, package, directory)
-
-                if (package == 'pymupdf'
-                        and state.graal
-                        and (
-                            'pymupdfpro' in state.packages_build
-                            or 'pymupdf_layout' in state.packages_build
-                            )
-                        ):
-                    # As of 2025-08-07, pipcl does graal builds by
-                    # running a non-graal build with graal python's
-                    # include and library paths.
-                    #
-                    # In the non-graal build, out setup.py will
-                    # still want to do `import pymupdf`, so we
-                    # prepare a non-graal venv containing its own
-                    # build of the specified pymupdf, and tell
-                    # pipcl to use it when it does the non-graal
-                    # build. Thus pymupdfpro's setup.py will be
-                    # able to do `import pymupdf` etc.
-                    #
-                    native_python = os.environ['PIPCL_GRAAL_PYTHON']
-                    assert native_python
-                    venv_native = 'venv-aptest-graal-native'
-                    pipcl.run(f'{native_python} -m venv {venv_native}')
-                    pipcl.run(
-                            f'. {venv_native}/bin/activate && pip install -v {directory_abs}',
-                            env_extra=state.env_extra,
-                            prefix='PyMuPDFPro/scripts/test.py install PyMuPDF graal native python: ',
-                            )
-                    # Tell pipcl to use <venv_native> when it
-                    # builds pymupdfpro/layout later on.
-                    state.env_extra['PIPCL_GRAAL_NATIVE_VENV'] = os.path.abspath(venv_native)
-
-                if state.build_type:
-                    if package == 'pymupdf':
-                        state.env_extra['PYMUPDF_SETUP_MUPDF_BUILD_TYPE'] = state.build_type
-                    if package == 'pymupdfpro':
-                        state.env_extra['PYMUPDFPRO_SETUP_BUILD_TYPE'] = state.build_type
-                    if package == 'pymupdf_layout':
-                        state.env_extra['PYMUPDF_LAYOUT_SETUP_BUILD_TYPE'] = state.build_type
-
-                pipcl.run(
-                        #f'pip wheel -v --extra-index-url {pip_index_url} --no-cache-dir -w {state.wheelhouse} {directory_abs}',
-                        f'pip wheel -v --extra-index-url {pip_index_url} -w {state.wheelhouse} {directory_abs}',
-                        env_extra=state.env_extra,
-                        prefix=f'build {package}: ',
-                        )
-                ret_wheel = new_files.get_one()
-
-                pipcl.run(
-                        #f'pip install -v --extra-index-url {pip_index_url} --no-cache-dir {wheel}',
-                        f'pip install -v --extra-index-url {pip_index_url} {ret_wheel}',
-                        env_extra=state.env_extra,
-                        prefix=f'install {package}: ',
-                        )
-    
-        if package == 'pymupdf':
-            # Set PYMUPDF_SETUP_VERSION so subsequent builds are configured
-            # for the PyMuPDF we have just built.
-            PYMUPDF_SETUP_VERSION = importlib.metadata.version('pymupdf')
-            state.env_extra['PYMUPDF_SETUP_VERSION'] = PYMUPDF_SETUP_VERSION
-            pipcl.log(f'### Have set {PYMUPDF_SETUP_VERSION=}')
-
-        return ret_wheel
-
     # We install packages in reverse order (e.g. pymupdf_layout before pymupdf)
     # so that packages specified to aptest override any package prerequisites.
     #
@@ -1448,7 +1455,7 @@ def do_build(state):
     #
     
     for package in state.packages_build:
-        wheel = do_package(package)
+        wheel = do_build_single(state, package)
         package_to_wheel[package] = wheel
         pipcl.run(
                 f'piprepo build {state.wheelhouse}',
