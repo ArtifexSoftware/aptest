@@ -258,6 +258,14 @@ g_package_info = {
                 'submodules': False,
                 'order': 1, # Fetch before Layout
             },
+        'smartoffice-neo':
+            {
+                'gitlab_name': 'smartoffice/smartoffice',
+                'git_branch': 'master',
+                'aliases':  ['sot-neo'],
+                'submodules': False,
+                'order': 1, # Fetch before Layout
+            },
         'pdf_feature_inspector':
             {
                 'github_name': 'ArtifexSoftware/pdf_feature_inspector',
@@ -462,6 +470,10 @@ def add_package(state, name, location):
         state.packages2[name] = (location.as_str(), location.pos)
         return
     state.packages[name] = (location.as_str(), location.pos)
+    
+    assert not ('smartoffice' in state.packages and 'smartoffice-neo' in state.packages), \
+            f'Only one of `smartoffice` and `smartoffice-neo` can be specifeid.'
+    
     state.packages_build.append(name)
     state.packages_test.append(name)
 
@@ -1347,7 +1359,7 @@ def do_build_single(state, package):
         if package == 'mupdf':
             state.env_extra['PYMUPDF_SETUP_MUPDF_BUILD'] = directory_abs
             # fixme: be able to set to '' for system install?
-        elif package == 'smartoffice':
+        elif package in ('smartoffice', 'smartoffice-neo'):
             # We don't build smartoffice here, instead we tell pymupdfpro
             # where the local smartoffice checkout is.
             state.env_extra['PYMUPDFPRO_SETUP_SOT'] = directory_abs
@@ -2157,7 +2169,7 @@ def do_test_single(state, package, failed_packages):
     location, _ = state.packages[package]
     if not location:
         return
-    if package == 'mupdf' or package == 'smartoffice':
+    if package in ('mupdf', 'smartoffice', 'smartoffice-neo'):
         return
     directory = _get_local(package, state, test=1)
     if not directory:
@@ -2638,7 +2650,7 @@ def _get_local(package, state, test=False):
             
             ssh_key = None
             ssh_keyfile = None
-            if package == 'smartoffice':
+            if package in ('smartoffice', 'smartoffice-neo'):
                 # Special handling uses PYMUPDFPRO_SETUP_SOT_KEY on Github from
                 # repository secret.
                 PYMUPDFPRO_SETUP_SOT_KEY = os.environ.get('PYMUPDFPRO_SETUP_SOT_KEY')
