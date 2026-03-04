@@ -232,14 +232,14 @@ g_package_info = {
             {
                 'github_name': 'ArtifexSoftware/PyMuPDFPro',
                 'git_branch': 'main',
-                'aliases':  ['pro', 'P'],
+                'aliases':  ['pro'],
                 'order': 2,
             },
         'pymupdf_layout':
             {
                 'github_name': 'ArtifexSoftware/sce',
                 'git_branch': 'master',
-                'aliases':  ['layout', 'l'],
+                'aliases':  ['layout'],
                 'submodules': False,
                 'order': 2,
             },
@@ -254,7 +254,7 @@ g_package_info = {
             {
                 'gitlab_name': 'smartoffice/sot',
                 'git_branch': 'master',
-                'aliases':  ['sot', 's'],
+                'aliases':  ['sot'],
                 'submodules': False,
                 'order': 1, # Fetch before Layout
             },
@@ -262,7 +262,7 @@ g_package_info = {
             {
                 'gitlab_name': 'smartoffice/smartoffice',
                 'git_branch': 'master',
-                'aliases':  ['sot-neo'],
+                'aliases':  ['sot-neo', '--neoso'],
                 'submodules': False,
                 'order': 1, # Fetch before Layout
             },
@@ -850,7 +850,7 @@ def get_args(argv):
                     new_args = '-r @github -u -p=git: --pro=git: --layout=git: --4llm=git: cibw --sdists'
                 elif arg == '--release-2':
                     # Build for linux-aarch64 (just cp310 because testing other python versions too slow).
-                    new_args = '-r @github -u -p git: -P git: -l git: cibw --remote-github-runners linux -e CIBW_ARCHS_LINUX=aarch64 -e "CIBW_BUILD=cp310*"'
+                    new_args = '-r @github -u -p git: --pro git: --layout git: cibw --remote-github-runners linux -e CIBW_ARCHS_LINUX=aarch64 -e "CIBW_BUILD=cp310*"'
                 elif arg == '--release-3':
                     # Build for win-x32.
                     new_args = '-r @github -u -p git: cibw --remote-github-runners windows -e CIBW_ARCHS_WINDOWS=x86 --cibw-skip-add-defaults=0'
