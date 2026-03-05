@@ -582,6 +582,7 @@ def gh_workflow_download_multiple(
         extra_wheels=None,
         upload='',
         token_pypi=None,
+        local_dir_union=None,
         ):
     '''
     Wait for workflows to finish, downloads to local machine, uploads to
@@ -615,7 +616,8 @@ def gh_workflow_download_multiple(
     pipcl.log(f'{",".join(ids)=}')
     ids0 = ids.copy()
     local_dir = f'gh_workflow-{time.strftime("%Y-%m-%d")}-{"-".join(ids)}'
-    local_dir_union = f'{local_dir}-union'
+    if not local_dir_union:
+        local_dir_union = f'{local_dir}-union'
     pipcl.log(f'{ids=} {local_dir=}')
     directories = [None] * len(ids)
     pipcl.log(f'Waiting for workflows to finish: {ids=}')
@@ -751,6 +753,9 @@ def _check_identical_wheels(leaf_to_paths):
                     data = f.read()
                 md5 = hashlib.md5(data)
                 pipcl.log(f'    size={st.st_size:>12,} {md5.hexdigest()=} {path}')
+                if leaf.startswith('pymupdf4llm-') and 'windows' in os.path.dirname(path):
+                    pipcl.log(f'    [Ignoring pymupdf4llm wheel from windows because contains \\r characters so differs from non-windows builds')
+                    continue
                 extracted_path = f'pymupdf-temp-{i}-{os.path.basename(path)}'
                 pipcl.fs_ensure_empty_dir(extracted_path)
                 #pipcl.log(f'Extracting to temporary: {path} -> {path_extracted}')
@@ -866,18 +871,39 @@ def _create_download_union(leaf_to_paths, extra_wheels, local_dir_union):
             pipcl.run(f'rsync -ai {extra_wheel} {local_dir_union}/')
     
     for leaf, paths in leaf_to_paths.items():
+        if not leaf.endswith(('.whl', '.tar.gz')):
+            pipcl.log(f'Ignoring {leaf=}.')
+            continue
         if 'emscripten' in leaf:
             pipcl.log(f'Pyodide wheel: {leaf=} {paths=}')
             pyodide_wheels.append((leaf, paths))
             continue
         path = paths[0]
+        path_leaf = os.path.basename(path)
+        path_existing = f'{local_dir_union}/{path_leaf}'
+        if os.path.exists(f'{local_dir_union}/{path_leaf}'):
+            if path_leaf.endswith('.whl'):
+                _check_identical_wheels(dict(path_leaf=[path_existing, path]))
+                continue
+            else:
+                a = pipcl.fs_read(path_existing, binary=1)
+                b = pipcl.fs_read(path, binary=1)
+                assert a == b, (
+                        f'Differing file already exists in {local_dir_union=}:\n'
+                        f'    {path_existing=}\n'
+                        f'    {path=}'
+                        )
+                pipcl.log(f'Identical file already exists: {local_dir_union}/{leaf}')
+                continue
+        #assert not os.path.exists(f'{local_dir_union}/{path_leaf}'), \
+        #        f'File already exists in {local_dir_union=}: {path_leaf}'
         if platform.system() == 'Windows':
             # rsync seems flakey on Windows, possibly because on my Windows
             # it's provided by cygwin.
             shutil.copy2(path, local_dir_union)
         else:
             pipcl.run(f'rsync -ai {path} {local_dir_union}/')
-    pipcl.log(f'{local_dir_union=}')
+    pipcl.log(f'Have populated {local_dir_union=}.')
     return pyodide_wheels
 
 
@@ -897,8 +923,14 @@ def _upload(token_pypi, local_dir_union, pyodide_wheels, upload):
 
     else:
         assert upload in ('pypi', 'test.pypi'), f'{upload=}'
-        paths = glob.glob(f'{local_dir_union}/*.whl') + glob.glob(f'{local_dir_union}/*.tar.gz')
+        paths = list()
+        for path in glob.glob(f'{local_dir_union}/*.whl') + glob.glob(f'{local_dir_union}/*.tar.gz'):
+            if 'pyodide' in path:
+                pipcl.log(f'Ignoring pyodide wheel: {path}')
+            else:
+                paths.append(path)
         paths.sort()
+        pipcl.log(f'{len(paths)=}:')
         for path in paths:
             assert path.endswith('.whl') or path.endswith('.tar.gz')
             s = pipcl.fs_filesize(path)
