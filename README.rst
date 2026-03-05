@@ -2009,6 +2009,7 @@ Changelog
 **2026-03-05**
 
 * Disabled backtraces in args diagnostics, unless `--devel`_ is specified.
+* Fixed build ordering of ``pymupdf_4llm`` because it now requires ``pymupdf_layout``.
 
 
 **2026-03-04**
