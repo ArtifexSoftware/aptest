@@ -408,8 +408,12 @@ class Args:
                 text += self.error_text()
                 if isinstance(exception, StopIteration):
                     text += f'Ran out of arguments.\n'
-                text += f'Expected one of:\n'
-                text += get_suggestions()
+                suggestions = get_suggestions()
+                if suggestions:
+                    text += f'Expected one of:\n'
+                    text += suggestions
+                else:
+                    text += f'(No suggestions available.)\n'
                 raise Exception(text.strip()) from exception
                 
         else:
