@@ -983,8 +983,9 @@ def get_args(argv):
                 state.github_upload = args.get_bool()
 
             elif arg == '-v':
-                state.venv = next(args).as_int()
-                assert state.venv in (0, 1, 2, 3), f'Invalid {state.venv=} should be 0, 1, 2 or 3.'
+                _venv = next(args)
+                assert _venv in ('0', '1', '2', '3'), f'Invalid venv={_venv.text}.'
+                state.venv = _venv.as_int()
             
             elif arg == '--venv-name':
                 state.venv_name = next(args).as_text()
@@ -2877,7 +2878,7 @@ if __name__ == '__main__':
         try:
             sys.exit(main(sys.argv))
         except Exception as e:
-            if 1:
+            if 0:
                 backtrace.show(reverse_chain=1, brief=1)
             elif isinstance(e, (subprocess.CalledProcessError, subprocess.TimeoutExpired)) and not g_devel:
                 # Terminate quietly, because failed commands will have generated
