@@ -45,6 +45,14 @@ g_atexit = None
 #
 APTEST_NESTED = os.environ.get('APTEST_NESTED')
 
+GITHUB_ACTIONS = os.environ.get('GITHUB_ACTIONS')
+
+COMP_LINE = os.environ.get('COMP_LINE')
+COMP_POINT = os.environ.get('COMP_POINT')
+#COMP_TYPE = os.environ.get('COMP_TYPE')
+#pipcl.log(f'{COMP_LINE=}')
+#pipcl.log(f'{COMP_POINT=}')
+
 
 def cibw_cp(*version_minors):
     '''
@@ -309,12 +317,16 @@ for name, value in g_package_info.items():
 def arg_alias(arg):
     '''
     Returns full name if arg is --<alias>.
+    
+    If <arg> is upper-case we return upper-case full name.
     '''
     for fullname, info in g_package_info.items():
         for alias in [fullname] + info.get('aliases', list()):
             alias = f'-{alias}' if len(alias) == 1 else f'--{alias}'
             if arg == alias:
                 return fullname
+            elif arg == alias.upper():
+                return fullname.upper()
 
 
 def package_alias(package):
@@ -322,9 +334,10 @@ def package_alias(package):
     Returns full name if arg is an alias.
     '''
     for fullname, info in g_package_info.items():
+        #pipcl.log(f'{package=}')
         if package in [fullname] + info['aliases']:
             return fullname
-    #return package
+    assert 0, f'Not package name/alias: {package!r}'
 
 
 def package_aliases(packages):
@@ -351,6 +364,7 @@ def gh_runner_alias(name):
     runner_aliases = [
             ('macos-14',         ['macos', 'macos-arm']),
             ('macos-15-intel',   ['macos-intel']),
+            ('ubuntu-24.04-arm', ['linux-arm']),
             ('ubuntu-latest',    ['linux', 'linux-intel']),
             ('windows-11-arm',   ['windows-arm']),
             ('windows-2022',     ['windows', 'windows-intel']),
@@ -466,17 +480,27 @@ def add_package(state, name, location):
             ok_locations.append(path[:-6])
         ok_locations.sort()
         if location not in ok_locations:
-            if os.environ.get('COMP_LINE'):
+            if COMP_LINE:
                 # Raise exception to force listing of available checkouts.
                 assert location in ok_locations, f'Location is not a Git checkout in current directory: {location}'
             else:
                 # Just output a warning.
                 pipcl.log(f'Warning, location is not a Git checkout in current directory: {location=}')
+    
+    
+    if name.lower() != name:
+        # Upper case names are defaults for making releases.
+        state.packages_for_release[name.lower()] = location # A cli.Arg.
+        return
+    
     if name in state.packages:
         pipcl.log(f'Adding second location for {name=} testing only: {location=}')
-        state.packages2[name] = (location.as_str(), location.pos)
+        state.packages2[name] = location_pos
         return
-    state.packages[name] = (location.as_str(), location.pos)
+    
+    location_pos = (location.as_str(), location.pos)
+    
+    state.packages[name] = location_pos
     
     assert not ('smartoffice' in state.packages and 'smartoffice-neo' in state.packages), \
             f'Only one of `smartoffice` and `smartoffice-neo` can be specifeid.'
@@ -501,11 +525,6 @@ def get_args(argv):
     If we are being called by bash for command-line completion, we reuturn
     None.
     '''
-    COMP_LINE = os.environ.get('COMP_LINE')
-    COMP_POINT = os.environ.get('COMP_POINT')
-    #COMP_TYPE = os.environ.get('COMP_TYPE')
-    #pipcl.log(f'{COMP_LINE=}')
-    #pipcl.log(f'{COMP_POINT=}')
     if COMP_LINE:
         # We must not write to stdout.
         del pipcl._log_f[:] # pylint: disable=protected-access
@@ -555,6 +574,7 @@ def get_args(argv):
     state = State()
     
     state.build_type = None
+    state.check_unchanged = False
     state.cibw_ignore_test_failures = False
     state.cibw_name = 'cibuildwheel'
     state.cibw_pyodide = None
@@ -567,6 +587,7 @@ def get_args(argv):
     state.clean_setup_all = list()
     state.commands = list()
     state.devel = False
+    state.draft_location = None
     state.env_extra = dict()
     state.github_upload = None
     state.gnn_doit = False
@@ -582,6 +603,7 @@ def get_args(argv):
     state.packages_build = list() # Sorted list of names.
     state.packages = dict()   # map from name to location.
     state.packages_test = list()  # Sorted list of names.
+    state.packages_for_release = dict()
     state.path_artifex_key = 'artifex-software-ssh-key'
     state.path_huggingface_key = 'huggingface-key'
     state.path_pro_key = 'thirdparty-so-key'
@@ -615,7 +637,7 @@ def get_args(argv):
     state.ssh_key_path_abs = None
     state.swig = None
     state.swig_quick = None
-    state.system_packages = True if os.environ.get('GITHUB_ACTIONS') == 'true' else False   # pylint: disable=simplifiable-if-expression
+    state.system_packages = True if GITHUB_ACTIONS == 'true' else False   # pylint: disable=simplifiable-if-expression
     state.system_site_packages = False
     state.tee_auto = False
     state.test_extra_packages = list()
@@ -633,6 +655,8 @@ def get_args(argv):
     state.venv_name = None
     state.verbose = True
     state.wheelhouse = 'aptest-wheelhouse'
+    state.wheelhouse_union = None
+    state.wheelhouse_union_release = None
     
     global g_devel
     g_devel = state.devel
@@ -649,7 +673,7 @@ def get_args(argv):
     args_list = list()
     args_list += [argv[0]]
     
-    if os.environ.get('APTEST_DOT_APTEST') != '0':
+    if os.environ.get('APTEST_DOT_APTEST') != '0' and not APTEST_NESTED:
         aptest_config_path = os.path.expanduser(f'~/.aptest')
         if os.path.exists(aptest_config_path):
             aptest_config = pipcl.fs_read(aptest_config_path)
@@ -719,6 +743,9 @@ def get_args(argv):
                 build_type = next(args)
                 assert build_type in ('release', 'debug', 'memento')
                 state.build_type = build_type.as_text()
+            
+            elif arg == '--check-unchanged':
+                state.check_unchanged = args.get_bool()
 
             elif arg == '--cibw-name':
                 state.cibw_name = next(args)
@@ -779,14 +806,22 @@ def get_args(argv):
                 _name = next(args).as_str()
                 add_package(state, _name, next(args))
             
+            elif arg == '--log-prefix':
+                _prefix = next(args).as_text()
+                if not APTEST_NESTED and not COMP_LINE:
+                    pipcl._log_prefix_stack.append(_prefix)
+            
             elif package := arg_alias(arg):
                 location = next(args)
                 add_package(state, package, location)
             
+            elif arg == '--release_packages':
+                state.release_packages = next(args).as_str()
+            
             elif arg == '--tee-auto':
                 tee_auto = args.get_bool()
-                # Ignore if we are being run by an outer aptest.
-                if tee_auto and not APTEST_NESTED:
+                # Ignore if we are being run by an outer aptest or by bash completion.
+                if tee_auto and not APTEST_NESTED and not COMP_LINE:
                     state.tee_auto = tee_auto
                     pipcl.log_tee(f'aptest-out-{g_date_time}', 'aptest-out')
 
@@ -794,8 +829,8 @@ def get_args(argv):
                 pos = args.pos
                 path = next(args).as_text()
                 #args.args_eq.set(pos, '')
-                # Ignore if we are being rerun by an outer aptest.
-                if path and not APTEST_NESTED:
+                # Ignore if we are being rerun by an outer aptest or by bash completion.
+                if path and not APTEST_NESTED and not COMP_LINE:
                     state.tee_path = path
                     pipcl.log_tee(state.tee_path)
 
@@ -845,28 +880,49 @@ def get_args(argv):
                 args.args_eq.set(pos, '')   # Avoid recursion when we rerun ourselves.
 
             elif arg.startswith('--release-'):
-                args.suggestions.clear()
-                assert (1
-                        and pos0[0] == args_list_base_len
-                        and len(args.argv) == args_list_base_len + 1
-                        ), f'{args_list_base_len=} {pos0[0]=} {len(args.argv)=} args `--release-*` must be only arg.'
-                if arg == '--release-1':
+                ## Must be last arg.
+                #assert args.pos[0] == len(args.argv), f'{len(args.argv)=} {args.pos=}.'
+                new_args = ''
+                new_args += f' --log-prefix {shlex.quote(arg.as_str() + ": ")}'
+                pipcl.log(f'{new_args=}')
+                new_args += ' -r @github cibw'
+                new_args += ' --check-unchanged'
+                new_args += ' --use-release-args'
+                
+                #if not state.wheelhouse_union:
+                #    assert state.wheelhouse_union_release, f'Must specify `--wheelhouse-union <dir>` before `--release-*`.'
+                #    new_args += f' --wheelhouse-union {shlex.quote(state.wheelhouse_union_release)}'
+                #for package, location_arg in state.packages_for_release.items():
+                #    if package not in state.packages:
+                #        new_args += f' -i {package} {shlex.quote(location_arg.as_str())}'
+                #packages = set(state.packages.keys()) | set(state.packages_for_release.keys())
+                
+                if 0:
+                    pass
+                
+                elif arg == '--release-1':
                     # Build core wheels and sdist.
                     # [pymupdf4llm is pure python so doesn't need to be
                     # mentioned in other --release-* options.]
-                    new_args = '-r @github -u -p=git: --pro=git: --layout=git: --4llm=git: cibw --sdists'
+                    new_args += ' --sdists -b pymupdf,pymupdfpro,pymupdf_layout,pymupdf4llm'
+                
                 elif arg == '--release-2':
                     # Build for linux-aarch64 (just cp310 because testing other python versions too slow).
-                    new_args = '-r @github -u -p git: --pro git: --layout git: cibw --remote-github-runners linux -e CIBW_ARCHS_LINUX=aarch64 -e "CIBW_BUILD=cp310*"'
+                    #new_args += ' -b pymupdf,pymupdfpro,pymupdf_layout,pymupdf4llm --remote-github-runners linux -e CIBW_ARCHS_LINUX=aarch64 -e "CIBW_BUILD=cp310*"'
+                    new_args += ' -b pymupdf,pymupdfpro,pymupdf_layout,pymupdf4llm --remote-github-runners macos-intel,linux-arm'
+                
                 elif arg == '--release-3':
                     # Build for win-x32.
-                    new_args = '-r @github -u -p git: cibw --remote-github-runners windows -e CIBW_ARCHS_WINDOWS=x86 --cibw-skip-add-defaults=0'
+                    new_args += ' -b pymupdf --remote-github-runners windows -e CIBW_ARCHS_WINDOWS=x86 --cibw-skip-add-defaults=0'
+                
                 elif arg == '--release-4':
                     # Build for linux-musllinux.
-                    new_args = '-r @github -u -p git: cibw --remote-github-runners linux -e "CIBW_BUILD=cp310-musllinux_x86_64" --cibw-skip-add-defaults=0'
+                    new_args += ' -b pymupdf --remote-github-runners linux -e "CIBW_BUILD=cp310-musllinux_x86_64" --cibw-skip-add-defaults=0'
+                
                 elif arg == '--release-5':
                     # Build for Pyodide.
-                    new_args = '-r @github -p git: cibw --cibw-pyodide --remote-github-runners linux'
+                    new_args += ' -b pymupdf --cibw-pyodide --remote-github-runners linux'
+                
                 elif arg == '--release-6':
                     # Build for cp314t.
                     #
@@ -874,12 +930,20 @@ def get_args(argv):
                     # py_limited_api and Py_GIL_DISABLED are not supported
                     # together as of 2026-02-20, e.g. see PEP 803 and PEP 809.
                     #
-                    new_args = '-r @github -u -p git: cibw --remote-github-runners linux --cibw-skip-add-defaults=0 -e CIBW_BUILD="cp314t*" -e CIBW_SKIP="*musllinux*" -e PYMUPDF_SETUP_PY_LIMITED_API=0'
+                    new_args += ' -b pymupdf --remote-github-runners linux --cibw-skip-add-defaults=0 -e CIBW_BUILD="cp314t*" -e CIBW_SKIP="*musllinux*" -e PYMUPDF_SETUP_PY_LIMITED_API=0'
+                
+                #elif arg == '--release-7':
+                #    new_args += ' -b pymupdf,pymupdfpro,pymupdf_layout,pymupdf4llm --remote-github-runners macos-15-intel'
+                    
                 else:
                     assert 0, f'Unrecognised {arg=}.'
+                
                 new_args = shlex.split(new_args)
                 args.args_eq.replace(arg.pos, args.pos, new_args)
                 continue
+            
+            elif arg == '--release-packages':
+                state.release_packages = next(args).as_str()
 
             elif arg == '--remote-do':
                 state.remote_do = args.get_bool()
@@ -927,7 +991,7 @@ def get_args(argv):
 
             elif arg == '--set-swig':
                 state.swig = next(args).as_text()
-                pipcl.log(f'{state.swig=}')
+                #pipcl.log(f'{state.swig=}')
 
             elif arg == '--set-swig-quick':
                 state.swig_quick = args.get_bool()
@@ -979,11 +1043,19 @@ def get_args(argv):
 
             elif arg == '--ticker':
                 _ticker = next(args).as_float()
-                if not APTEST_NESTED:
+                if not APTEST_NESTED and GITHUB_ACTIONS != 'true':
                     state.ticker = _ticker
 
             elif arg == '-u':
                 state.github_upload = args.get_bool()
+            
+            elif arg == '--use-release-args':
+                assert state.wheelhouse_union_release, f'Must specify `--wheelhouse-union <dir>` for releases.'
+                state.wheelhouse_union = state.wheelhouse_union_release
+                
+                assert state.packages_for_release, f'Must specify upper-case packages for release.'
+                for package, location in state.packages_for_release.items():
+                    add_package(state, package, location)
 
             elif arg == '-v':
                 _venv = next(args)
@@ -996,11 +1068,21 @@ def get_args(argv):
             elif arg == '-V':
                 state.verbose = next(args).as_int()
                 assert state.verbose in (0, 1), f'Verbose level should be 0 or 1'
+            
+            elif arg == '--wheelhouse-union':
+                state.wheelhouse_union = next(args).as_str()
+
+            elif arg == '--wheelhouse-union-release':
+                state.wheelhouse_union_release = next(args).as_str()
+
+            elif arg == '--draft-location':
+                state.draft_location = next(args).as_str()
 
             elif arg in (
                     'build',
                     'cibw',
                     'docs',
+                    'draft',
                     'gnn-download',
                     'gnn-show',
                     'gnn-select-show',
@@ -1009,6 +1091,7 @@ def get_args(argv):
                     'populate',
                     'test',
                     'test-gnn',
+                    'upload',
                     'windows-show-vs-instances',
                     ):
                 state.commands.append(arg.as_str())
@@ -1044,6 +1127,8 @@ def _get_token_pypi(state):
 def do_remote_github(state, args):
     assert isinstance(args, cli.Args)
     pipcl.run('pip install requests')
+    pipcl.run(f'pip install --upgrade piprepo "setuptools<81"')
+    pipcl.run('pip install piprepo')
     if platform.system() == 'Windows':
         branch = f'aptest-{os.environ["USERNAME"]}'
     else:
@@ -1123,6 +1208,9 @@ def do_remote_github(state, args):
                     inputs = dict(args=args_string, matrix=matrix_json),
                     
                     )
+            pipcl.log(f'args_string is:')
+            args_string_lines = '\n-'.join(args_string.split(' -'))
+            pipcl.log(textwrap.indent(args_string_lines, '    '))
             url = f'https://api.github.com/repos/{info["github_name"]}'
             yml = 'test.yml'
             workflow_id = github.gh_run_workflow(
@@ -1145,7 +1233,13 @@ def do_remote_github(state, args):
                 #extra_wheels=upload_extra_wheels,
                 upload=upload,
                 token_pypi=_get_token_pypi(state) if upload else None,
+                local_dir_union=state.wheelhouse_union,
                 )
+        if state.wheelhouse_union:
+            pipcl.run(
+                    f'piprepo build {state.wheelhouse_union}',
+                    prefix='piprepo build: ',
+                    )
 
 def do_remote(state, argv):
     remote = state.remote
@@ -1569,7 +1663,7 @@ def do_cibw(state):
         elif state.cibw_pyodide:
             # Using python-3.13 fixes problems with MuPDF's setjmp/longjmp.
             CIBW_BUILD = 'cp313*'
-        elif os.environ.get('GITHUB_ACTIONS') == 'true':
+        elif GITHUB_ACTIONS == 'true':
             # Build/test all supported Python versions.
             CIBW_BUILD = cibw_cp(*python_versions_minor)
             if platform.system() == 'Windows':
@@ -1610,6 +1704,11 @@ def do_cibw(state):
         pipcl.log(f'{package=}')
         directory = _get_local(package, state)
         
+        if package == 'pymupdf4llm' and not state.pymupdf4llm_unified:
+            # setup.py is in subdirectory pymupdf4llm/.
+            directory += '/pymupdf4llm'
+        
+        pipcl.log(f'{package} _get_local() => {directory=}')
         if not directory:
             # location is pip.
             pipcl.log(f'Unable to process with cibuildwheel because location is pip: {package=} and now second location')
@@ -1640,6 +1739,7 @@ def do_cibw(state):
             continue
         
         if state.sdists and platform.system() == 'Linux':
+            pipcl.log(f'Calling build_sdist() {package=} {directory=}.')
             build_sdist(state, package, directory)
 
         if package in ('pdf2docx', 'pymupdf4llm'):
@@ -1762,7 +1862,7 @@ def do_cibw(state):
                     f'cd {directory} && cibuildwheel{cibw_pyodide_args}'
                         f' --output-dir {os.path.abspath(state.wheelhouse)}',
                     env_extra=env_extra,
-                    prefix=f'cibw {package}: ',
+                    prefix=f'{package}: ',
                     )
 
         pipcl.run(f'ls -ld {state.wheelhouse}/*')
@@ -2392,8 +2492,8 @@ def main(argv):
                     env_extra=dict(APTEST_NESTED='1'),
                     )
             sys.exit(e)
-            
-    # Rerun ourselves in a venv if necessary.
+    
+    # Rerun ourselves in a venv or Github if necessary.
     if (not state.remote and state.commands) or state.remote == '@github':
         if state.venv:
             # Rerun ourselves inside a venv if not already in a venv.
@@ -2549,7 +2649,7 @@ def main(argv):
         state.env_extra['PYMUPDF_LAYOUT_SETUP_SWIG'] = swig_binary
     
     if (1
-            and os.environ.get('GITHUB_ACTIONS') == 'true'
+            and GITHUB_ACTIONS == 'true'
             and pipcl.darwin()
             and platform.machine()=='x86_64'
             ):
@@ -2601,6 +2701,12 @@ def main(argv):
                     #
                     pipcl.run(f'docutils -g -d -s -t --pep-references --stylesheet={g_root}/rst.css {g_root}/README.rst {out}')
                     pipcl.log(f'Have created: {out}')
+                
+                elif command == 'draft':
+                    assert state.draft_location
+                    assert state.wheelhouse_union_release
+                    command = f'rsync -ai {state.wheelhouse_union_release}/ {state.draft_location}/'
+                    pipcl.run(command)
 
                 elif command == 'gnn-download':
                     do_gnn_download(state)
@@ -2637,6 +2743,17 @@ def main(argv):
 
                 elif command == 'test':
                     do_test(state)
+                
+                elif command == 'upload':
+                    if not state.wheelhouse_union:
+                        assert state.wheelhouse_union_release, f'Need `--wheelhouse-union-release <wheelhouse_union_dir>`'
+                        state.wheelhouse_union = state.wheelhouse_union_release
+                    github._upload(
+                            token_pypi=_get_token_pypi(state),
+                            local_dir_union=state.wheelhouse_union,
+                            pyodide_wheels=None,
+                            upload='pypi',
+                            )
                 
                 elif command == 'windows-show-vs-instances':
                     pipcl.log(f'{command}:')
@@ -2727,7 +2844,7 @@ def _get_local(package, state, test=False):
     
     # Show information about the checkout, regardless of where it came from.
     sha, comment, diff, branch = pipcl.git_info(directory)
-    with pipcl.LogPrefix(f'Local checkout {directory}: '):
+    with pipcl.LogPrefix(f'Local checkout of {package=}, {directory}: '):
         pipcl.log(f'{sha=}')
         pipcl.log(f'{branch=}')
         pipcl.log(f'comment:\n{textwrap.indent(comment or "", "    ")}')
@@ -2735,6 +2852,10 @@ def _get_local(package, state, test=False):
             pipcl.log(f'diff:\n{textwrap.indent(diff or "", "    ")}')
         else:
             pipcl.log(f'{diff=}')
+    
+    if state.check_unchanged:
+        assert not diff, f'Checkout is changed but {state.check_unchanged=}: {package=} {directory=}.'
+        # todo: also check that sha is on remote.
     
     return directory
     
@@ -2892,6 +3013,7 @@ if __name__ == '__main__':
                 pass
             else:
                 backtrace.show(reverse_chain=1, limit=None if g_devel else 0, brief=1)
+            pipcl.log(f'Aptest terminating with error.')
             sys.exit(1)
         finally:
             if g_atexit:
