@@ -25,17 +25,25 @@ Supported packages
 ------------------
 
 * ``langchain_pymupdf_layout``
-* ``mupdf`` (built by pymupdf's setup.py)
+* ``mupdf``
 * ``pdf2docx``
 * ``pdf_feature_inspector``
 * ``pymupdf``
 * ``pymupdf4llm``
 * ``pymupdf_layout``
 * ``pymupdfpro``
-* ``smartoffice`` (build by pymupdfpro's setup.py)
-* ``smartoffice-seo`` (build by pymupdfpro's setup.py)
+* ``smartoffice``
+* ``smartoffice-seo``
 
-Only one of ``smartoffice`` and ``smartoffice-seo`` can be specified.
+Notes:
+
+* Only one of ``smartoffice`` and ``smartoffice-seo`` can be specified.
+* ``mupdf``, ``smartoffice`` and ``smartoffice-seo`` are pseudo packages.
+
+  They are not built into python wheels, instead:
+
+  * ``mupdf`` is built into ``pymupdf``.
+  * ``smartoffice`` and ``smartoffice-seo`` are built into ``pymupdfpro``.
 
 
 Package locations
@@ -53,13 +61,13 @@ Building packages
 
 For each package:
 
-* If package was specified with ``pip:``
+* If package was specified with ``pip:...``
   
   * A wheel will be downloaded and installed from https://pypi.org.
 
 * Otherwise:
 
-  * If package was specified with ``git:`` we clone/update a local checkout.
+  * If package was specified with ``git:...`` we clone/update a local checkout.
 
   * The package is built locally into a wheel with ``pip wheel``.
   * This will typically take place in an internal pip venv.
@@ -68,7 +76,9 @@ For each package:
   * Note that the wheel will be specific to the current system
     and might not work on other systems with the same OS.
     
-    If you need a more portable wheel, see the `cibw`_ command.
+    For example on Linux it will require at least the current system's glibc.
+    
+    If you need a more portable wheel, use the `cibw`_ command.
   
 * The wheel is added to a local pypi-style PEP 503 package repository.
 * We use pip's ``--extra-index-url`` option to refer to our internal package
@@ -76,18 +86,6 @@ For each package:
 * Thus pip will use previously built package wheels as prerequisites, as required.
 
 See the `build`_ command.
-
-
-Pseudo packages
----------------
-
-Some packages are not built by Aptest:
-
-* ``mupdf`` - built by pymupdf's setup.py, communicated by environment variable.
-* ``smartoffice`` - built by pymupdfpro's setup.py, communicated by environment variable.
-* ``smartoffice-neo`` - built by pymupdfpro's setup.py, communicated by environment variable.
-
-One only one of ``smartoffice`` and ``smartoffice-neo`` can be specified.
 
 
 Testing packages
@@ -121,15 +119,15 @@ See the `cibw`_ command.
 Examples
 --------
 
-Build, install and test pymupdf, pymupdfpro and pymupdf_layout using
-local checkouts::
+Build, install and test ``pymupdf``, ``pymupdfpro`` and ``pymupdf_layout`` using
+local checkouts:
 
-    aptest/aptest.py -p PyMuPDF --pro PyMuPDFPro -m mupdf --layout sce build test
+    ``aptest/aptest.py -p PyMuPDF --pro PyMuPDFPro -m mupdf --layout sce build test``
 
-Build, install and test pymupdf, pymupdfpro and pymupdf_layout using
-central git repositories::
+Build, install and test ``pymupdf``, ``pymupdfpro`` and ``pymupdf_layout`` using
+central git repositories:
 
-    aptest/aptest.py -p git: --pro git: --layout git: build test
+    ``aptest/aptest.py -p git: --pro git: --layout git: build test``
 
 Make release, building/testing on Github, downloading to local machine,
 and uploading to https://pypi.org (also see `Release procedure`_)::
@@ -141,39 +139,43 @@ and uploading to https://pypi.org (also see `Release procedure`_)::
     aptest/aptest.py --release-5
     aptest/aptest.py --release-6
 
-Build/test pymupdf, pymupdfpro and pymupdf-layout using cibuildwheel,
-getting packages from different locations::
+Build/test ``pymupdf``, ``pymupdfpro`` and ``pymupdf-layout`` using cibuildwheel,
+getting packages from different locations:
 
-    aptest/aptest.py -r @github -p pip: --pro PyMuPDFPlus --layout git: cibw
+    ``aptest/aptest.py -r @github -p pip: --pro PyMuPDFPlus --layout git: cibw``
 
-Test current pymupdf release with latest test suite in central git::
+Test current ``pymupdf`` release with latest test suite in central git:
 
-    aptest/aptest.py -r macmini -p pip: -p git: build test
+    ``aptest/aptest.py -r macmini -p pip: -p git: build test``
 
-Test current pymupdf release with test suite in local checkout::
+Test current ``pymupdf`` release with test suite in local checkout:
 
-    aptest/aptest.py -r macmini -p pip: -p PyMuPDF build test
+    ``aptest/aptest.py -r macmini -p pip: -p PyMuPDF build test``
 
-Runs specific Github workflow PyMuPDFPlus/.github/workflows/test_multiple.yml, on windows only::
+Runs specific Github workflow ``PyMuPDFPlus/.github/workflows/test_multiple.yml``, on windows only:
 
-    aptest/aptest.py -r @github --remote-github-yml test_multiple.yml --pro PyMuPDFPlus --remote-github-yml-inputs 'args=-o windows'
+    ``aptest/aptest.py -r @github --remote-github-yml test_multiple.yml --pro PyMuPDFPlus --remote-github-yml-inputs --remote-github-runners windows``
 
-Tests https://pypi.org's pymupdf, pymupdfpro and pymupdf_layout with the test
-suites on central git::
+Test `<https://pypi.org>`_'s ``pymupdf``, ``pymupdfpro`` and ``pymupdf_layout`` with the test
+suites on central git:
 
-    aptest/aptest.py -r @github -p pip: --pro pip: --layout pip: -p git: --pro git: --layout git: build test
+    ``aptest/aptest.py -r @github -p pip: --pro pip: --layout pip: -p git: --pro git: --layout git: build test``
 
-Download wheels from a previous Aptest Github workflow run::
+Download wheels from a previous Aptest Github workflow run:
 
-    aptest/aptest.py -r @github --aptest aptest --remote-github-workflow-id 21760695687
+    ``aptest/aptest.py -r @github --aptest aptest --remote-github-workflow-id 21760695687``
 
-Test Aptest itself::
+Test Aptest itself:
 
-    aptest/aptest.py --aptest aptest test
+    ``aptest/aptest.py --aptest aptest test``
 
-Build pymupdfpro with alternative smartoffice-neo:
+Build/test ``pymupdfpro`` with alternative ``smartoffice-neo``:
 
-    aptest/aptest.py --smartoffice-neo git: --pro git: build test
+    ``aptest/aptest.py --smartoffice-neo git: --pro git: build test``
+
+Run ``pymupdf_layout`` gnn tests with ``mupdf`` version 1.27.2, current ``pymupdf`` in git, and local checkout ``sce/`` of ``pymupdf_layout`` (this assumes that the DocLayNet dataset has been downloaded, see `Using DocLayNet dataset`_):
+
+    ``aptest/aptest.py --test-gnn-det eval/eval_pymupdf_layout.py -m=git:'-t 1.27.2' -p=git: --layout=sce test-gnn``
 
 
 Release procedure
@@ -184,6 +186,7 @@ Instructions for releasing wheels for:
     * ``pymupdf``
     * ``pymupdfpro``
     * ``pymupdf_layout``
+    * ``pymupdf4llm``
 
 
 * Get local checkout of latest version of each package, corresponding to what will be released.
@@ -211,7 +214,7 @@ Instructions for releasing wheels for:
 
 * Test local checkouts of all packages on Github machines::
 
-    aptest/aptest.py -r @github -p PyMuPDF --pro PyMuPDFPro --layout sce cibw
+    aptest/aptest.py -r @github -p PyMuPDF --pro PyMuPDFPro --layout sce --4llm pymupdf4llm cibw
 
 * Push each package to Github.
 * Optionally lock github branches for each project.
@@ -300,7 +303,7 @@ Instructions for releasing wheels for:
       
         PyMuPDF-<version> has just been released.
       
-        See: https://github.com/pymupdf/PyMuPDF/discussions/<announcement>
+        See: https://github.com/pymupdf/PyMuPDF/discussions/<announcement-id>
 
 * Wait for Linux aarch64 wheels build to finish.
 
@@ -339,7 +342,7 @@ Instructions for releasing wheels for:
   
   [2026-01-30: hopefully we'll have a more official location soon.]
 
-* Build cp314t (free threading) wheel.
+* Build ``cp314t`` (Python-3.14 free threading) wheel.
 
   Run::
   
@@ -353,16 +356,16 @@ Instructions for releasing wheels for:
 
 * Post-release changes for all projects.
   
-  * Increment version in ``setup.py``.
+  * Increment version in all package ``setup.py`` files.
 
-* Extra post-release changes for pymupdf.
+* Extra post-release changes for ``pymupdf``.
 
-  In ``changes.txt``:
+  In ``pymupdf``'s ``changes.txt``:
 
   * Add date of release that was just made.
   * Add title for next release ``**Changes in version <next-version>**``.
 
-  In ``.github/ISSUE_TEMPLATE/bug_report.yml``:
+  In ``pymupdf``'s ``.github/ISSUE_TEMPLATE/bug_report.yml``:
 
   * Add version of next release to drop-down list of versions.
 
@@ -375,7 +378,7 @@ Details
 Run remotely
 ^^^^^^^^^^^^
 
-Aptest can transparently rerun itself in remote locations:
+Aptest can transparently re-run itself in remote locations:
 
 * Remote machine (with ssh/rsync).
 * Github runner (push to unique(ish) branches and run a workflow).
@@ -387,7 +390,7 @@ Use of Python venv virtual environments
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 If Aptest is not already running inside a Python venv, it automatically creates a
-venv and re-run itself inside it.
+venv and re-runs itself inside it.
 
 * The `build`_ command builds and installs into the current venv.
 * The `test`_ command tests packages that are installed in the current venv.
@@ -530,7 +533,7 @@ Smartoffice ssh key
 
 We allow specification of a custom ssh private key that allows access to the
 smartoffice/smartoffice-neo repositories;
-this is required when PyMuPDFPro builds SmartOffice
+this may be required when pymupdfpro builds SmartOffice
 because of how the SmartOffice build system works.
 
 * If required, this key should be provided in file ``thirdparty-so-key`` in the
@@ -562,36 +565,25 @@ https://github.com/ArtifexSoftware/sce/wiki/How-to-train-GNN.
 * Downloading and extracting is tracked using marker files, to avoid running
   unnecessarily more than once.
 
-The `test-gnn`_ command runs pymupdf_layout tests on the DocLayNet dataset, depending
-on the `--test-gnn-det` value:
+* The `test-gnn`_ command runs ``pymupdf_layout`` tests on the DocLayNet dataset,
+  depending on the `--test-gnn-det`_ value.
 
-* ``eval_gnn`` - use ``sce:eval/eval_gnn.py:det_func()``.
-* ``eval_oracle_gnn`` - use ``sce:eval/eval_oracle_gnn.py:det_func()``.
-* ``eval_pymupdf4llm`` - use ``sce:eval/eval_pymupdf4llm.py:det_func()``.
-* ``eval_pymupdf_layout`` - use ``sce:eval/eval_pymupdf_layout.py:det_func()``.
-
-The ``pymupdf_layout`` package must have been built/installed.
+* The ``pymupdf_layout`` package must have been built/installed.
 
 
 Argument completion with Bash
 .............................
 
-``aptest/aptest.py completion`` writes a bash completion script for Aptest to
-stdout.
+Aptest has support for customised bash argument completion using ``<tab>``.
 
-* Add argument completion for Aptest to the current Bash session with::
+Activate in the current bash session with::
 
     source <(aptest/aptest.py completion)
 
-  Subsequently when entering an Aptest command, bash will respond to ``<tab>``
-  by completing and/or showing valid args.
-
-* Or write into relevant files with one of::
+Alternatively activate in all new bash sessions with one of::
 
     aptest/aptest.py completion > /etc/bash_completion.d/aptest.py.bash_completion
     aptest/aptest.py completion >> ~/.bash_completion
-
-  See Bash's ``help complete`` for more information.
 
 * Also see special command  `completion`_.
 
@@ -625,18 +617,18 @@ Bool options
 Bool options are handled specially, they set to true by default, and can be
 set explicitly using ``--foo=<value>``:
   
-Set to True:
+Set to true:
 
-* --foo
-* --foo=1
-* --foo=true
-* --foo=True.
+* ``--foo``
+* ``--foo=1``
+* ``--foo=true``
+* ``--foo=True``
 
-Set to False:
+Set to false:
 
-* --foo=0
-* --foo=false
-* --foo=False.
+* ``--foo=0``
+* ``--foo=false``
+* ``--foo=False``
 
 .. _~/.aptest:
 
@@ -914,7 +906,7 @@ Options
         
         (or their aliases.)
 
-    ``package-location``:
+    ``package-location`` should be one of:
     
         ``pip:``
             Install from https://pypi.org using pip.
@@ -923,15 +915,18 @@ Options
             Install ``<package-name><suffix>`` from https://pypi.org using pip.
             For example ``pip:==1.26.3`` will install version 1.26.3 of
             the package.
+        
         ``pip:*.whl``
             Install from local wheel using pip.
+        
         ``pip:*.tar.gz``
             Install from local sdist using pip.
+        
         ``"git:[-b|--branch <branch>] [--depth <depth>] [-s|--sha <40-char-sha>] [-t|--tag <tag>] [<remote>]"``
             Clone/update from git remote into local checkout
-            ``aptest-git-<package-name>``.
+            ``aptest-git-<package-name>``, from which we build/install from source.
             
-            * Any local changes in an existing local checkout are deleted.
+            * If the local checkout already exists, any local changes are deleted.
             
             Defaults:
             
@@ -939,8 +934,8 @@ Options
             * ``<remote>``: hard-coded for each package (typically a Github repository).
             * ``<depth>``: 1.
 
-        <local-dir>
-            Local directory, typically a git checkout.
+        ``<directory>``
+            A local directory, typically a git checkout, from which we build/install from source.
 
     If a package is specified twice, the first location will be used
     for building, and the second location used for testing. This allows
@@ -970,7 +965,7 @@ Options
 
 -m <mupdf-location>
 ...................
-    Specify location of mupdf.
+    Specify location of package ``mupdf``.
     
     Alias for ``-i mupdf <location>``.
     
@@ -996,7 +991,7 @@ Options
 
 -p <pymupdf-location>
 .....................
-    Specify location of pymupdf.
+    Specify location of package ``pymupdf``.
     
     Alias for ``-i pymupdf <location>``.
     
@@ -1009,14 +1004,14 @@ Options
 
 -r <remote>
 ...........
-    Re-run ourselves on remote machine(s) and on success copy wheels
+    Aptest ourselves on remote machine(s) and on success copy wheels
     back to local machine.
 
     If ``<remote>`` is ``@github``, we run on Github:
 
     * We push specified local checkouts directories (specified
       by ``-i``, ``-m``, ``-p`` etc) to branches called ``aptest-$USER`` in the
-      central repositories on https://github.com.
+      hard-coded per-packagae central repositories, typically on https://github.com.
 
     * **Warning**: this will make git forget about any new files in local
       checkouts that have been added but not yet committed.
@@ -1046,7 +1041,7 @@ Options
       * `--remote-github-yml-inputs`_
     
     Otherwise ``<remote>`` should specify a remote machine on which to run
-    aptest:
+    Aptest:
 
     * If ``<remote>`` contains one or more spaces it is interpreted as the ssh
       command to use, optionally ending with a colon followed by
@@ -1128,9 +1123,9 @@ Options
 
 -v <venv>
 .........
-    Changes how we rerun ourselves in a venv when required.
+    Changes how we re-run ourselves in a venv when required.
 
-    0 - Never rerun inside a venv.
+    0 - Never re-run inside a venv.
     
         For example one could use this if already in a venv.
 
@@ -1166,7 +1161,7 @@ Options
 
 --atexit <command>
 ..................
-    Run ``<command>`` when aptest terminates.
+    Run ``<command>`` when Aptest terminates.
     
     For example:
     
@@ -1231,7 +1226,7 @@ Options
     
     * As of 2026-02-10, only pymupdf does anything in response to this.
     
-    * pymupdf's ``setup.py clean`` deletes files for pymupdf's extension and
+    * ``pymupdf``'s ``setup.py clean`` deletes files for pymupdf's extension and
       mupdf's C++/Python APIs.
       
     ``--clean-setup pymupdf`` can be useful if pymupdf fails to import mupdf;
@@ -1246,7 +1241,7 @@ Options
     
     * As of 2026-02-10, only pymupdf does anything in response to this.
     
-    * pymupdf's ``setup.py clean --all`` deletes files for pymupdf's extension and
+    * ``pymupdf``'s ``setup.py clean --all`` deletes files for pymupdf's extension and
       mupdf's C++/Python APIs and the mupdf C API.
 
 .. _--devel:
@@ -1336,7 +1331,7 @@ Options
 
 --langchain <langchain-pymupdf-layout-location>
 ...............................................
-    Specify location of langchain-pymupdf-layout.
+    Specify location of package ``langchain-pymupdf-layout``.
     
     Alias for ``-i langchain_pymupdf_layout <langchain-pymupdf-layout-location>``.
     
@@ -1350,7 +1345,7 @@ Options
 --langchain-pymupdf-layout <langchain-pymupdf-layout-location>
 ..............................................................
 
-    Specify location of langchain-pymupdf-layout.
+    Specify location of package ``langchain-pymupdf-layout``.
     
     Alias for ``-i langchain_pymupdf_layout <langchain-pymupdf-layout-location>``.
     
@@ -1364,7 +1359,7 @@ Options
 
 --layout <pymupdf_layout-location>
 ..................................
-    Specify location of pymupdf_layout.
+    Specify location of package ``pymupdf_layout``.
     
     Alias for ``-i pymupdf_layout <pymupdf_layout-location>``.
     
@@ -1377,7 +1372,7 @@ Options
 
 --mupdf <mupdf-location>
 ........................
-    Specify location of mupdf.
+    Specify location of package ``mupdf``.
     
     Alias for ``-i mupdf <mupdf-location>``.
     
@@ -1391,7 +1386,7 @@ Options
 --neoso <smartoffice-neo-location>
 ....................................
 
-    Specify location of smartoffice-neo.
+    Specify location of package ``smartoffice-neo``.
     
     Alias for ``-i smartoffice-neo <smartoffice-neo-location>``.
     
@@ -1405,7 +1400,7 @@ Options
 
 --pdf2docx <pdf2docx-location>
 ..............................
-    Specify location of pdf2docx.
+    Specify location of package ``pdf2docx``.
     
     Alias for ``-i pdf2docx <pdf2docx-location>``.
     
@@ -1417,7 +1412,7 @@ Options
 
 --pdf_feature_inspector <pdf_feature_inspector-location>
 ........................................................
-    Specify location of pdf_feature_inspector.
+    Specify location of package ``pdf_feature_inspector``.
     
     Alias for ``-i pdf_feature_inspector <pdf_feature_inspector-location>``.
     
@@ -1430,7 +1425,7 @@ Options
 
 --pfi <pdf_feature_inspector-location>
 ......................................
-    Specify location of pdf_feature_inspector.
+    Specify location of package ``pdf_feature_inspector``.
     
     Alias for ``-i pdf_feature_inspector <pdf_feature_inspector-location>``.
     
@@ -1443,7 +1438,7 @@ Options
 
 --pro <pymupdfpro-location>
 ...........................
-    Specify location of pymupdfpro.
+    Specify location of package ``pymupdfpro``.
     
     Alias for ``-i pymupdfpro <pymupdfpro-location>``.
     
@@ -1455,7 +1450,7 @@ Options
 
 --pymupdf <pymupdf-location>
 ............................
-    Specify location of pymupdf.
+    Specify location of package ``pymupdf``.
     
     Alias for ``-i pymupdf <pymupdf-location>``.
     
@@ -1468,7 +1463,7 @@ Options
 
 --pymupdfpro <pymupdfpro-location>
 ..................................
-    Specify location of pymupdfpro.
+    Specify location of package ``pymupdfpro``.
     
     Alias for ``-i pymupdfpro <pymupdfpro-location>``.
     
@@ -1480,7 +1475,7 @@ Options
 
 --pymupdf4llm <pymupdf4llm-location>
 ....................................
-    Specify location of pymupdf4llm.
+    Specify location of package ``pymupdf4llm``.
     
     Alias for ``-i pymupdf4llm <pymupdf4llm-location>``.
     
@@ -1493,7 +1488,7 @@ Options
 
 --pymupdf_layout <pymupdf_layout-location>
 ..........................................
-    Specify location of pymupdf_layout.
+    Specify location of package ``pymupdf_layout``.
     
     Alias for ``-i pymupdf_layout <pymupdf_layout-location>``.
     
@@ -1754,7 +1749,7 @@ Options
 
 --smartoffice <smartoffice-location>
 ....................................
-    Specify location of smartoffice.
+    Specify location of package ``smartoffice``.
     
     Alias for ``-i smartoffice <smartoffice-location>``.
     
@@ -1767,7 +1762,7 @@ Options
 
 --smartoffice-neo <smartoffice-neo-location>
 ............................................
-    Specify location of smartoffice-neo, an alternative to `--smartoffice`_.
+    Specify location of package ``smartoffice-neo``, an alternative to ``--smartoffice``.
     
     Alias for ``-i smartoffice-neo <smartoffice-neo-location>``.
     
@@ -1782,7 +1777,7 @@ Options
 --sot <smartoffice-location>
 ............................
 
-    Specify location of smartoffice.
+    Specify location of package ``smartoffice``.
     
     Alias for ``-i smartoffice <smartoffice-location>``.
     
@@ -1795,7 +1790,7 @@ Options
 --sot-neo <smartoffice-neo-location>
 ....................................
 
-    Specify location of smartoffice-neo.
+    Specify location of package ``smartoffice-neo``.
     
     Alias for ``-i smartoffice-neo <smartoffice-neo-location>``.
     
@@ -1878,8 +1873,10 @@ Options
 ........................
     This is required by `test-gnn`_.
     
-    Sets the Python file to be run, relative to the root of the pymupdf_layout
-    checkout. Valid values are:
+    Sets the Python script to be run,
+    relative to the root of the ``pymupdf_layout`` checkout.
+    
+    Valid values for ``<gnn_det>`` are:
     
     * ``eval/eval_docling.py``
     * ``eval/eval_gnn.py``
@@ -1937,7 +1934,9 @@ Options
 
 --token-pypi-path <path>
 ........................
-    Specify location of file pypi upload token, required for the `-u`_ option.
+    Specify location of file containing a `https://pypi.org`_ upload token.
+    
+    Required for the `-u`_ option.
 
     Also see `~/.aptest`_.
 
@@ -1967,7 +1966,7 @@ Options
 
 --4llm <location>
 .................
-    Specify location of pymupdf4llm.
+    Specify location of package ``pymupdf4llm``.
     
     Alias for ``-i pymupdf4llm <location>``.
     
@@ -1992,19 +1991,25 @@ Special arguments
 
 completion
 ..........
-    Must be the only arg. Prints a bash completion script for
-    aptest.py, to stdout.
+    Must be the only arg. Writes an Aptest bash completion script to stdout.
 
-    The script works by using ``aptest.py`` itself to write valid
-    completions to stdout (which it does if environment variable
-    ``COMP_LINE`` is defined).
+    The completion script works by internally running ``aptest.py`` in
+    completion mode (where ``COMP_LINE`` is defined), where it writes valid
+    completions to stdout.
 
-    If ``APTEST_COMPLETION_DEBUG`` is defined, it is a path to which
-    diagnostics are appended.
+    When in completion mode, Aptest will append diagnostics to file
+    ``APTEST_COMPLETION_DEBUG`` if defined.
+    
+    Also see `Argument completion with Bash`_.
 
 
 Changelog
 ---------
+
+**2026-03-05**
+
+* Disabled backtraces in args diagnostics, unless `--devel`_ is specified.
+
 
 **2026-03-04**
 
@@ -2096,7 +2101,7 @@ Changelog
 
 * Changed `-V <-VV_>`__ to take the verbose level (0 or 1) instead of incrementing it.
 * Changed default verbose level to 1.
-* Show git sha and diff of aptest itself on startup if verbose.
+* Show git sha and diff of Aptest itself on startup if verbose.
 * `cibw`_: don't attempt to build/test layout on macos-intel-python3.14
   because onnxruntime not available.
 * Fixed .github/workflows/test_multiple.yml failures.
@@ -2126,7 +2131,7 @@ Changelog
 
 **2026-01-30**
 
-* Allow testing of aptest itself.
+* Allow testing of Aptest itself.
 * Added `--release-5`_ for building pyodide pymupdf wheel.
 * Avoid remaining potential for ``build`` command to end up installing incorrect package versions.
 
