@@ -92,8 +92,9 @@ def sync_reverse(
         remote_dir,
         path_remote,
         path_local,
-        ssh_command,
         *,
+        ssh_command,
+        state,
         filters=None,
         verbose=1,
         doit=1,
@@ -138,7 +139,7 @@ def sync_reverse(
     command += (
             f' :{remote_dir}/{path_remote} {path_local}'
             )
-    return pipcl.run(command, prefix=f'reverse sync {path_remote} => {path_local}: ', log=1, check=check)
+    return pipcl.run(command, prefix=f'reverse sync {path_remote} => {path_local}: ', log=1, check=check, ticker=state.ticker)
         
 
 def sync(remote, remote_dir, path, ssh_command, verbose, state):    # pylint: disable=too-many-positional-arguments
@@ -977,7 +978,9 @@ def get_args(argv):
                 state.cibw_ignore_test_failures = args.get_bool()
 
             elif arg == '--ticker':
-                state.ticker = next(args).as_float()
+                _ticker = next(args).as_float()
+                if not APTEST_NESTED:
+                    state.ticker = _ticker
 
             elif arg == '-u':
                 state.github_upload = args.get_bool()
@@ -1282,6 +1285,7 @@ def do_remote(state, argv):
                 f'{state.wheelhouse}/',
                 f'{state.wheelhouse}/',
                 ssh_command=ssh_command,
+                state=state,
                 filters=filters,
                 )
     if 1:
@@ -1293,11 +1297,12 @@ def do_remote(state, argv):
                 'test-gnn-results/',
                 'test-gnn-results/',
                 ssh_command=ssh_command,
+                state=state,
                 extra='--ignore-missing-args',
                 check=0,
                 )
         if e:
-            pipcl.log(f'Warning, ignoring failed of reverse rsync: {e=}.')
+            pipcl.log(f'Warning, ignoring failed of reverse rsync of test-gnn-results/: {e=}.')
 
 
 def build_sdist(state, package, directory):
@@ -2443,6 +2448,7 @@ def main(argv):
                             clean=(state.venv>=3),
                             makelink='venv-aptest',
                             env_extra=dict(APTEST_NESTED='1'),
+                            ticker=state.ticker,
                             )
                 sys.exit(e)
     
@@ -2763,7 +2769,7 @@ def venv_in(path=None):
         return sys.prefix != sys.base_prefix
 
 
-def venv_run(args, path, *, recreate=True, clean=False, makelink=None, env_extra=None):
+def venv_run(args, path, *, recreate=True, clean=False, makelink=None, env_extra=None, ticker=0):
     '''
     Runs command inside venv and returns termination code.
     
@@ -2812,7 +2818,7 @@ def venv_run(args, path, *, recreate=True, clean=False, makelink=None, env_extra
             os.symlink(path, makelink)
         except Exception as e:
             pipcl.log(f'Warning: failed to create link from {makelink=} to {path=}: {e}')
-    e = pipcl.run(command, check=0, prefix=f'{path}: ', env_extra=env_extra)
+    e = pipcl.run(command, check=0, prefix=f'{path}: ', env_extra=env_extra, ticker=ticker)
     return e
 
 
