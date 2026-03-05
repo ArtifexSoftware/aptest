@@ -233,7 +233,7 @@ g_package_info = {
                 'github_name': 'pymupdf/pymupdf4llm',
                 'git_branch': 'main',
                 'aliases':  ['4llm'],
-                'order': 2,
+                'order': 3, # Need to be higher than pymupdf_layout.
             },
         'pymupdfpro':
             {
@@ -255,7 +255,7 @@ g_package_info = {
                 'github_name': 'pymupdf/langchain-pymupdf-layout',
                 'git_branch': 'main',
                 'aliases':  ['langchain'],
-                'order': 3,
+                'order': 4,
             },
         'smartoffice':
             {
@@ -278,7 +278,7 @@ g_package_info = {
                 'github_name': 'ArtifexSoftware/pdf_feature_inspector',
                 'git_branch': 'main',
                 'aliases':  ['pfi'],
-                'order': 4,
+                'order': 5,
             },
         
         # Experimental, doesn't work.
