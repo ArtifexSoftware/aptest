@@ -3545,7 +3545,7 @@ def _duration(s):
 # %f - function name
 # %l - line number
 # %p - path.
-# %t - current time YYYY-MM-DD-HH-MM-SS
+# %t - current time YYYY-mm-dd-HH-MM-SS
 g_log_format = '[+%d] %p:%l: %f(): '
 g_log_t0 = time.time()
 
@@ -3998,7 +3998,7 @@ def swig_get(swig, quick, swig_local='pipcl-swig-git'):
         swig_local:
             path to use for checkout.
     '''
-    log(f'{swig=}')
+    #log(f'{swig=}')
     if swig and swig.startswith('git:'):
         assert platform.system() != 'Windows', f'Cannot build swig on Windows.'
         # Note that {swig_local}/install/bin/swig doesn't work on MacOS because
