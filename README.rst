@@ -204,7 +204,7 @@ Instructions for releasing wheels for:
   * Pymupdf has a test that checks version numbers in ``changes.txt`` etc are
     consistent with ``setup.py``.
 
-* Ensure that PyMuPDF's Github issues and ``changes.txt`` are synchronised.
+* Ensure that ``pymupdf``'s Github issues and ``changes.txt`` are synchronised.
 
   * Go to https://github.com/pymupdf/PyMuPDF/issues.
   * For all issues that are labeled as ``Fixed in next release``, ensure that
@@ -212,23 +212,74 @@ Instructions for releasing wheels for:
   * For all issues mentioned as fixed in ``changes.txt``, ensure that
     the corresponding Github issue is labelled as ``Fixed in next release``.
 
-* Test local checkouts of all packages on Github machines::
+* Test local checkouts of all packages on Github machines:
 
-    aptest/aptest.py -r @github -p PyMuPDF --pro PyMuPDFPro --layout sce --4llm pymupdf4llm cibw
+    ``aptest/aptest.py -r @github -p PyMuPDF --pro PyMuPDFPro --layout sce --4llm pymupdf4llm cibw``
 
-* Push each package to Github.
-* Optionally lock github branches for each project.
+* Specify package source for releases in `~/.aptest`_.
 
-  On each Github repository go to: ``Settings/Branches/main/Edit/Lock branch``.
+  To use local checkouts:
 
-* Build and release the main wheels and sdists::
+      ``-P PyMuPDF --PRO PyMuPDFPlus --LAYOUT sce --4LLM pymupdf4llm``
+  
+  Or to use specific sha's for each package:
 
-      aptest/aptest.py --release-1
+      ``-P 'git:--sha ...' --PRO 'git:--sha ...' --LAYOUT 'git:--sha ...' --4LLM 'git:--sha ...'``
+  
+* Specify release directory in `~/.aptest`_:
+  
+    ``--wheelhouse-union-release release-1.27.2``
 
-  * On success this will download wheels/sdist to local machine and ask
-    (twice) whether you want to upload to https://pypi.org.
-  * At this point one can optionally test the downloaded wheels locally.
-  * Agree to upload to https://pypi.org.
+* Optionally specify a draft location for wheels and sdists:
+
+    ``--draft-location julian@ghostscript.com:public_html/wheels-1.27.2/``
+      
+    
+* Build wheels for all packages:
+
+    ``aptest/aptest.py --release-1``
+  
+    ``aptest/aptest.py --release-2``
+  
+    ``aptest/aptest.py --release-3``
+  
+    ``aptest/aptest.py --release-4``
+  
+    ``aptest/aptest.py --release-5``
+  
+    ``aptest/aptest.py --release-6``
+    
+  On success this will populate the release directory with all wheels and sdists
+  
+  Also see:
+  
+  * `--release-*`_.
+  
+* At this point one can optionally test the wheels locally.
+  
+* Optionally upload to a pypi-style repository with:
+  
+    ``aptest/aptest.py draft``
+    
+  (Assuming `--draft-location`_ was added to `~/.aptest`_.)
+    
+  Testing can then use (for example):
+    
+      ``pip install --extra-index-url https://ghostscript.com/~julian/wheels-1.27.2/simple pymupdf4llm``
+  
+
+* Upload all wheels and sdists to https://pypi.org/ with `upload`_:
+
+      ``aptest/aptest.py upload``
+
+* Release pyodide wheel.
+
+  Copy/rsync the pyodide wheel in the release directory
+  to ``julian@ghostscript.com:public_html/pyodide/``.
+  
+  Tell ``@jamie`` about the Pyodide wheel.
+  
+  [2026-01-30: hopefully we'll have a more official location soon.]
 
 * Tag the release.
 
@@ -237,12 +288,6 @@ Instructions for releasing wheels for:
 
       git tag <version>
       git push origin <version>
-
-* Start building Linux-aarch64 wheels::
-
-    aptest/aptest.py --release-2
-
-  [This will take a few hours, don't wait for it to finish here.]
 
 * Extra updates to Github's pymupdf repository.
 
@@ -259,8 +304,6 @@ Instructions for releasing wheels for:
       ```
       python -m pip install --upgrade pymupdf
       ```
-
-      [Linux-aarch64 wheels will be built and uploaded later.]
 
   * Paste the release's changelog into the text field.
   * Modify any ReST-style links to work as markdown, e.g.
@@ -305,71 +348,24 @@ Instructions for releasing wheels for:
       
         See: https://github.com/pymupdf/PyMuPDF/discussions/<announcement-id>
 
-* Wait for Linux aarch64 wheels build to finish.
+* Possible post-release changes:
 
-* Agree to upload linux-aarch64 wheels to https://pypi.org.
-
-* Update Github release discussion to say that Linux aarch64 wheels are now
-  available, e.g. with a post saying::
-
-    Linux-aarch64 wheels are now available; install in the usual way with pip.
-
-* Build and release Windows-x32 wheel.
-
-  Run::
-  
-    aptest/aptest.py --release-3
-
-  Wait for build to finish, agree to upload.
-
-* Build and release Linux musllinux-x64 wheel.
-
-  Run::
-  
-    aptest/aptest.py --release-4
-
-  Wait for build to finish, agree to upload.
-
-* Build and release pyodide wheel.
-
-  Run::
-  
-    aptest/aptest.py --release-5
-
-  Upload the resulting pyodide wheel to ``julian@ghostscript.com:public_html/pyodide/``.
-  
-  Tell ``@jamie`` about the Pyodide wheel.
-  
-  [2026-01-30: hopefully we'll have a more official location soon.]
-
-* Build ``cp314t`` (Python-3.14 free threading) wheel.
-
-  Run::
-  
-    aptest/aptest.py --release-6
-  
-  Wait for build to finish, agree to upload.
-
-* Unlock projects' branches if they were locked above:
-
-  Github repository: settings/Branches/main/Edit/Lock branch - uncheck.
-
-* Post-release changes for all projects.
+  For all projects.
   
   * Increment version in all package ``setup.py`` files.
 
-* Extra post-release changes for ``pymupdf``.
+  Extra post-release changes for ``pymupdf``.
 
-  In ``pymupdf``'s ``changes.txt``:
+  * In ``pymupdf``'s ``changes.txt``:
 
-  * Add date of release that was just made.
-  * Add title for next release ``**Changes in version <next-version>**``.
+    * Add date of release that was just made.
+    * Add title for next release ``**Changes in version <next-version>**``.
 
-  In ``pymupdf``'s ``.github/ISSUE_TEMPLATE/bug_report.yml``:
+  * In ``pymupdf``'s ``.github/ISSUE_TEMPLATE/bug_report.yml``:
 
-  * Add version of next release to drop-down list of versions.
+    * Add version of next release to drop-down list of versions.
 
-    (This is required for tests to pass.)
+      (This is required for tests to pass.)
 
 
 Details
@@ -681,19 +677,28 @@ build
 
 cibw
 ....
-    Build and test packages using cibuildwheel. Wheels are placed
-    in directory ``aptest-wheelhouse``, which is initially cleared.
+    Build and test packages using `cibuildwheel <https://cibuildwheel.pypa.io>`_.
+    Wheels are placed in directory ``aptest-wheelhouse``.
     
     * We do not install wheels and it is generally not useful to do
       ``cibw test``.
 
-    If CIBW_BUILD is unset, we set it as follows:
+    If ``CIBW_BUILD`` is unset, we set it as follows:
     
     * On Github we build and test with all supported Python versions.
     * Otherwise we build and test with the current Python version only.
 
-    If CIBW_ARCHS is unset we set $CIBW_ARCHS_WINDOWS, $CIBW_ARCHS_MACOS
-    and $CIBW_ARCHS_LINUX to auto64 if they are unset.
+    If ``CIBW_ARCHS`` is unset, we set ``CIBW_ARCHS_WINDOWS``, ``CIBW_ARCHS_MACOS``
+    and ``CIBW_ARCHS_LINUX`` to ``auto64`` if they are unset.
+    
+    The cibuildwheel tool cannot handle pure python packages, so we manually
+    build+test such packages.
+    
+    * This will use the current python version only,
+      and not (for example) use a manylinux docker on Linux.
+      
+    * For example with the pure-python package ``pymupdf4llm``,
+      we only test ``pymupdf4llm`` + ``pymupdf_layout`` + ``pymupdf`` together on native Python.
 
     Also see:
 
@@ -708,6 +713,15 @@ docs
     Convert `<README.rst>`__ into `<README.rst.html>`__.
     
     Currently uses `docutils <https://pypi.org/project/docutils/>`__.
+
+draft
+.....
+    Rsync ``<wheelhouse_union_dir>`` to location specified by `--draft-location`_.
+
+    Also see:
+
+    * `--wheelhouse-union`_.
+    * `--wheelhouse-union-release`_.
 
 gnn-download
 ............
@@ -769,7 +783,7 @@ test
 
 
 test-gnn
-....................
+.........
 
     * Test GNN model
     * Writes results to ``test-gnn-results/test-gnn-YYYY-mm-dd-HH-MM-SS.json``.
@@ -812,9 +826,15 @@ test-gnn
     * `--test-gnn-push`_
 
 
+upload
+......
+    Upload all wheels and sdists in directory specified by `--wheelhouse-union`_, to https://pypi.org.
+
+
 windows-show-vs-instances
 .........................
     Show available Visual Studio installs.
+
 
 Options
 ^^^^^^^
@@ -866,7 +886,7 @@ Options
     set ``PYMUPDF_SETUP_MUPDF_REBUILD=0`` so pymupdf will not rebuild its
     mupdf.
 
-.. _--build-type:
+.. _-e:
 
 -e <name>=<value>
 .................
@@ -961,6 +981,14 @@ Options
     * `--smartoffice`_ and alias `--sot`_.
     * `--smartoffice-neo`_ and aliases `--sot-neo`_, `--neoso`_.
 
+
+.. _--log-prefix:
+
+--log-prefix <log_prefix>
+.........................
+    Add prefix to all logging.
+
+
 .. _-m:
 
 -m <mupdf-location>
@@ -1027,11 +1055,11 @@ Options
     * On success we copy Github logs and artifacts
       and extracted wheels etc to local directory:
       
-          ``gh_workflow_YYYY-MM-DD-<workflowid>``
+          ``gh_workflow_YYYY-mm-dd-<workflowid>``
           
       Wheels are also copied in flat format into:
       
-          ``gh_workflow_YYYY-MM-DD-<workflowid>-union/``.
+          ``gh_workflow_YYYY-mm-dd-<workflowid>-union/``.
     
     * Also see:
     
@@ -1039,6 +1067,7 @@ Options
       * `--remote-github-workflow-id`_
       * `--remote-github-yml`_
       * `--remote-github-yml-inputs`_
+      * `--wheelhouse-union`_
     
     Otherwise ``<remote>`` should specify a remote machine on which to run
     Aptest:
@@ -1169,9 +1198,19 @@ Options
     * ``--atexit beep``
 
 
+.. _--build-type:
+
 --build-type debug | memento | release
 ......................................
     Set build type. Default is ``release``.
+
+
+.. _--check-unchanged:
+
+--check-unchanged (bool)
+........................
+    If true, fail if git diff is not empty in local checkout.
+
 
 .. _--cibw-name:
 
@@ -1253,7 +1292,28 @@ Options
     * File/line information in log messages.
     * Backtraces in error messages.
 
-.. _-e:
+
+.. _--draft-location:
+
+--draft-location <remote>
+.........................
+    Location to which `draft`_ command rsync's ``wheelhouse_union_release``.
+    
+    If ``<remote>`` can be accessed via https,
+    it can be used as a pypi-style package repository with:
+    
+        ``pip install --extra-index-url <url>/simple ...``
+    
+    For example after:
+    
+        ``--draft-location julian@ghostscript.com:public_html/wheels-1.27.2``
+    
+    One can install packages with:
+    
+        ``pip install --extra-index-url https://ghostscript.com/~julian/wheels-1.27.2/simple pymupdf ...``
+    
+    [Note the trailing ``/simple``.]
+
 
 --gnn-doit (bool)
 .................
@@ -1533,46 +1593,47 @@ Options
     Set Python to use. If set we re-run ourselves using specified
     python command.
 
-.. _--release-:
+.. _--release-*:
 
 --release-1
 ...........
+    Build release wheels for ``pymupdf``, ``pymupdfpro``, ``pymupdf4llm`` and
+    ``pymupdf_layout``, for core platforms ``linux-x64``, ``windows-x64`` and ``macos-arm64``.
+        
+    Also builds sdists.
+    
+    Also see `Release procedure`_.
+
 --release-2
 ...........
+    Build release wheels for ``pymupdf``, ``pymupdfpro``, ``pymupdf4llm`` and ``pymupdf_layout``, for
+    platforms ``linux-aarch64`` and ``macos-x64``.
+    
+    Also see `Release procedure`_.
+
 --release-3
 ...........
+    Build release ``pymupdf`` wheel for platform ``windows-x32``.
+    
+    Also see `Release procedure`_.
+
 --release-4
 ...........
+    Build release ``pymupdf`` wheel for platform ``linux-x64-musl``.
+    
+    Also see `Release procedure`_.
+
 --release-5
 ...........
+    Build release ``pymupdf`` wheel for platform ``pyodide``.
+    
+    Also see `Release procedure`_.
+
 --release-6
 ...........
-    Preset args for making releases. Only one may be specified, and it
-    must be the only arg.
-
-    ``aptest/aptest.py --release-1``
-        Build+upload wheels for pymupdf, pymupdfpro and pymupdf_layout,
-        for core platforms:
-        
-        * linux-x64
-        * windows-x64
-        * macos-x64
-        * macos-arm64
-        
-        Also builds sdists.
-    ``aptest/aptest.py --release-2``
-        Build+upload wheels for pymupdf, pymupdfpro and pymupdf_layout, for
-        linux-aarch64.
-    ``aptest/aptest.py --release-3``
-        Build+upload pymupdf-win32 wheel.
-    ``aptest/aptest.py --release-4``
-        Build+upload pymupdf-linux-x64-musl wheel.
-    ``aptest/aptest.py --release-5``
-        Build pyodide wheel.
-    ``aptest/aptest.py --release-5``
-        Build+upload pymupdf-cp314t-linux-x64 (free threading) wheel.
+    Build release ``pymupdf`` wheel for platform ``linux-x64`` and free threading python-3.14.
     
-    Also see: `Release procedure`_
+    Also see `Release procedure`_.
 
 .. _--remote-do:
 
@@ -1713,6 +1774,7 @@ Options
     If true, the `build`_ and `cibw`_ commands will also build sdists.
     
     We only build sdists for these packages:
+    
     * ``pymupdf``
     * ``pymupdf4llm``
     * ``pdf2docx``
@@ -1964,6 +2026,41 @@ Options
 
 .. _--4llm:
 
+
+.. _--wheelhouse-union:
+
+--wheelhouse-union <wheelhouse_union_dir>
+.........................................
+    Directory in which to place wheels downloaded from Github, instead of
+    default ``gh_workflow-YYYY-mm-dd-<workflow-id>-union``.
+    
+    We also run ``piprepo build`` in this directory so it can function as a
+    pypi-style package store.
+    
+    Also see:
+    
+    * `-r`_.
+    * `--draft-location`_.
+    * `--wheelhouse-union-release`_.
+    * `upload`_.
+
+
+.. _--wheelhouse-union-release:
+
+--wheelhouse-union-release <wheelhouse_union_dir>
+.................................................
+    Default value of `--wheelhouse-union`_ if not specified and a
+    `--release-*`_ option is given.
+    
+    This is typically used when building release wheels/sdists on Github for
+    uploading to https://pypi.org with `upload`_, or with `draft`_.
+    
+    Also see:
+    
+    * `-r`_.
+    * `--release-*`_.
+    * `--wheelhouse-union`_.
+
 --4llm <location>
 .................
     Specify location of package ``pymupdf4llm``.
@@ -2005,6 +2102,24 @@ completion
 
 Changelog
 ---------
+
+**2026-03-10**
+
+* Don't overwrite ``--tee`` output when doing bash command completion.
+* Cope with windows pure python ``pymupdf4llm`` wheels differing because of DOS line endings.
+* Improved release procedure.
+  
+  * Build all wheels/sdists in local directory using multiple invocations of Aptest.
+  * Upload everything to https://pypi.org in one operation.
+  
+* New option `--check-unchanged`_.
+* New option `--draft-location`_.
+* New option `--log-prefix`_.
+* New option `--wheelhouse-union`_.
+* New option `--wheelhouse-union-release`_.
+* New command `draft`_.
+* New command `upload`_.
+
 
 **2026-03-05**
 
@@ -2085,7 +2200,7 @@ Changelog
 **2026-02-11**
 
 * Fixed `-u`_ upload.
-* Fixed checking of `--release-`_ options.
+* Fixed checking of `--release-*`_ options.
 * Fixed bug in `run`_ command.
 
 **2026-02-10**
