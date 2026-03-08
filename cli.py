@@ -152,7 +152,7 @@ class Completions:
     
     def add(self, suggestion, pos):
         if pos < self.pos:
-            pipcl.log(f'Was not expecting {pos=} < {self.pos=}.')
+            pipcl.log(f'Warning: was not expecting {pos=} < {self.pos=}.')
             self.items.clear()
             self.pos = pos
         if pos > self.pos:
