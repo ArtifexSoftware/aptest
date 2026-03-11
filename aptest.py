@@ -18,6 +18,7 @@ import sys
 import sysconfig
 import textwrap
 import time
+import xml.dom.minidom
 
 import backtrace
 import cli
@@ -493,12 +494,12 @@ def add_package(state, name, location):
         state.packages_for_release[name.lower()] = location # A cli.Arg.
         return
     
+    location_pos = (location.as_str(), location.pos)
+    
     if name in state.packages:
         pipcl.log(f'Adding second location for {name=} testing only: {location=}')
         state.packages2[name] = location_pos
         return
-    
-    location_pos = (location.as_str(), location.pos)
     
     state.packages[name] = location_pos
     
@@ -889,14 +890,6 @@ def get_args(argv):
                 new_args += ' --check-unchanged'
                 new_args += ' --use-release-args'
                 
-                #if not state.wheelhouse_union:
-                #    assert state.wheelhouse_union_release, f'Must specify `--wheelhouse-union <dir>` before `--release-*`.'
-                #    new_args += f' --wheelhouse-union {shlex.quote(state.wheelhouse_union_release)}'
-                #for package, location_arg in state.packages_for_release.items():
-                #    if package not in state.packages:
-                #        new_args += f' -i {package} {shlex.quote(location_arg.as_str())}'
-                #packages = set(state.packages.keys()) | set(state.packages_for_release.keys())
-                
                 if 0:
                     pass
                 
@@ -907,8 +900,7 @@ def get_args(argv):
                     new_args += ' --sdists -b pymupdf,pymupdfpro,pymupdf_layout,pymupdf4llm'
                 
                 elif arg == '--release-2':
-                    # Build for linux-aarch64 (just cp310 because testing other python versions too slow).
-                    #new_args += ' -b pymupdf,pymupdfpro,pymupdf_layout,pymupdf4llm --remote-github-runners linux -e CIBW_ARCHS_LINUX=aarch64 -e "CIBW_BUILD=cp310*"'
+                    # Build macos-intel and linux-arm wheels.
                     new_args += ' -b pymupdf,pymupdfpro,pymupdf_layout,pymupdf4llm --remote-github-runners macos-intel,linux-arm'
                 
                 elif arg == '--release-3':
@@ -1396,7 +1388,7 @@ def do_remote(state, argv):
                 check=0,
                 )
         if e:
-            pipcl.log(f'Warning, ignoring failed of reverse rsync of test-gnn-results/: {e=}.')
+            pipcl.log(f'[Ignoring failure of reverse rsync of test-gnn-results/: {e=}.]')
 
 
 def build_sdist(state, package, directory):
@@ -2329,9 +2321,12 @@ def do_test_single(state, package, failed_packages):
         if package == 'aptest':
             pipcl.run(f'pip install swig')
         
+        path_junit_xml = f'{os.path.abspath(state.wheelhouse)}/{package}-pytest-junit.xml'
+        
         command = f'cd {directory} && pytest'
         #command += f' --report-log=aptest-pytest.jsonl'
-        command += f' --junit-xml={os.path.abspath(state.wheelhouse)}/{package}-pytest-junit.xml'
+        command += f' --junit-xml={path_junit_xml}'
+        #command += f' --durations=10'
         if state.pytest_options:
             command += f' {state.pytest_options}'
         if state.pytest_paths:
@@ -2352,7 +2347,7 @@ def do_test_single(state, package, failed_packages):
             # without specifying any location.
             #
             command += f' tests'
-            if package == 'pymupdf4llm' and not state.pymupdf4llm_unified:
+            if 0 and package == 'pymupdf4llm' and not state.pymupdf4llm_unified:
                 command += '/pymupdf4llm/llama_index'
         if package == 'pymupdf4llm':
             # Testing requires extra packages.
@@ -2399,6 +2394,11 @@ def do_test_single(state, package, failed_packages):
                 prefix=f'pytest: ',
                 check=0,
                 )
+        try:
+            junit_xml_pretty = xml.dom.minidom.parse(path_junit_xml).toprettyxml()
+            pipcl.fs_write(f'{path_junit_xml}.xml', junit_xml_pretty)
+        except Exception as e:
+            pipcl.log(f'Failed to prettyfy {path_junit_xml=}: {e}')
     if e:
         failed_packages.append(package)
 
@@ -3003,7 +3003,9 @@ if __name__ == '__main__':
             doctest.testmod(None)
     else:
         try:
-            sys.exit(main(sys.argv))
+            e = main(sys.argv)
+            pipcl.log(f'Terminating with exit code {e}.')
+            sys.exit(e)
         except Exception as e:
             if 0:
                 backtrace.show(reverse_chain=1, brief=1)
