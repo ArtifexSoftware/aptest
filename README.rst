@@ -2103,6 +2103,13 @@ completion
 Changelog
 ---------
 
+**2026-03-12**
+
+* Use Github's native linux-arm runner instead of CIBW_ARCHS_LINUX=aarch64 and emulation.
+* Run pytest in 4llm's top-level tests/ directory, not test/pymupdf4llm/llama_index/.
+* Create pretty-printed version of pytest's pytest-junit.xml.
+
+
 **2026-03-10**
 
 * Don't overwrite ``--tee`` output when doing bash command completion.
