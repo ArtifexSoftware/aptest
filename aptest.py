@@ -746,6 +746,8 @@ def get_args(argv):
                 _names = next(args).as_text()
                 _names = _names.split(',') if _names else list()
                 apply_deltas(state.packages_build, _names, aliasfn=package_alias)
+                for p in state.packages_build:
+                    assert p in state.packages, f'Package location not specified: {p}.'
 
             elif arg == '--build-type':
                 build_type = next(args)
@@ -904,11 +906,11 @@ def get_args(argv):
                     # Build core wheels and sdist.
                     # [pymupdf4llm is pure python so doesn't need to be
                     # mentioned in other --release-* options.]
-                    new_args += ' --sdists -b pymupdf,pymupdfpro,pymupdf_layout,pymupdf4llm'
+                    new_args += ' --sdists -b pymupdf,pymupdfpro,pymupdf_layout,pymupdf4llm,pdf4llm'
                 
                 elif arg == '--release-2':
                     # Build macos-intel and linux-arm wheels.
-                    new_args += ' -b pymupdf,pymupdfpro,pymupdf_layout,pymupdf4llm --remote-github-runners macos-intel,linux-arm'
+                    new_args += ' -b pymupdf,pymupdfpro,pymupdf_layout,pymupdf4llm,pdf4llm --remote-github-runners macos-intel,linux-arm'
                 
                 elif arg == '--release-3':
                     # Build for win-x32.
