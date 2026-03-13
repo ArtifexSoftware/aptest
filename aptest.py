@@ -244,6 +244,13 @@ g_package_info = {
                 'aliases':  ['4llm'],
                 'order': 3, # Need to be higher than pymupdf_layout.
             },
+        'pdf4llm':
+            {
+                'github_name': 'pymupdf/pymupdf4llm',
+                'git_branch': 'main',
+                'aliases':  [],
+                'order': 4, # Need to be higher than pymupdf_layout.
+            },
         'pymupdfpro':
             {
                 'github_name': 'ArtifexSoftware/PyMuPDFPro',
@@ -1395,7 +1402,12 @@ def build_sdist(state, package, directory):
     '''
     Build sdist if <package> is allowed to have a sdist.
     '''
-    if package in ('pymupdf', 'pymupdf4llm', 'pdf2docx'):
+    if package in (
+            'pdf2docx',
+            'pdf4llm',
+            'pymupdf',
+            'pymupdf4llm',
+            ):
         # pymupdf4llm's setup.py requires `-d` is after `sdist`.
         pipcl.run(
                 f'cd {directory} && python setup.py sdist -d {os.path.abspath(state.wheelhouse)}',
@@ -1456,6 +1468,9 @@ def do_build_single(state, package):
         if package == 'pymupdf4llm' and not state.pymupdf4llm_unified:
             # setup.py is in subdirectory pymupdf4llm/.
             directory += '/pymupdf4llm'
+        elif package == 'pdf4llm':
+            # setup.py is in subdirectory.
+            directory += '/pdf4llm'
         directory_abs = os.path.abspath(directory)
         pipcl.log(f'{package=} {directory=}')
         if package == 'mupdf':
@@ -1699,6 +1714,8 @@ def do_cibw(state):
         if package == 'pymupdf4llm' and not state.pymupdf4llm_unified:
             # setup.py is in subdirectory pymupdf4llm/.
             directory += '/pymupdf4llm'
+        elif package == 'pdf4llm':
+            directory += '/pdf4llm'
         
         pipcl.log(f'{package} _get_local() => {directory=}')
         if not directory:
@@ -1734,7 +1751,7 @@ def do_cibw(state):
             pipcl.log(f'Calling build_sdist() {package=} {directory=}.')
             build_sdist(state, package, directory)
 
-        if package in ('pdf2docx', 'pymupdf4llm'):
+        if package in ('pdf2docx', 'pdf4llm', 'pymupdf4llm'):
             # Build/test directly.
             pipcl.log(f'Not using cibuildwheel for {package=} because does not support pure python wheels.')
             
@@ -2332,6 +2349,8 @@ def do_test_single(state, package, failed_packages):
         if state.pytest_paths:
             for path in state.pytest_paths:
                 command += f' {path}'
+        elif package == 'pdf4llm':
+            command += f' pdf4llm/tests'
         else:
             # We need to somehow limit things to {package}/tests/
             # because otherwise pytest can recurse into other
@@ -2347,8 +2366,6 @@ def do_test_single(state, package, failed_packages):
             # without specifying any location.
             #
             command += f' tests'
-            if 0 and package == 'pymupdf4llm' and not state.pymupdf4llm_unified:
-                command += '/pymupdf4llm/llama_index'
         if package == 'pymupdf4llm':
             # Testing requires extra packages.
             pipcl.run(f'pip install llama_index')
