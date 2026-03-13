@@ -282,7 +282,7 @@ def _gh_runs_newest(token, url_base, verbose=0):
         workflow = workflows[-1]
         id_ = workflow[ 'id']
         id_ = str(id_)
-        pipcl.log(f'Returning {id_=}')
+        #pipcl.log(f'Returning {id_=}')
         return id_
     else:
         # No workflows have ever run.
@@ -312,6 +312,7 @@ def gh_run_workflow(
     
     Returns workflow id.
     '''
+    data['return_run_details'] = True
     pipcl.log(f'{url_base=}')
     pipcl.log(f'data:')
     pipcl.log(json.dumps(data, indent='    '))
@@ -325,25 +326,36 @@ def gh_run_workflow(
     run0_id = _gh_runs_newest(token, url_base)
     pipcl.log(f'{data=}')
     url = f'{url_base}/actions/workflows/{yml}/dispatches'
-    _gh_post(token, url, json=data)
+    r = _gh_post(token, url, json=data)
     pipcl.log(f'Have started new workflow run: {url=}')
+    #pipcl.log(f'{r=}')
+    r_json = r.json()
+    pipcl.log(f'{r_json=}')
+    pipcl.log(f'{json.dumps(r_json, indent="    ")}')
 
-    # Unfortunately `r` does not contain any information about the id of
-    # the run we have just created. E.g. see:
-    #
-    #   https://stackoverflow.com/questions/69479400/get-run-id-after-triggering-a-github-workflow-dispatch-event
-    #
-    # That link has a way to embed a uid in the new run and detect it. But
-    # for now we'll do things more crudely - repeatedly look for a new run
-    # - it will be most recent run with different id from workflow0.
-    #
-    pipcl.log('Polling for first mention of the new workflow run we have just created...')
-    while 1:
-        run_id = _gh_runs_newest(token, url_base)
-        pipcl.log(f'{run0_id=} {run_id=}')
-        if run_id != run0_id:
-            break
-        time.sleep(10)
+    # As of 2026-03-13 we use Github's new return_run_details flag when
+    # creating the workflow, so new workflow id is in r.json(). Our code
+    # relies on the id being a string, so we convert here.
+    run_id = r_json['workflow_run_id']
+    run_id = str(run_id)
+    
+    if 0:
+        # Unfortunately `r` does not contain any information about the id of
+        # the run we have just created. E.g. see:
+        #
+        #   https://stackoverflow.com/questions/69479400/get-run-id-after-triggering-a-github-workflow-dispatch-event
+        #
+        # That link has a way to embed a uid in the new run and detect it. But
+        # for now we'll do things more crudely - repeatedly look for a new run
+        # - it will be most recent run with different id from workflow0.
+        #
+        pipcl.log('Polling for first mention of the new workflow run we have just created...')
+        while 1:
+            run_id = _gh_runs_newest(token, url_base)
+            pipcl.log(f'{run0_id=} {run_id=}')
+            if run_id != run0_id:
+                break
+            time.sleep(10)
     pipcl.log(f'New workflow run is: {run_id=}')
     
     return run_id
