@@ -2103,6 +2103,12 @@ completion
 Changelog
 ---------
 
+** 2026-03-16 **
+
+* Added support for pdf4llm.
+* Add pdf4llm to release.
+
+
 **2026-03-12**
 
 * Use Github's native linux-arm runner instead of CIBW_ARCHS_LINUX=aarch64 and emulation.
