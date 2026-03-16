@@ -2538,15 +2538,16 @@ def run(
 
     Args:
         command:
-            A string, the command to run.
+            A string command to run or list of string args to run.
 
-            Multiple lines in `command` are treated as a single command.
+            If a string:
+                Multiple lines in `command` are treated as a single command.
 
-            * If a line starts with `#` it is discarded.
-            * If a line contains ` #`, the trailing text is discarded.
+                * If a line starts with `#` it is discarded.
+                * If a line contains ` #`, the trailing text is discarded.
 
-            When running the command on Windows, newlines are replaced by
-            spaces; otherwise each line is terminated by a backslash character.
+                When running the command on Windows, newlines are replaced by
+                spaces; otherwise each line is terminated by a backslash character.
         capture:
             If true, we include the command's output in our return value.
         check:
@@ -2615,8 +2616,11 @@ def run(
             for k in sorted(env_extra.keys()):
                 text += f'    {k}={shlex.quote(env_extra[k])}\n'
         log1(text, caller=caller+1)
-    sep = ' ' if windows() else ' \\\n'
-    command2 = sep.join( lines)
+    if isinstance(command, str):
+        sep = ' ' if windows() else ' \\\n'
+        command2 = sep.join( lines)
+    else:
+        command2 = command
     
     if platform.system() == 'Windows':
         # The `selectors` module does not support pipes.
@@ -2675,7 +2679,7 @@ def run(
             
             child = subprocess.Popen(   # pylint: disable=consider-using-with
                     command2,
-                    shell=True,
+                    shell=isinstance(command2, str),
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
                     encoding=encoding,
@@ -3142,17 +3146,20 @@ def _command_lines( command):
 
     Returns list of lines.
     '''
-    command = textwrap.dedent( command)
-    lines = []
-    for line in command.split( '\n'):
-        if line.startswith( '#'):
-            h = 0
-        else:
-            h = line.find( ' #')
-        if h >= 0:
-            line = line[:h]
-        if line.strip():
-            lines.append(line.rstrip())
+    if isinstance(command, str):
+        command = textwrap.dedent( command)
+        lines = []
+        for line in command.split( '\n'):
+            if line.startswith( '#'):
+                h = 0
+            else:
+                h = line.find( ' #')
+            if h >= 0:
+                line = line[:h]
+            if line.strip():
+                lines.append(line.rstrip())
+    else:
+        return command
     return lines
 
 
