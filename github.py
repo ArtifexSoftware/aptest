@@ -712,7 +712,7 @@ def gh_workflow_download_multiple(
             leaf = os.path.basename(path)
             leaf_to_paths.setdefault(leaf, []).append(path)
 
-    _check_identical_wheels(leaf_to_paths)
+    leaf_to_paths = _check_identical_wheels(leaf_to_paths)
     
     pyodide_wheels = _create_download_union(leaf_to_paths, extra_wheels, local_dir_union)
     #pipcl.log(f'Have copied {len(pyodide_wheels)} Pyodide wheels into {local_dir_union}.')
@@ -752,14 +752,19 @@ def _check_identical_wheels(leaf_to_paths):
     
     pipcl.log('Checking duplicate sdist/wheels')
     num_diffs = 0
+    ret = dict()
     for leaf in sorted(leaf_to_paths.keys()):   # pylint: disable=too-many-nested-blocks
         paths = leaf_to_paths[ leaf]
         pipcl.log(f'{leaf}:')
         try:
-            #def i_path(i):
-            #    return f'pymupdf-temp-{i}'
+            pipcl.log(f'paths ({len(paths)}):')
+            for path in paths:
+                pipcl.log(f'    {path}')
             extracted_paths = []
+            path_to_use = None
             for i, path in enumerate(paths):
+                if path.endswith('.xml'):
+                    continue
                 st = os.stat(path)
                 with open(path, 'rb') as f:
                     data = f.read()
@@ -768,17 +773,17 @@ def _check_identical_wheels(leaf_to_paths):
                 if leaf.startswith(('pymupdf4llm-', 'pdf4llm-')) and 'windows' in os.path.dirname(path):
                     pipcl.log(f'    [Ignoring pymupdf4llm wheel from windows because contains \\r characters so differs from non-windows builds')
                     continue
+                if not path_to_use:
+                    path_to_use = path
                 extracted_path = f'pymupdf-temp-{i}-{os.path.basename(path)}'
                 pipcl.fs_ensure_empty_dir(extracted_path)
-                #pipcl.log(f'Extracting to temporary: {path} -> {path_extracted}')
+                pipcl.log(f'Extracting to temporary:\n    {path}\n    ->\n    {extracted_path}')
                 if path.endswith('.whl'):
                     with zipfile.ZipFile(path) as z:
                         z.extractall(extracted_path)
                 elif path.endswith('.tar.gz'):
                     with tarfile.open(path) as z:
                         z.extractall(extracted_path)
-                elif path.endswith('.xml'):
-                    continue
                 else:
                     assert 0, f'Unrecognised suffix: {path=}'
                 extracted_paths.append(extracted_path)
@@ -851,25 +856,30 @@ def _check_identical_wheels(leaf_to_paths):
             if numdiffs0:
                 num_diffs += numdiffs0
             else:
+                if path_to_use:
+                    ret[leaf] = path_to_use
                 for extracted_path in extracted_paths:
                     assert extracted_path.startswith('pymupdf-temp-')
                     pipcl.fs_remove(extracted_path)
         finally:
             for extracted_path in extracted_paths:
                 if num_diffs:
-                    pipcl.log(f'Not removing extracted files in: {extracted_path}')
+                    pipcl.log(f'{num_diffs=}: Not removing {extracted_path=}.')
                 else:
-                    pipcl.log(f'Would remove: {extracted_path=}')
+                    pipcl.log(f'Not removing: {extracted_path=}.')
                     #pipcl.fs_remove(extracted_path)
 
     pipcl.log(f'{num_diffs=}')
     assert num_diffs == 0
+    return ret
 
 
-def _create_download_union(leaf_to_paths, extra_wheels, local_dir_union):
+def _create_download_union(leaf_to_path, extra_wheels, local_dir_union):
     '''
     Copies wheels from leaf_to_paths[...] and <extra_wheels> into
     <local_dir_union>.
+    
+    leaf_to_path: maps leafname to path.
     '''
     pyodide_wheels = list()
     
@@ -878,25 +888,27 @@ def _create_download_union(leaf_to_paths, extra_wheels, local_dir_union):
     pipcl.log(f'Copying sdist and wheels into: {local_dir_union}/')
     os.makedirs(local_dir_union, exist_ok=1)
     
-    pipcl.log(f'{leaf_to_paths=}')
+    pipcl.log(f'{leaf_to_path=}')
     pipcl.log(f'{extra_wheels=}')
     if extra_wheels:
         for extra_wheel in extra_wheels:
             pipcl.log(f'Copying {extra_wheel=} into {local_dir_union}/:')
             pipcl.run(f'rsync -ai {extra_wheel} {local_dir_union}/')
     
-    for leaf, paths in leaf_to_paths.items():
+    for leaf, path in leaf_to_path.items():
+        assert isinstance(path, str)
+        pipcl.log(f'{leaf=}: {path=}')
         if not leaf.endswith(('.whl', '.tar.gz')):
             pipcl.log(f'Ignoring {leaf=}.')
             continue
         if 'emscripten' in leaf:
-            pipcl.log(f'Pyodide wheel: {leaf=} {paths=}')
-            pyodide_wheels.append((leaf, paths))
+            pipcl.log(f'Pyodide wheel: {leaf=} {path=}')
+            pyodide_wheels.append((leaf, path))
             continue
-        path = paths[0]
+        #path = paths[0]
         path_leaf = os.path.basename(path)
         path_existing = f'{local_dir_union}/{path_leaf}'
-        if os.path.exists(f'{local_dir_union}/{path_leaf}'):
+        if os.path.exists(path_existing):
             if path_leaf.endswith('.whl'):
                 _check_identical_wheels(dict(path_leaf=[path_existing, path]))
             else:
