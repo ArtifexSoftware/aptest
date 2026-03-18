@@ -2114,7 +2114,7 @@ Changelog
 **2026-03-18**
 
 * Added ``pymupdf4llm`` and ``pdf4llm`` to `Release procedure`_.
-* Don't check ``pymupdf4llm`` and ``pdf4llm`` on macos/intel/python-3.14,
+* With `cibw`_, don't build/test ``pymupdf4llm`` and ``pdf4llm`` on macos/intel/python-3.14,
   because ``onnxruntime`` not available.
 * Added `--check-pushed`_.
 
