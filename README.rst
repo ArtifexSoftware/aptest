@@ -199,10 +199,10 @@ Instructions for releasing wheels for:
 
 * Ensure the version number is correct in all packages.
 
-  * All packages should use the same version number.
+  * All packages should have the same version number.
   * Version numbers are always defined in ``setup.py``.
-  * Version numbers may also be defined in other files such as ``README``.
-  * Pymupdf has a test that checks version numbers in ``changes.txt`` etc are
+  * Version numbers may also be defined in other files such as ``README`` and ``CHANGES``.
+  * ``pymupdf`` has a test that checks version numbers in ``changes.txt`` etc are
     consistent with ``setup.py``.
 
 * Ensure that ``pymupdf``'s Github issues and ``changes.txt`` are synchronised.
@@ -275,8 +275,10 @@ Instructions for releasing wheels for:
 
 * Release pyodide wheel.
 
-  Copy/rsync the pyodide wheel in the release directory
-  to ``julian@ghostscript.com:public_html/pyodide/``.
+  Copy/rsync the pyodide wheel in the release directory to
+  ``julian@ghostscript.com:public_html/pyodide/``, for example:
+  
+    ``rsync -ai pymupdf-1.27.2-cp313-abi3-pyodide_2025_0_wasm32.whl julian@ghostscript.com:public_html/pyodide/``
   
   Tell ``@jamie`` about the Pyodide wheel.
   
@@ -290,7 +292,7 @@ Instructions for releasing wheels for:
       git tag <version>
       git push origin <version>
 
-* Extra updates to Github's pymupdf repository.
+* Extra updates to Github's ``pymupdf`` repository.
 
   * Go to: https://github.com/pymupdf/PyMuPDF/releases
   * Click ``Draft a new release``.
@@ -2110,6 +2112,16 @@ completion
 
 Changelog
 ---------
+
+**2026-03-19**
+
+* Fix handling of ``pdf4llm`` wheels when making releases.
+
+  (Like ``pymupdf4llm`` wheels, these are pure python but differ if created on
+  Windows due to carriage return characters.)
+
+* Minor improvements to diagnostics.
+
 
 **2026-03-18**
 
