@@ -582,6 +582,7 @@ def get_args(argv):
     state = State()
     
     state.build_type = None
+    state.check_pushed = False
     state.check_unchanged = False
     state.cibw_ignore_test_failures = False
     state.cibw_name = 'cibuildwheel'
@@ -756,6 +757,9 @@ def get_args(argv):
             
             elif arg == '--check-unchanged':
                 state.check_unchanged = args.get_bool()
+
+            elif arg == '--check-pushed':
+                state.check_pushed = args.get_bool()
 
             elif arg == '--cibw-name':
                 state.cibw_name = next(args)
@@ -1147,8 +1151,8 @@ def do_remote_github(state, args):
         # Push ourselves to Git.
         git_push(g_root, 'git@github.com:ArtifexSoftware/aptest.git', branch, state, doit=state.remote_do)
 
-        # Push specified local package repository to Github and update args to
-        # point to new location.
+        # Push specified local packages to Github and update args to point to
+        # new location.
         for package_name, (package_location, args_pos) in list(state.packages.items()) + list(state.packages2.items()):
             if not package_location.startswith(('git:', 'pip:')):
                 # Push to a Github branch and update argv[] to refer to this
@@ -1847,7 +1851,7 @@ def do_cibw(state):
             env_extra['PIP_EXTRA_INDEX_URL'] = PIP_EXTRA_INDEX_URL
 
             if (1
-                    and package == 'pymupdf_layout'
+                    and package in ('pymupdf_layout', 'pymupdf4llm', 'pdf4llm')
                     and platform.system() == 'Darwin'
                     and platform.machine() == 'x86_64'
                     ):
@@ -1875,7 +1879,9 @@ def do_cibw(state):
                     env_extra=env_extra,
                     prefix=f'{package}: ',
                     )
-
+        
+        pipcl.log(f'Build/test succeeded for {package=}.')
+        
         pipcl.run(f'ls -ld {state.wheelhouse}/*')
         pipcl.run(f'piprepo build {state.wheelhouse}')
 
@@ -1890,6 +1896,8 @@ def do_cibw(state):
                     path_dir = os.path.join(dirpath, dirname)
                     st = os.stat(path_dir)
                     pipcl.log(f'{st=}: {path_dir=}')
+    
+    pipcl.log(f'Build/test succeeded for packages {state.packages_build}.')
 
 
 def do_gnn_download(state):
@@ -2368,10 +2376,6 @@ def do_test_single(state, package, failed_packages):
             # without specifying any location.
             #
             command += f' tests'
-        if package == 'pymupdf4llm':
-            # Testing requires extra packages.
-            pipcl.run(f'pip install llama_index')
-            pipcl.run(f'pip install pytest-asyncio')
         
         if state.pytest_wrap in ('valgrind', 'helgrind'):
             if not state.pytest_options:
@@ -2416,10 +2420,14 @@ def do_test_single(state, package, failed_packages):
         try:
             junit_xml_pretty = xml.dom.minidom.parse(path_junit_xml).toprettyxml()
             pipcl.fs_write(f'{path_junit_xml}.xml', junit_xml_pretty)
-        except Exception as e:
+        except Exception as ee:
+            e = ee
             pipcl.log(f'Failed to prettyfy {path_junit_xml=}: {e}')
     if e:
+        pipcl.log(f'Tests failed for {package=}.')
         failed_packages.append(package)
+    else:
+        pipcl.log(f'Tests succeeded for {package=}.')
 
 
 def do_test(state):
@@ -2840,7 +2848,14 @@ def _get_local(package, state, test=False):
                     )
     else:
         directory = location
-    
+        if state.check_unchanged:
+            _, _, diff, _ = pipcl.git_info(directory)
+            assert not diff, f'{state.check_unchanged=} but checkout has uncommited changes: {directory!r}.'
+        if state.check_pushed:
+            out = pipcl.run(f'cd {directory} && git branch -r --contains', capture=1)
+            assert isinstance(out, str)
+            pipcl.log(f'{out=}')
+            assert out.strip(), f'{state.check_pushed=} but local checkout has un-pushed commits: {directory!r}'
     if not test:
         if package in state.clean_git:
             pipcl.run(
@@ -2875,6 +2890,7 @@ def _get_local(package, state, test=False):
     if state.check_unchanged:
         assert not diff, f'Checkout is changed but {state.check_unchanged=}: {package=} {directory=}.'
         # todo: also check that sha is on remote.
+        
     
     return directory
     
