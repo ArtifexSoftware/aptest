@@ -1717,13 +1717,6 @@ def do_cibw(state):
         pipcl.log(f'{package=}')
         directory = _get_local(package, state)
         
-        if package == 'pymupdf4llm' and not state.pymupdf4llm_unified:
-            # setup.py is in subdirectory pymupdf4llm/.
-            directory += '/pymupdf4llm'
-        elif package == 'pdf4llm':
-            directory += '/pdf4llm'
-        
-        pipcl.log(f'{package} _get_local() => {directory=}')
         if not directory:
             # location is pip.
             pipcl.log(f'Unable to process with cibuildwheel because location is pip: {package=} and now second location')
@@ -1743,6 +1736,13 @@ def do_cibw(state):
             #name = f'{package}{location[4:]}'
             #state.env_extra['CIBW_BUILD_FRONTEND'] = f'pip wheel {name}'
         
+        if package == 'pymupdf4llm' and not state.pymupdf4llm_unified:
+            # setup.py is in subdirectory pymupdf4llm/.
+            directory += '/pymupdf4llm'
+        elif package == 'pdf4llm':
+            directory += '/pdf4llm'
+        
+        pipcl.log(f'{package} _get_local() => {directory=}')
         directory_abs = os.path.abspath(directory)
         if package == 'mupdf':
             if platform.system() == 'Linux' and not state.cibw_pyodide:
@@ -1757,17 +1757,29 @@ def do_cibw(state):
             pipcl.log(f'Calling build_sdist() {package=} {directory=}.')
             build_sdist(state, package, directory)
 
-        if package in ('pdf2docx', 'pdf4llm', 'pymupdf4llm'):
+        python_version_tuple = (
+                int(platform.python_version_tuple()[0]),
+                int(platform.python_version_tuple()[1]),
+                )
+        
+        if (1
+                and python_version_tuple == (3, 14)
+                and package in ('pdf4llm', 'pymupdf4llm')
+                and platform.system() == 'Darwin'
+                and platform.machine() == 'x86_64'
+                ):
+            pipcl.log(f'Not doing build/test on macos/intel/python-3.14 because onnxruntime not available: {package=}')
+        
+        elif package in ('pdf2docx', 'pdf4llm', 'pymupdf4llm'):
             # Build/test directly.
             pipcl.log(f'Not using cibuildwheel for {package=} because does not support pure python wheels.')
-            
             new_files = pipcl.NewFiles(f'{state.wheelhouse}/*.whl')
             do_build_single(state, package)
             failed_packages = list()
             do_test_single(state, package, failed_packages)
             
             # Delete any new prerequisite wheels that are not for <package>, so
-            # we behave like cibuildwheels.
+            # we behave like cibuildwheel.
             new_wheels = new_files.get()
             for wheel_path in new_wheels:
                 assert wheel_path.endswith('.whl')
@@ -1851,12 +1863,13 @@ def do_cibw(state):
             env_extra['PIP_EXTRA_INDEX_URL'] = PIP_EXTRA_INDEX_URL
 
             if (1
-                    and package in ('pymupdf_layout', 'pymupdf4llm', 'pdf4llm')
+                    and package == 'pymupdf_layout'
                     and platform.system() == 'Darwin'
                     and platform.machine() == 'x86_64'
                     ):
                 # 2026-02-08: onnxruntime is not available on macos-intel-python3.14.
                 #
+                pipcl.log(f'Excluding cp314* because onnxruntime not available on macos/intel/python-3.14.')
                 env_extra['CIBW_BUILD'] = CIBW_BUILD.replace(' cp314*', '')
             else:
                 env_extra['CIBW_BUILD'] = CIBW_BUILD
