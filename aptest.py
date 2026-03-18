@@ -3052,7 +3052,10 @@ if __name__ == '__main__':
     else:
         try:
             e = main(sys.argv)
-            pipcl.log(f'Terminating with exit code {e}.')
+            if e:
+                pipcl.log(f'Exiting with error code {e}.')
+            else:
+                pipcl.log(f'Exiting with success.')
             sys.exit(e)
         except Exception as e:
             if 0:
