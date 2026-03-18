@@ -899,7 +899,6 @@ def _create_download_union(leaf_to_paths, extra_wheels, local_dir_union):
         if os.path.exists(f'{local_dir_union}/{path_leaf}'):
             if path_leaf.endswith('.whl'):
                 _check_identical_wheels(dict(path_leaf=[path_existing, path]))
-                continue
             else:
                 a = pipcl.fs_read(path_existing, binary=1)
                 b = pipcl.fs_read(path, binary=1)
@@ -909,7 +908,7 @@ def _create_download_union(leaf_to_paths, extra_wheels, local_dir_union):
                         f'    {path=}'
                         )
                 pipcl.log(f'Identical file already exists: {local_dir_union}/{leaf}')
-                continue
+            continue
         #assert not os.path.exists(f'{local_dir_union}/{path_leaf}'), \
         #        f'File already exists in {local_dir_union=}: {path_leaf}'
         if platform.system() == 'Windows':
