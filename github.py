@@ -765,7 +765,7 @@ def _check_identical_wheels(leaf_to_paths):
                     data = f.read()
                 md5 = hashlib.md5(data)
                 pipcl.log(f'    size={st.st_size:>12,} {md5.hexdigest()=} {path}')
-                if leaf.startswith('pymupdf4llm-') and 'windows' in os.path.dirname(path):
+                if leaf.startswith(('pymupdf4llm-', 'pdf4llm-')) and 'windows' in os.path.dirname(path):
                     pipcl.log(f'    [Ignoring pymupdf4llm wheel from windows because contains \\r characters so differs from non-windows builds')
                     continue
                 extracted_path = f'pymupdf-temp-{i}-{os.path.basename(path)}'
@@ -820,6 +820,9 @@ def _check_identical_wheels(leaf_to_paths):
                         )
                 if e:
                     numdiffs0 += 1
+                    pipcl.log(f'### Files/dirs differ:')
+                    pipcl.log(f'###     { extracted_paths[i]}')
+                    pipcl.log(f'###     { extracted_paths[i+1]}')
                 if excludes:
                     e = 0
                     for dirpath, _dirnames, filenames in os.walk(extracted_paths[i]):
