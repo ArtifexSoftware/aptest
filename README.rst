@@ -183,10 +183,11 @@ Release procedure
 
 Instructions for releasing wheels for:
 
+    * ``pdf4llm``
     * ``pymupdf``
-    * ``pymupdfpro``
-    * ``pymupdf_layout``
     * ``pymupdf4llm``
+    * ``pymupdf_layout``
+    * ``pymupdfpro``
 
 
 * Get local checkout of latest version of each package, corresponding to what will be released.
@@ -214,17 +215,17 @@ Instructions for releasing wheels for:
 
 * Test local checkouts of all packages on Github machines:
 
-    ``aptest/aptest.py -r @github -p PyMuPDF --pro PyMuPDFPro --layout sce --4llm pymupdf4llm cibw``
+    ``aptest/aptest.py -r @github -p PyMuPDF --pro PyMuPDFPro --layout sce --4llm pymupdf4llm --pdf4llm pymupdf4llm cibw``
 
 * Specify package source for releases in `~/.aptest`_.
 
   To use local checkouts:
 
-      ``-P PyMuPDF --PRO PyMuPDFPlus --LAYOUT sce --4LLM pymupdf4llm``
+      ``-P PyMuPDF --PRO PyMuPDFPlus --LAYOUT sce --4LLM pymupdf4llm --PDF4LLM pymupdf4llm``
   
   Or to use specific sha's for each package:
 
-      ``-P 'git:--sha ...' --PRO 'git:--sha ...' --LAYOUT 'git:--sha ...' --4LLM 'git:--sha ...'``
+      ``-P 'git:--sha ...' --PRO 'git:--sha ...' --LAYOUT 'git:--sha ...' --4LLM 'git:--sha ...' --PDF4LLM 'git:--sha ...'``
   
 * Specify release directory in `~/.aptest`_:
   
@@ -1205,6 +1206,13 @@ Options
     Set build type. Default is ``release``.
 
 
+.. _--check-pushed:
+
+--check-pushed (bool)
+........................
+    If true, fail if local checkout is not pushed to remote.
+
+
 .. _--check-unchanged:
 
 --check-unchanged (bool)
@@ -2103,7 +2111,22 @@ completion
 Changelog
 ---------
 
-** 2026-03-16 **
+**2026-03-18**
+
+* Added ``pymupdf4llm`` and ``pdf4llm`` to `Release procedure`_.
+* Don't check ``pymupdf4llm`` and ``pdf4llm`` on macos/intel/python-3.14,
+  because ``onnxruntime`` not available.
+* Added `--check-pushed`_.
+
+
+**2026-03-17**
+
+* Added ``pymupdf4llm`` and ``pdf4llm`` to ``.github/workflows/test_release.yml``.
+* Add handling of `--check-unchanged`_ when running on Github.
+* Don't install extra packages when testing ``pymupdf4llm`` - is now unnecessary.
+
+
+**2026-03-16**
 
 * Added support for pdf4llm.
 * Add pdf4llm to release.
