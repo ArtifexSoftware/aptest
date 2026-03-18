@@ -40,6 +40,7 @@ python_versions_minor = range(10, 14+1)
 
 g_devel = False
 g_atexit = None
+g_log_tee = None    # Used to output final `Aptest: log output is in: aptest-out-2026-03-18-15-40-15`.
 
 # We use APTEST_NESTED to indicate that we are being re-run inside a venv or on
 # a remote machine, by an outer aptest invocation.
@@ -495,7 +496,6 @@ def add_package(state, name, location):
                 # Just output a warning.
                 pipcl.log(f'Warning, location is not a Git checkout in current directory: {location=}')
     
-    
     if name.lower() != name:
         # Upper case names are defaults for making releases.
         state.packages_for_release[name.lower()] = location # A cli.Arg.
@@ -697,8 +697,6 @@ def get_args(argv):
     APTEST_options = shlex.split(APTEST_options)
     args_list += APTEST_options
     
-    args_list_base_len = len(args_list)
-    
     if COMP_LINE:
         line = COMP_LINE
         # We don't seem to need to use COMP_POINT.
@@ -823,7 +821,7 @@ def get_args(argv):
             elif arg == '--log-prefix':
                 _prefix = next(args).as_text()
                 if not APTEST_NESTED and not COMP_LINE:
-                    pipcl._log_prefix_stack.append(_prefix)
+                    pipcl._log_prefix_stack.append(_prefix) # pylint: disable=protected-access
             
             elif package := arg_alias(arg):
                 location = next(args)
@@ -837,7 +835,9 @@ def get_args(argv):
                 # Ignore if we are being run by an outer aptest or by bash completion.
                 if tee_auto and not APTEST_NESTED and not COMP_LINE:
                     state.tee_auto = tee_auto
-                    pipcl.log_tee(f'aptest-out-{g_date_time}', 'aptest-out')
+                    global g_log_tee
+                    g_log_tee = f'aptest-out-{g_date_time}'
+                    pipcl.log_tee(g_log_tee, 'aptest-out')
 
             elif arg == '--tee-path':
                 pos = args.pos
@@ -894,7 +894,7 @@ def get_args(argv):
                 args.args_eq.set(pos, '')   # Avoid recursion when we rerun ourselves.
 
             elif arg.startswith('--release-'):
-                ## Must be last arg.
+                # Must be last arg.
                 #assert args.pos[0] == len(args.argv), f'{len(args.argv)=} {args.pos=}.'
                 new_args = ''
                 new_args += f' --log-prefix {shlex.quote(arg.as_str() + ": ")}'
@@ -1359,7 +1359,10 @@ def do_remote(state, argv):
 
         if state.tee_auto:
             def make_tee_out_remote():
-                pipcl.fs_symlink(f'aptest-out-{remote}', f'aptest-out-{g_date_time}')
+                from_ = f'aptest-out-{remote}'
+                to_ = g_log_tee
+                pipcl.log(f'Creating symlink {from_} => {to_}.')
+                pipcl.fs_symlink(f'aptest-out-{remote}', to_)
             atexit.register(make_tee_out_remote)
         
         pipcl.run(
@@ -2794,7 +2797,7 @@ def main(argv):
                     if not state.wheelhouse_union:
                         assert state.wheelhouse_union_release, f'Need `--wheelhouse-union-release <wheelhouse_union_dir>`'
                         state.wheelhouse_union = state.wheelhouse_union_release
-                    github._upload(
+                    github._upload( # pylint: disable=protected-access
                             token_pypi=_get_token_pypi(state),
                             local_dir_union=state.wheelhouse_union,
                             pyodide_wheels=None,
@@ -2869,7 +2872,7 @@ def _get_local(package, state, test=False):
         directory = location
         if state.check_unchanged:
             _, _, diff, _ = pipcl.git_info(directory)
-            assert not diff, f'{state.check_unchanged=} but checkout has uncommited changes: {directory!r}.'
+            assert not diff, f'{state.check_unchanged=} but checkout has uncommitted changes: {directory!r}.'
             pipcl.log(f'{state.check_unchanged=}, local checkout ok: {directory!r}')
         if state.check_pushed:
             out = pipcl.run(f'cd {directory} && git branch -r --contains', capture=1)
@@ -2910,7 +2913,6 @@ def _get_local(package, state, test=False):
     if state.check_unchanged:
         assert not diff, f'Checkout is changed but {state.check_unchanged=}: {package=} {directory=}.'
         # todo: also check that sha is on remote.
-        
     
     return directory
     
@@ -3059,10 +3061,12 @@ if __name__ == '__main__':
     else:
         try:
             e = main(sys.argv)
+            if g_log_tee:
+                pipcl.log(f'Aptest: log output is in: {g_log_tee}')
             if e:
-                pipcl.log(f'Aptest exiting with error {e}.')
+                pipcl.log(f'Aptest: exiting with error {e}.')
             else:
-                pipcl.log(f'Aptest exiting with success.')
+                pipcl.log(f'Aptest: exiting with success.')
             sys.exit(e)
         except Exception as e:
             if 0:
