@@ -1017,6 +1017,7 @@ def upload_pypi(token_pypi, paths, pypi_test: bool=False):
     command += f'. {venv}/bin/activate'
     command += f' && python -m twine upload'
     command += f' --disable-progress-bar'
+    command += f' --verbose'
     if pypi_test:
         command += f' --repository testpypi'
     assert token_pypi
