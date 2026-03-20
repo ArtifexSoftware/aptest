@@ -278,7 +278,7 @@ Instructions for releasing wheels for:
   Copy/rsync the pyodide wheel in the release directory to
   ``julian@ghostscript.com:public_html/pyodide/``, for example:
   
-    ``rsync -ai pymupdf-1.27.2-cp313-abi3-pyodide_2025_0_wasm32.whl julian@ghostscript.com:public_html/pyodide/``
+    ``rsync -ai release-1.27.2/pymupdf-1.27.2-cp313-abi3-pyodide_2025_0_wasm32.whl julian@ghostscript.com:public_html/pyodide/``
   
   Tell ``@jamie`` about the Pyodide wheel.
   
@@ -2112,6 +2112,11 @@ completion
 
 Changelog
 ---------
+
+**2026-03-20**
+
+* Fix use of `--smartoffice`_ with `cibw`_.
+
 
 **2026-03-19**
 
