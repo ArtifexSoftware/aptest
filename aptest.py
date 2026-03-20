@@ -1755,6 +1755,13 @@ def do_cibw(state):
                 state.env_extra['PYMUPDF_SETUP_MUPDF_BUILD'] = directory_abs
             # fixme: be able to set to '' for system install?
             continue
+        elif package == 'smartoffice':
+            if platform.system() == 'Linux' and not state.cibw_pyodide:
+               # Need /host/ prefix so accessible from within manylinux docker.
+                state.env_extra['PYMUPDFPRO_SETUP_SOT'] = f'/host{directory_abs}'
+            else:
+                state.env_extra['PYMUPDFPRO_SETUP_SOT'] = directory_abs
+            continue
         
         if state.sdists and platform.system() == 'Linux':
             pipcl.log(f'Calling build_sdist() {package=} {directory=}.')
