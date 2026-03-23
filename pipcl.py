@@ -409,9 +409,11 @@ class Package:
             home_page:
                 Used for metadata `Home-page`.
                 URL of home page.
+                Deprecated since metadata-1.2 - use project_url.
             download_url:
                 Used for metadata `Download-URL`.
                 Where this version can be downloaded from.
+                Deprecated since metadata-1.2 - use project_url.
             author:
                 Used for metadata `Author`.
                 Author.
@@ -2393,6 +2395,7 @@ def git_get(
         fs_write_key(keyfile, key)
     if keyfile:
         GIT_SSH_COMMAND = f'ssh -i {os.path.abspath(keyfile)} -o StrictHostKeyChecking=no'
+        GIT_SSH_COMMAND = GIT_SSH_COMMAND.replace('\\', '/')    # Required on windows.
         log(f'{keyfile=}')
         log(f'{GIT_SSH_COMMAND=}')
         env_extra = (env_extra or dict()) | dict(GIT_SSH_COMMAND=GIT_SSH_COMMAND)
@@ -2718,6 +2721,8 @@ def run(
                         if i < len(lines) - 1:
                             write('\n')
                             line_start = True
+                        #else:
+                        #   line_start = not line
                     flush()
                 if not raw:
                     break
