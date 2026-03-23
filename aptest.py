@@ -47,8 +47,10 @@ g_log_tee = None    # Used to output final `Aptest: log output is in: aptest-out
 #
 APTEST_NESTED = os.environ.get('APTEST_NESTED')
 
+# Sometimes we modify defaults if running on Github.
 GITHUB_ACTIONS = os.environ.get('GITHUB_ACTIONS')
 
+# Things for bash command-line completion.
 COMP_LINE = os.environ.get('COMP_LINE')
 COMP_POINT = os.environ.get('COMP_POINT')
 #COMP_TYPE = os.environ.get('COMP_TYPE')
@@ -73,6 +75,8 @@ def git_push(path, repository, remote_branch, state, *, tmpcommit=True, doit=Tru
     If <tmpcommit> is true, we do a temporary commit of any uncommitted changes
     before pushing, then restore. Note that this will forget about newly added
     files.
+    
+    Used by `-r @github`.
     '''
     _sha, _comment, _diff, branch = pipcl.git_info(path)
     if not doit:
@@ -156,9 +160,9 @@ def sync(remote, remote_dir, path, ssh_command, verbose, state):    # pylint: di
     '''
     Syncs <path> to <remote>:<remote_dir>/ using rsync.
     
-    If <path>/.git is a directory we sync only files known to git.
-
-    Returns true if <path>/.git is a directory.
+    If <path>/.git is a directory we sync only files known to git and return true.
+    
+    Otherwise we sync the entire directory and return false.
     '''
     ret = None
     ssh_command2 = f'{ssh_command}'
@@ -325,7 +329,7 @@ for name, value in g_package_info.items():
 
 def arg_alias(arg):
     '''
-    Returns full name if arg is --<alias>.
+    Returns full name if arg is --<alias> in g_package_info.
     
     If <arg> is upper-case we return upper-case full name.
     '''
@@ -340,7 +344,7 @@ def arg_alias(arg):
 
 def package_alias(package):
     '''
-    Returns full name if arg is an alias.
+    Returns full name if arg is an alias in g_package_info.
     '''
     for fullname, info in g_package_info.items():
         #pipcl.log(f'{package=}')
@@ -387,6 +391,10 @@ def gh_runner_alias(name):
 
 
 def name_info(package):
+    '''
+    Returns dict with info about a package from g_package_info, or a dict with
+    empty info if not found.
+    '''
     ret = g_package_info.get(package)
     if ret:
         return ret
@@ -445,21 +453,23 @@ def apply_deltas(items, deltas, check=1, aliasfn=lambda name: name):
     '''
     Modifies <items> according to <deltas>.
     
-    items: list.
+    items:
+        A list of strings.
     deltas:
-        List of strings. Each is '+', '-' or '', followed by a package name, or
-        alias for a package name.
+        List of strings. Each is '+', '-' or '', followed by a name, or alias
+        for a name as decide by <aliasfn>.
+    check:
+        If true we raise an exception if asked to remove a name that is not in
+        <items>.
+    aliasfn:
+        Function that takes an alias and returns the full name.
     '''
-    #pipcl.log(f'{items=} {deltas=}')
     if deltas and not deltas[0].startswith(('+', '-')):
         del items[:]
-        #pipcl.log(f'{items=} {deltas=}')
 
     for delta in deltas:
-        #pipcl.log(f'{delta=}')
         if delta == '-':
             del items[:]
-            #pipcl.log(f'{items=}')
         elif delta.startswith('-'):
             try:
                 items.remove(aliasfn(delta[1:]))
@@ -467,18 +477,17 @@ def apply_deltas(items, deltas, check=1, aliasfn=lambda name: name):
                 #pipcl.log(f'Failed to remove {delta[1:]=} from {items=}')
                 if check:
                     raise
-            #pipcl.log(f'{items=}')
         else:
             if delta.startswith('+'):
                 delta = delta[1:]
-                #pipcl.log(f'{delta=}')
             delta = aliasfn(delta)
-            #pipcl.log(f'{delta=}')
             items.append(delta)
-            #pipcl.log(f'{items=}')
 
     
 def add_package(state, name, location):
+    '''
+    Used by `-i` and alias options such as `--layout`.
+    '''
     assert isinstance(name, str)
     assert isinstance(location, cli.Arg)
     if not location.text.startswith(('git:', 'pip:')):
@@ -497,7 +506,8 @@ def add_package(state, name, location):
                 pipcl.log(f'Warning, location is not a Git checkout in current directory: {location=}')
     
     if name.lower() != name:
-        # Upper case names are defaults for making releases.
+        # Upper case names are defaults for making releases, for which we use
+        # state.packages_for_release.
         state.packages_for_release[name.lower()] = location # A cli.Arg.
         return
     
@@ -528,13 +538,14 @@ def add_package(state, name, location):
 
 def get_args(argv):
     '''
-    Parses command-line args in <argv> and returns a State instance.
+    Parses command-line args in <argv> and returns a State instance. Any
+    changes to behaviour of this function should be added to README.md.
 
-    If we are being called by bash for command-line completion, we reuturn
+    If we are being called by bash for command-line completion, we return
     None.
     '''
     if COMP_LINE:
-        # We must not write to stdout.
+        # Bash completion; we must not write to stdout.
         del pipcl._log_f[:] # pylint: disable=protected-access
         APTEST_COMPLETION_DEBUG = os.environ.get('APTEST_COMPLETION_DEBUG')
         #print(f'{APTEST_COMPLETION_DEBUG=}', file=sys.stderr, flush=1)
@@ -563,10 +574,11 @@ def get_args(argv):
                 '''))
         sys.exit()
     
-    #if COMP_LINE:
-    #    pipcl.log(f'COMP_LINE is set')
-    
     class State:
+        '''
+        Represents parsed args, with protection against adding a new member
+        after _frozen` has been set to true.
+        '''
         _frozen = False # So self._frozen exists at start of __init__().
         def __init__(self):
             pass
@@ -682,6 +694,7 @@ def get_args(argv):
     args_list = list()
     args_list += [argv[0]]
     
+    # First read args from ~/.aptest if it exists.
     if os.environ.get('APTEST_DOT_APTEST') != '0' and not APTEST_NESTED:
         aptest_config_path = os.path.expanduser(f'~/.aptest')
         if os.path.exists(aptest_config_path):
@@ -693,11 +706,13 @@ def get_args(argv):
             aptest_config = shlex.split(aptest_config2)
             args_list += aptest_config
     
+    # Read args from APTEST_options if set.
     APTEST_options = os.environ.get('APTEST_options', '')
     APTEST_options = shlex.split(APTEST_options)
     args_list += APTEST_options
     
     if COMP_LINE:
+        # Bash completion, get args from COMP_LINE instead of sys.argv.
         line = COMP_LINE
         # We don't seem to need to use COMP_POINT.
         if 0 and COMP_POINT:    # pylint: disable=condition-evals-to-constant
@@ -707,6 +722,7 @@ def get_args(argv):
         args_list += shlex.split(line)[1:]
         pipcl.log(f'     {args_list=}')
     else:
+        # Normal operation, get args from <argv>.
         args_list += argv[1:]
         if 0:
             pipcl.log(f'args_list ({len(args_list)}):')
@@ -1759,6 +1775,21 @@ def do_cibw(state):
             if platform.system() == 'Linux' and not state.cibw_pyodide:
                # Need /host/ prefix so accessible from within manylinux docker.
                 state.env_extra['PYMUPDFPRO_SETUP_SOT'] = f'/host{directory_abs}'
+                
+                
+                # This doesn't work:
+                #
+                # 2026-03-20: attempt to workaround failure on github when building pro:
+                # test_4158(): PYMUPDFPRO_SETUP_SOT='/host/home/runner/work/aptest/aptest/aptest-git-smartoffice'
+                # ../../../project/tests/test_simple.py:348:test_4158(): Running: env_extra=None cd /host/home/runner/work/aptest/aptest/aptest-git-smartoffice && git show -s --format=%cI HEAD
+                # fatal: detected dubious ownership in repository at '/host/home/runner/work/aptest/aptest/aptest-git-smartoffice'
+                # To add an exception for this directory, call:
+                # git config --global --add safe.directory /host/home/runner/work/aptest/aptest/aptest-git-smartoffice
+                #
+                #
+                # Maybe we need to run it inside docker? Or in the test itself?
+                #
+                pipcl.run(f'git config --global --add safe.directory {directory_abs}', check=0)
             else:
                 state.env_extra['PYMUPDFPRO_SETUP_SOT'] = directory_abs
             continue
