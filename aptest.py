@@ -610,6 +610,7 @@ def get_args(argv):
     state.devel = False
     state.draft_location = None
     state.env_extra = dict()
+    state.git_depth = 1
     state.github_upload = None
     state.gnn_doit = False
     state.gnn_show_graph = None
@@ -808,6 +809,9 @@ def get_args(argv):
                 assert '=' in _nv, f'-e <name>=<value> does not contain "=": {_nv!r}'
                 _name, _value = _nv.split('=', 1)
                 state.env_extra[_name] = _value
+            
+            elif arg == '--git-depth':
+                state.git_depth = next(args).as_int()
             
             elif arg == '--gnn-doit':
                 state.gnn_doit = args.get_bool()
@@ -1216,7 +1220,7 @@ def do_remote_github(state, args):
             args_string = shlex.join(args.args_eq.argv[1:])
             if not state.verbose:
                 # Run with verbose on Github, e.g. to show os.environ etc.
-                args_string += ' -V'
+                args_string += ' -V=1'
             # We define the .yml's `matrix: os: ...` by passing in a dict encoded with json, as
             # expected by test.yml's workflow_dispatch:inputs:matrix
             assert state.remote_github_runners, f'No runner specified.'
@@ -1589,7 +1593,7 @@ def do_build_single(state, package):
                     prefix=f'install {package}: ',
                     )
 
-    if package == 'pymupdf':
+    if 0 and package == 'pymupdf':
         # Set PYMUPDF_SETUP_VERSION so subsequent builds are configured
         # for the PyMuPDF we have just built.
         PYMUPDF_SETUP_VERSION = importlib.metadata.version('pymupdf')
@@ -1633,7 +1637,7 @@ def do_build(state):
         #
         pipcl.run(f'pip uninstall -y {package}')
         wheel = package_to_wheel[package]
-        pipcl.run(f'pip install --no-deps {wheel}')
+        pipcl.run(f'pip install {wheel}')
 
 
 def do_cibw(state):
@@ -1738,7 +1742,7 @@ def do_cibw(state):
         
         if not directory:
             # location is pip.
-            pipcl.log(f'Unable to process with cibuildwheel because location is pip: {package=} and now second location')
+            pipcl.log(f'Unable to process with cibuildwheel because location is pip: {package=} and no second location')
             continue
             
             # Experimental code to try to get cibw to test an existing wheel.
@@ -1803,6 +1807,9 @@ def do_cibw(state):
                 int(platform.python_version_tuple()[1]),
                 )
         
+        # As of 2026-03-23, no onnxruntime wheel is available for macos-intel
+        # python-3.14. For python<=3.13, wheels for older releases are
+        # available.
         if (1
                 and python_version_tuple == (3, 14)
                 and package in ('pdf4llm', 'pymupdf4llm')
@@ -1952,6 +1959,14 @@ def do_cibw(state):
                     pipcl.log(f'{st=}: {path_dir=}')
     
     pipcl.log(f'Build/test succeeded for packages {state.packages_build}.')
+    
+    if package == 'pymupdf':
+        # Set PYMUPDF_SETUP_VERSION so subsequent builds are configured
+        # for the PyMuPDF we have just built.
+        PYMUPDF_SETUP_VERSION = importlib.metadata.version('pymupdf')
+        state.env_extra['PYMUPDF_SETUP_VERSION'] = PYMUPDF_SETUP_VERSION
+        pipcl.log(f'### Have set {PYMUPDF_SETUP_VERSION=}')
+
 
 
 def do_gnn_download(state):
@@ -2905,6 +2920,7 @@ def _get_local(package, state, test=False):
                     submodules=info['submodules'],
                     key=ssh_key,
                     keyfile=ssh_keyfile,
+                    depth=state.git_depth,
                     )
     else:
         directory = location
