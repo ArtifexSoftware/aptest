@@ -8,6 +8,7 @@ Aptest - artifex python packages build/test system
     :backlinks: entry
     :depth: 2
 
+
 Overview of Aptest
 ------------------
 
@@ -33,17 +34,20 @@ Supported packages
 * ``pymupdf_layout``
 * ``pymupdfpro``
 * ``smartoffice``
-* ``smartoffice-seo``
+* ``smartoffice-marina``
+* ``smartoffice-neo``
 
 Notes:
 
-* Only one of ``smartoffice`` and ``smartoffice-seo`` can be specified.
-* ``mupdf``, ``smartoffice`` and ``smartoffice-seo`` are pseudo packages.
+* Only one of ``smartoffice``, ``smartoffice-marina`` and ``smartoffice-neo`` can be specified.
+* ``mupdf``, ``smartoffice``, ``smartoffice-marina`` and ``smartoffice-neo`` are pseudo packages.
 
   They are not built into python wheels, instead:
 
   * ``mupdf`` is built into ``pymupdf``.
-  * ``smartoffice`` and ``smartoffice-seo`` are built into ``pymupdfpro``.
+  * ``smartoffice``, ``smartoffice-marina`` and ``smartoffice-neo`` are built into ``pymupdfpro``.
+
+See the `-i`_ option.
 
 
 Package locations
@@ -112,6 +116,12 @@ Build/test with cibuildwheel
 * We set ``PIP_EXTRA_INDEX_URL`` to point to our internal package repository.
 * cibuildwheel uses pip internally so this ensures that previously-built
   prerequisite wheels will be installed as required.
+*
+  Note that, unlike testing with the `test`_ command,
+  prerequisite packages can
+  override packages specified to Aptest.
+  We try to avoid this by setting PYMUPDF_SETUP_VERSION
+  but generally one should use `build`_ and `test_` when testing non-standard versions.
 
 See the `cibw`_ command.
 
@@ -173,6 +183,10 @@ Build/test ``pymupdfpro`` with alternative ``smartoffice-neo``:
 
     ``aptest/aptest.py --smartoffice-neo git: --pro git: build test``
 
+Build/test ``pymupdfpro`` with alternative ``smartoffice-marina``:
+
+    ``aptest/aptest.py --smartoffice-marina git: --pro git: build test``
+
 Run ``pymupdf_layout`` gnn tests with ``mupdf`` version 1.27.2, current ``pymupdf`` in git, and local checkout ``sce/`` of ``pymupdf_layout`` (this assumes that the DocLayNet dataset has been downloaded, see `Using DocLayNet dataset`_):
 
     ``aptest/aptest.py --test-gnn-det eval/eval_pymupdf_layout.py -m=git:'-t 1.27.2' -p=git: --layout=sce test-gnn``
@@ -219,6 +233,9 @@ Instructions for releasing wheels for:
 
 * Specify package source for releases in `~/.aptest`_.
 
+  This is done with upper-case versions of the usual package-specifier options,
+  so that different `--release-*`_ options can select different subsets.
+  
   To use local checkouts:
 
       ``-P PyMuPDF --PRO PyMuPDFPlus --LAYOUT sce --4LLM pymupdf4llm --PDF4LLM pymupdf4llm``
@@ -374,6 +391,7 @@ Instructions for releasing wheels for:
 Details
 -------
 
+
 Run remotely
 ^^^^^^^^^^^^
 
@@ -494,65 +512,41 @@ Workarounds
     which is part of setuptools,
     but only setuptools<81.
 
+
 Keys/tokens
 ^^^^^^^^^^^
 
-Github ReST token
-.................
-* This is required for remote running on Github.
-* Specify with `--token-github-path`_.
+Aptest allows different keys to be used when it runs operations such as git
+commands, pypi uploads and Github ReST operations.
 
-* Also see `-r`_.
+* Keys can be in files or environment variables.
 
-Pypi token
-..........
-* This is required for uploading to https://pypi.org.
-* Specify with `--token-pypi-path`_.
-
-* Also see `-u`_.
-
-Github/ArtifexSoftware ssh key
-..............................
-
-We allow specification of a custom ssh private key to push to and/or
-access https://github.com/PyMuPDF/PyMuPDF and repositories within
-https://github.com/ArtifexSoftware/.
-
-This key can be provided in two ways:
-
-* In file ``artifex-software-ssh-key`` in the current directory.
-* In environment variable ``ARTIFEX_SOFTWARE_SSH_KEY``.
-
-When pushing to these repositories, we run ssh with
-``StrictHostKeyChecking=no``, which may end up writing to
-``~/.ssh/known_hosts``.
-
-Smartoffice ssh key
-...................
-
-We allow specification of a custom ssh private key that allows access to the
-smartoffice/smartoffice-neo repositories;
-this may be required when pymupdfpro builds SmartOffice
-because of how the SmartOffice build system works.
-
-* If required, this key should be provided in file ``thirdparty-so-key`` in the
-  current directory.
-
-Huggingface token
-.................
-
-If required, this token should be provided in file ``huggingface-key`` in the
-current directory.
+* Keys are selected by matching a prefix against git remotes, urls etc.
 
 Use of keys with remote runs
 ............................
 
-* If the `-r`_ option is used to defer to a remote machine, the key files are
-  copied to the remote machine. This obviously has security implications.
+* If the `-r`_ option is used to defer to a remote machine,
+  all specific key files are copied to the remote machine.
+  
+  * This is probably only usable if key files are in the current directory.
+  
+  * This obviously has security implications.
 
-* If the `-r`_ option is used to defer to a Github runner, we rely on the
-  https://ArtifexSoftware/aptest repository having secrets that allow the required
-  access.
+* If the `-r`_ option is used to defer to a Github runner with `-r @github`_,
+  we rely on the Github Aptest repository https://ArtifexSoftware/aptest
+  having secrets that allow the required access,
+  and one should specify the corresponding environment variables using the `--key`_ option.
+
+To create a github ReST token:
+
+* Follow instructions for creating a "classic" token at
+      https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#creating-a-personal-access-token-classic.
+* In ``scopes``, select just ``repo``.
+
+Also see:
+
+* `--key`_.
 
 
 Using DocLayNet dataset
@@ -593,6 +587,7 @@ Command-line arguments
 .. contents::
     :local:
 
+
 Overview
 ^^^^^^^^
 
@@ -606,9 +601,11 @@ Commands and options
 * Options and commands can be interleaved but it may be clearer to separate
   them on the command line.
 
+
 Option values
 .............
 Option values can be specified with ``--foo <value>`` or ``--foo=<value>``.
+
 
 Bool options
 ............
@@ -630,6 +627,7 @@ Set to false:
 * ``--foo=False``
 
 .. _~/.aptest:
+
 
 Default arguments in file ~/.aptest
 ...................................
@@ -678,6 +676,7 @@ build
     * `--clean-setup`_
     * `--clean-setup-all`_
 
+
 cibw
 ....
     Build and test packages using `cibuildwheel <https://cibuildwheel.pypa.io>`_.
@@ -711,11 +710,13 @@ cibw
     * `--cibw-pyodide-version`_
     * `--cibw-skip-add-defaults`_
 
+
 docs
 ....
     Convert `<README.rst>`__ into `<README.rst.html>`__.
     
     Currently uses `docutils <https://pypi.org/project/docutils/>`__.
+
 
 draft
 .....
@@ -726,10 +727,12 @@ draft
     * `--wheelhouse-union`_.
     * `--wheelhouse-union-release`_.
 
+
 gnn-download
 ............
     Download and extract dataset for the ``pymupdf_layout`` GNN model. Does not
     do unnecessary downloads or extracts.
+
 
 gnn-show
 ........
@@ -751,9 +754,11 @@ gnn-show
     * `--gnn-show-text`_
     * `--gnn-show-select`_
 
+
 gnn-train
 .........
     Trains ``pymupdf_layout``. Not tested.
+
 
 populate
 ........
@@ -771,6 +776,7 @@ populate
 run
 ...
     Runs commands specified by `--run`_ within checkouts.
+
 
 test
 ....
@@ -852,6 +858,7 @@ Options
     * Does nothing if ``<env_name>`` is unset.
     * Useful when running via Github action.
 
+
 .. _-b:
 
 -b <build-packages-modify>
@@ -889,13 +896,13 @@ Options
     set ``PYMUPDF_SETUP_MUPDF_REBUILD=0`` so pymupdf will not rebuild its
     mupdf.
 
+
 .. _-e:
 
 -e <name>=<value>
 .................
     Set specified environment variable.
 
-.. _--gnn-doit:
 
 -h
 ..
@@ -904,6 +911,7 @@ Options
     Also see:
     
     * `--help`_.
+
 
 .. _-i:
 
@@ -925,6 +933,7 @@ Options
             pymupdf_layout
             pymupdfpro
             smartoffice
+            smartoffice-marina
             smartoffice-neo
         
         (or their aliases.)
@@ -983,6 +992,10 @@ Options
     * `--pymupdfpro`_ and alias `--pro`_.
     * `--smartoffice`_ and alias `--sot`_.
     * `--smartoffice-neo`_ and aliases `--sot-neo`_, `--neoso`_.
+    
+    Also see:
+    
+    * `--git-depth`_.
 
 
 .. _--log-prefix:
@@ -1005,6 +1018,7 @@ Options
     * `-i`_.
     * `--mupdf`_.
 
+
 .. _-o:
 
 -o <os_names>
@@ -1016,7 +1030,8 @@ Options
     Also see:
     
     * `--remote-github-runners`_ - this will be more efficient when running
-      on Github with ``-r @github``.
+      on Github with `-r @github`_.
+
 
 .. _-p:
 
@@ -1031,11 +1046,14 @@ Options
     * `-i`_.
     * `--pymupdf`_.
 
+
 .. _-r:
+
+.. _-r @github:
 
 -r <remote>
 ...........
-    Aptest ourselves on remote machine(s) and on success copy wheels
+    Run ourselves on remote machine(s) and on success copy wheels
     back to local machine.
 
     If ``<remote>`` is ``@github``, we run on Github:
@@ -1044,12 +1062,9 @@ Options
       by ``-i``, ``-m``, ``-p`` etc) to branches called ``aptest-$USER`` in the
       hard-coded per-packagae central repositories, typically on https://github.com.
 
-    * **Warning**: this will make git forget about any new files in local
-      checkouts that have been added but not yet committed.
-
-      This is because we currently push any uncommitted changes as a
-      temporary commit, then use ``git reset HEAD~1`` to restore git
-      state.
+    * If there are uncommitted changes they are temporarily committed
+      and we use the git stash to save/restore things.
+      As of 2026-03-30 this fixes a problem where newly-added files were removed.
 
     * We re-run the ``aptest.py`` command on Github machines, changing
       ``-i``, ``-m`` etc args to use ``git:...`` to refer to the above
@@ -1063,6 +1078,9 @@ Options
       Wheels are also copied in flat format into:
       
           ``gh_workflow_YYYY-mm-dd-<workflowid>-union/``.
+    
+    * ``-r@github`` is ignored if we are already running on Github
+      (``GITHUB_ACTIONS=='true'``).
     
     * Also see:
     
@@ -1113,6 +1131,7 @@ Options
       * `--remote-rsync-path`_
       * `--remote-rsync-wsl`_
 
+
 .. _-t:
 
 -t <test-packages-modify>
@@ -1144,12 +1163,16 @@ Options
         -t -m,--layout
         -t -mupdf,-pymupdf_layout
 
+
 .. _-u:
 
 -u (bool)
 .........
-    If true and ``-r @github`` is used, then on success we ask the user to
+    [Obsolete]
+    
+    If true and `-r @github`_ is used, then on success we ask the user to
     confirm and then upload wheels to https://pypi.org.
+
 
 .. _-v:
 
@@ -1183,11 +1206,13 @@ Options
     
     * `--venv-name`_
 
+
 .. _-VV:
 
 -V <verbose>
 ............
     Set verbose level. Supported values are 0 and 1.
+
 
 .. _--atexit:
 
@@ -1222,6 +1247,13 @@ Options
     If true, fail if git diff is not empty in local checkout.
 
 
+.. _--cibw-ignore-test-failures:
+
+--cibw-ignore-test-failures (bool)
+..................................
+    If true, the `cibw`_ command ignores test failures. Default is false.
+
+
 .. _--cibw-name:
 
 --cibw-name <cibw_name>
@@ -1234,6 +1266,7 @@ Options
 
     Default is ``cibuildwheel``, i.e. the current release.
 
+
 .. _--cibw-pyodide:
 
 --cibw-pyodide (bool)
@@ -1241,12 +1274,14 @@ Options
      Make the `cibw`_ command build a pyodide wheel; runs
      ``cibuildwheel --platform pyodide ...`` etc.
 
+
 .. _--cibw-pyodide-version:
 
 --cibw-pyodide-version <cibw_pyodide_version>
 .............................................
     Override default Pyodide version to use with `cibw`_ command
     by setting ``CIBW_PYODIDE_VERSION``.
+
 
 .. _--cibw-skip-add-defaults:
 
@@ -1259,12 +1294,14 @@ Options
     Set to false with ``--cibw-skip-add-defaults=0`` or
     ``--cibw-skip-add-defaults=false`` or ``--cibw-skip-add-defaults=False``.
 
+
 .. _--clean-git:
 
 --clean-git <packages>
 ......................
     Add comma-separated packages/aliases to list of packages for which we run
     ``git clean -fdx`` in the `build`_ and `populate`_ commands.
+
 
 .. _--clean-setup:
 
@@ -1281,6 +1318,7 @@ Options
     ``--clean-setup pymupdf`` can be useful if pymupdf fails to import mupdf;
     this can be caused by the build system not rebuilding correctly.
 
+
 .. _--clean-setup-all:
 
 --clean-setup-all <packages>
@@ -1292,6 +1330,7 @@ Options
     
     * ``pymupdf``'s ``setup.py clean --all`` deletes files for pymupdf's extension and
       mupdf's C++/Python APIs and the mupdf C API.
+
 
 .. _--devel:
 
@@ -1307,7 +1346,7 @@ Options
 
 --draft-location <remote>
 .........................
-    Location to which `draft`_ command rsync's ``wheelhouse_union_release``.
+    Location to which the `draft`_ command rsync's ``wheelhouse_union_release``.
     
     If ``<remote>`` can be accessed via https,
     it can be used as a pypi-style package repository with:
@@ -1325,9 +1364,23 @@ Options
     [Note the trailing ``/simple``.]
 
 
+.. _--git-depth:
+
+--git-depth <depth>
+...................
+    Set git depth when cloning/updating package specified with ``git:...``.
+    
+    Also see:
+    
+    * `-i`_.
+
+
+.. _--gnn-doit:
+
 --gnn-doit (bool)
 .................
     If 0 (the default) we never download/extract DocLayNet.
+
 
 .. _--gnn-show-graph:
 
@@ -1335,12 +1388,14 @@ Options
 .......................
     Override default name of gnn-graph out file in `gnn-show`_ command.
 
+
 .. _--gnn-show-path:
 
 --gnn-show-path <path>
 ......................
     Add comma-separated paths of json output file for `gnn-show`_ command. Can
     be called multiple times.
+
 
 .. _--gnn-show-select:
 
@@ -1358,11 +1413,13 @@ Options
     
         --gnn-show-select "'environ' in results and results.environ.USER=='jules' and results.python['platform.system()']=='Windows' and  results.state.get('limit')==5
 
+
 .. _--gnn-show-text:
 
 --gnn-show-text <path>
 ......................
     Override default filename of `gnn-show`_ text output.
+
 
 .. _--graal:
 
@@ -1389,6 +1446,7 @@ Options
     [After the first time, suggest ``-v 1`` to avoid delay from
     updating/building pyenv and recreating the graal venv.]
 
+
 --help
 ......
     Show this help.
@@ -1398,6 +1456,58 @@ Options
     * `-h`_.
 
 .. _--langchain:
+
+
+.. _--key:
+
+--key <prefix> <path>[,<env>]
+.............................
+
+    Specify a key file and/or environment variable,
+    to be used for matching URLs or git remotes etc.
+
+    * The longest matching prefix is used.
+    * A match is only made if ``<prefix>`` or ``<env>`` exist.
+    * ``<path>`` is the path of a file containing the key.
+    * ``<env>`` is the name of an environment variable containing the key.
+
+    For example:
+
+    * Use file ``thirdparty-so-key`` for accessing git remotes starting with ``git@gitlab.artifex.com:``:
+
+      ``--key git@gitlab.artifex.com: thirdparty-so-key``.
+
+    * Also specify an environment variable for a Github repository secret,
+      that allows access to gitlab when running in a Github action.
+
+      ``--key git@gitlab.artifex.com: thirdparty-so-key,PYMUPDFPRO_SETUP_SOT_KEY``
+
+    * Specify a file containing the pypi.org token to be used by the `upload`_ command:
+
+      ``--key https://upload.pypi.org/ token-pypi.org``
+
+    It can be convenient to put `--key`_ options in `~/.aptest`_, for example::
+
+        # Key for pypi.org for use by `upload` command.
+        --key https://upload.pypi.org/ token-pypi.org
+
+        # Key for Github ReST operations used by `-r @github`.
+        --key https://api.github.com/ token-github.com
+
+        # Key for accessing repositories on Github.
+        --key git@github.com: artifex-software-ssh-key,ARTIFEX_SOFTWARE_SSH_KEY
+
+        # Key for accessing repositories on Artifex Gitlab.
+        --key git@gitlab.artifex.com: thirdparty-so-key,PYMUPDFPRO_SETUP_SOT_KEY
+
+    * When keys are used for ssh operations, Aptest runs ssh with
+      ``StrictHostKeyChecking=no``,
+      which may end up writing to ``~/.ssh/known_hosts``.
+
+    Also see:
+
+    * `Keys/tokens`_.
+
 
 --langchain <langchain-pymupdf-layout-location>
 ...............................................
@@ -1409,6 +1519,7 @@ Options
 
     * `-i`_.
     * `--langchain-pymupdf-layout`_.
+
 
 .. _--langchain-pymupdf-layout:
 
@@ -1438,6 +1549,7 @@ Options
     * `-i`_.
     * `--pymupdf_layout`_.
 
+
 .. _--mupdf:
 
 --mupdf <mupdf-location>
@@ -1450,6 +1562,21 @@ Options
     
     * `-i`_.
     * `-m`_.
+
+
+.. _--marina:
+
+--marina <smartoffice-marina-location>
+......................................
+
+    Specify location of package ``smartoffice-marina``.
+    
+    Alias for ``-i smartoffice-marina <smartoffice-marina-location>``.
+    
+    Also see:
+    
+    * `--smartoffice-marina`_.
+
 
 .. _--neoso:
 
@@ -1478,6 +1605,7 @@ Options
     
     * `-i`_.
 
+
 .. _--pdf_feature_inspector:
 
 --pdf_feature_inspector <pdf_feature_inspector-location>
@@ -1490,6 +1618,7 @@ Options
     
     * `-i`_.
     * `--pfi`_.
+
 
 .. _--pfi:
 
@@ -1504,6 +1633,7 @@ Options
     * `-i`_.
     * `--pdf_feature_inspector`_.
 
+
 .. _--pro:
 
 --pro <pymupdfpro-location>
@@ -1515,6 +1645,7 @@ Options
     Also see:
     
     * `--pymupdfpro`_.
+
 
 .. _--pymupdf:
 
@@ -1529,6 +1660,7 @@ Options
     * `-i`_.
     * `-p`_.
 
+
 .. _--pymupdfpro:
 
 --pymupdfpro <pymupdfpro-location>
@@ -1540,6 +1672,7 @@ Options
     Also see:
     
     * `--pro`_.
+
 
 .. _--pymupdf4llm:
 
@@ -1554,6 +1687,7 @@ Options
     * `-i`_.
     * `--4llm`_.
 
+
 .. _--pymupdf_layout:
 
 --pymupdf_layout <pymupdf_layout-location>
@@ -1567,6 +1701,7 @@ Options
     * `-i`_.
     * `--layout`_.
 
+
 .. _--pytest:
 
 --pytest <pytest-flags>
@@ -1577,6 +1712,7 @@ Options
     
     * ``--pytest '-k test_123'``
     * ``--pytest '-v -k "test_123 or test_246"'``
+
 
 .. _--pytest-path:
 
@@ -1590,11 +1726,13 @@ Options
     Can be specified multiple times.
     Default is ``<package_root>/tests/``.
 
+
 .. _--pytest-wrap:
 
 --pytest-wrap gdb | valgrind | helgrind
 .......................................
     Makes `test`_ command run `pytest <https://docs.pytest.org>`_ under specified tool.
+
 
 .. _--python:
 
@@ -1602,6 +1740,7 @@ Options
 .................
     Set Python to use. If set we re-run ourselves using specified
     python command.
+
 
 .. _--release-*:
 
@@ -1614,6 +1753,7 @@ Options
     
     Also see `Release procedure`_.
 
+
 --release-2
 ...........
     Build release wheels for ``pymupdf``, ``pymupdfpro``, ``pymupdf4llm`` and ``pymupdf_layout``, for
@@ -1621,11 +1761,13 @@ Options
     
     Also see `Release procedure`_.
 
+
 --release-3
 ...........
     Build release ``pymupdf`` wheel for platform ``windows-x32``.
     
     Also see `Release procedure`_.
+
 
 --release-4
 ...........
@@ -1633,17 +1775,20 @@ Options
     
     Also see `Release procedure`_.
 
+
 --release-5
 ...........
     Build release ``pymupdf`` wheel for platform ``pyodide``.
     
     Also see `Release procedure`_.
 
+
 --release-6
 ...........
     Build release ``pymupdf`` wheel for platform ``linux-x64`` and free threading python-3.14.
     
     Also see `Release procedure`_.
+
 
 .. _--remote-do:
 
@@ -1656,12 +1801,13 @@ Options
     If false (``--remote-do=0``) we don't sync to remote and we don't run any
     commands on remote. But we do sync remote wheels to local.
 
+
 .. _--remote-github-runners:
 
 --remote-github-runners <github-runners-modify>
 ...............................................
     Comma-separated ordered list of modifications to the list of
-    Github runners on which ``-r @github`` runs.
+    Github runners on which `-r @github`_ runs.
 
     This list defaults to runners for Linux-x64, Windows-x64
     and MacOS-arm64. Then for each comma-separated item in
@@ -1686,6 +1832,7 @@ Options
 
     * Run only on windows-arm::
       
+        --remote-github-os windows-arm
         --remote-github-os -,+windows-arm
 
 
@@ -1693,27 +1840,29 @@ Options
 
 --remote-github-workflow-id <workflow_id>
 .........................................
-    Changes the behaviour of ``-r @github``. Don't start a new run on Github,
-    instead continue from a previous ``-r @github`` invocation by waiting for
+    Changes the behaviour of `-r @github`_. Don't start a new run on Github,
+    instead continue from a previous `-r @github`_ invocation by waiting for
     ``<workflow_id>`` to finish and downloading logs and wheels etc to the
     local machine.
     
-    * One still needs to specify ``-r @github``.
+    * One still needs to specify `-r @github`_.
     
     Previous downloads are not repeated unnecessarily:
     
     * Downloads are made to a temporary file that is then atomically renamed.
     * Files that already exist locally are not downloaded again.
 
+
 .. _--remote-github-yml:
 
 --remote-github-yml <yml>
 .........................
-    With ``-r @github``, run the specified ``.yml`` file (leafname only) instead
+    With `-r @github`_, run the specified ``.yml`` file (leafname only) instead
     of running ``aptest.py``.
     If no packages are specified, runs on Github's
     ``ArtifexSoftware/aptest`` repository; otherwise exactly one package
     must be specified.
+
 
 .. _--remote-github-yml-inputs:
 
@@ -1736,11 +1885,13 @@ Options
     
         --remote-github-yml-inputs 'args=-o windows'
 
+
 .. _--remote-prefix:
 
 --remote-prefix <remote_prefix>
 ...............................
-    Run remote using specified (Python) command. Ignored by ``-r @github``.
+    Run remote using specified (Python) command. Ignored by `-r @github`_.
+
 
 .. _--remote-prefix-default:
 
@@ -1754,6 +1905,7 @@ Options
     
     Also see `~/.aptest`_.
 
+
 .. _--remote-rsync-path:
 
 --remote-rsync-path <remote_rsync_path>
@@ -1761,6 +1913,7 @@ Options
     Specify ``--rsync-path`` when running rsync, to identify location of
     rsync on remote. E.g. ``--remote-rsync-path 'wsl rsync'`` if remote is
     a Windows machine with rsync installed in the default WSL system.
+
 
 .. _--remote-rsync-wsl:
 
@@ -1770,12 +1923,14 @@ Options
 
     If true we tweak various things to cope with remote using wsl rsync.
 
+
 .. _--run:
 
 --run <package> <command>
 .........................
     Make `run`_ command run the specified command within checkout of
     ``<package>``.
+
 
 .. _--sdists:
 
@@ -1790,6 +1945,7 @@ Options
     * ``pdf2docx``
     
     With `cibw`_, we only build sdists if on Linux.
+
 
 .. _--set-swig:
 
@@ -1810,12 +1966,14 @@ Options
     
     * Otherwise should be the swig binary to use.
 
+
 .. _--set-swig-quick:
 
 --set-swig-quick (bool)
 .......................
     If true and `--set-swig`_'s ``<swig>`` value starts with ``git:``, we do not
     update/build swig if it is already present.
+
 
 .. _--smartoffice:
 
@@ -1829,6 +1987,21 @@ Options
     
     * `-i`_.
     * `--sot`_.
+
+
+.. _--smartoffice-marina:
+
+--smartoffice-marina <smartoffice-marina-location>
+..................................................
+    Specify location of package ``smartoffice-marina``, an alternative to ``--smartoffice``.
+    
+    Alias for ``-i smartoffice-marina <smartoffice-marina-location>``.
+    
+    Also see:
+    
+    * `-i`_.
+    * `--marina`_.
+
 
 .. _--smartoffice-neo:
 
@@ -1844,6 +2017,7 @@ Options
     * `--neoso`_.
     * `--sot-neo`_.
 
+
 .. _--sot:
 
 --sot <smartoffice-location>
@@ -1856,6 +2030,7 @@ Options
     Also see:
     
     * `--smartoffice`_.
+
 
 .. _--sot-neo:
 
@@ -1871,6 +2046,7 @@ Options
     * `--smartoffice-neo`_.
     * `--neoso`_.
 
+
 .. _--system-packages:
 
 --system-packages (bool)
@@ -1879,13 +2055,13 @@ Options
     Valgrind, using ``apt`` on Linux and ``brew`` on MacOS. Default is true if
     running as Github action, otherwise false.
 
+
 .. _--system-site-packages:
 
 --system-site-packages (bool)
 .............................
     If true, use ``--system-site-packages`` when creating venv. Defaults is false.
 
-.. _--test-extra-packages:
 
 .. _--tee-auto:
 
@@ -1894,12 +2070,15 @@ Options
     If true, we copy log output to file ``aptest-out-YYYY-mm-dd-HH-MM-SS``, and on
     exit create convenience softlink ``aptest-out``.
     
+    Otherwise we cancel any existing tee.
+    
     If `-r`_ is used to run on a remote machine (not ``@github`),
     we create a second convenience softlink called ``aptest-out-<remote>``.
     
     Default is false.
     
     Can be useful to put this in `~/.aptest`_.
+
 
 .. _--tee-path:
 
@@ -1909,10 +2088,14 @@ Options
     
     Can be useful to put this in `~/.aptest`_.
 
+
+.. _--test-extra-packages:
+
 --test-extra-packages <names>
 .............................
     Installs specified comma-separated packages from https://pypi.org before
     running tests in `test`_ command.
+
 
 .. _--test-gnn-cache:
 
@@ -1939,6 +2122,7 @@ Options
     * https://pypi.org version numbers for Artifex packages specified with ``pip:...``.
     * Any `--test-gnn-limit`_ value.
 
+
 .. _--test-gnn-det:
 
 --test-gnn-det <gnn_det>
@@ -1964,11 +2148,13 @@ Options
     Adds specified ``key=value`` pair to the root of the results dict
     created by `test-gnn`_.
 
+
 .. _--test-gnn-limit:
 
 --test-gnn-limit <limit>
 ........................
     Set number of gnn files to tested by `test-gnn`_. Default is all.
+
 
 .. _--test-gnn-out:
 
@@ -1976,6 +2162,7 @@ Options
 .....................
     Where to write json data containing test details from `test-gnn`_. Default
     is a filename containing the current date and time.
+
 
 .. _--test-gnn-push:
 
@@ -1985,45 +2172,13 @@ Options
     https://github.com/ArtifexSoftware/PyMuPDF-pymupdf-results. Default is false.
 
 
-.. _--token-github-path:
-
---token-github-path <path>
-..........................
-    Specify location of file containing a Github ReST token, required for ``-r @github``.
-
-    Also see `~/.aptest`_.
-    
-    To create a token:
-    
-    * Follow instructions for creating a "classic" token at
-      https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#creating-a-personal-access-token-classic.
-    * In ``scopes``, select just ``repo``.
-    
-    Also see `-r`_.
-
-
-.. _--token-pypi-path:
-
---token-pypi-path <path>
-........................
-    Specify location of file containing a `https://pypi.org`_ upload token.
-    
-    Required for the `-u`_ option.
-
-    Also see `~/.aptest`_.
-
-.. _--cibw-ignore-test-failures:
-
---cibw-ignore-test-failures (bool)
-..................................
-    If true, the `cibw`_ command ignores test failures. Default is false.
-
 .. _--ticker:
 
 --ticker <delay>
 ................
     Use ticker with specified delay. Disabled if ``delay==0``. Default is
     0.5.
+
 
 .. _--venv-name:
 
@@ -2033,8 +2188,6 @@ Options
     
     Default is ``venv-aptest-<python-version>-<word-size>``,
     for example ``venv-aptest-3.14.2-64``.
-
-.. _--4llm:
 
 
 .. _--wheelhouse-union:
@@ -2071,6 +2224,9 @@ Options
     * `--release-*`_.
     * `--wheelhouse-union`_.
 
+
+.. _--4llm:
+
 --4llm <location>
 .................
     Specify location of package ``pymupdf4llm``.
@@ -2081,16 +2237,6 @@ Options
     
     * `-i`_.
     * `--pymupdf4llm`_.
-
-.. _--4llm-unified:
-
---4llm-unified (bool)
-.....................
-
-    If true:
-    
-    * We assume package ``pymupdf4llm`` has been updated to contain ``pymupdf_layout``.
-    * Package ``pymupdf_layout`` is not built, but is expected to contain tests.
 
 
 Special arguments
@@ -2112,6 +2258,19 @@ completion
 
 Changelog
 ---------
+
+**2026-03-31**
+
+* Added control of git depth; see `--git-depth`_.
+* Improve internal specification of packages - use explicit git remote.
+* With `cibw`_, improve handling of old versions of pymupdf.
+* Improved key handling, removing hard-coded key file paths in favour of new option `--key`_.
+* Added support for (pseudo) package ``smartoffice-marina`` with pymupdfpro.
+* Added pymupdf4llm to scheduled Github tests in ``.github/workflows/test_multiple.yml``.
+* Ignore `-r @github`_ if already running on Github.
+* Fixed `-r @github`_ forgetting about newly added files.
+* Removed ``--4llm-unified`` as we decided not to unify ``pymupdf4llm`` and ``pymupdf_layout``.
+* Make ``--tee-auto=0`` cancel an existing tee.
 
 **2026-03-20**
 
@@ -2202,7 +2361,7 @@ Changelog
 * Renamed ``--swig`` and ``--swig-quick`` to `--set-swig`_ and `--set-swig-quick`_.
 * Added support for package ``swig``.
 * Changes to `test-gnn`_.
-* `--4llm-unified`_ now expects layout to be in 4llm
+* ``--4llm-unified`` now expects layout to be in 4llm
   (previously 4llm was moved into layout).
 * Fixed handling of ``pymupdf4llm``.
 * Also build sdists for ``pymupdf4llm`` and ``pdf2docx`` (as well as ``pymupdf``).
@@ -2246,8 +2405,8 @@ Changelog
 
 **2026-02-12**
 
-* Added `--token-github-path`_.
-* Added `--token-pypi-path`_.
+* Added ``--token-github-path``.
+* Added ``--token-pypi-path``.
 * Fixed ``-r @github`` on Windows.
 
 **2026-02-11**
@@ -2295,7 +2454,7 @@ Changelog
 **2026-01-31**
 
 * Update tests to use mupdf 1.27.x branch.
-* Added experimental support for unified 4llm+layout package; see `--4llm-unified`_.
+* Added experimental support for unified 4llm+layout package; see ``--4llm-unified``.
 
 
 **2026-01-30**
