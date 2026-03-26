@@ -11,6 +11,7 @@ import importlib.metadata
 import json
 import os
 import platform
+import re
 import shlex
 import shutil
 import subprocess
@@ -216,56 +217,56 @@ def sync(remote, remote_dir, path, ssh_command, verbose, state):    # pylint: di
 g_package_info = {
         'aptest':
             {
-                'github_name': 'ArtifexSoftware/aptest',
+                'git_remote': 'git@github.com:ArtifexSoftware/aptest.git',
                 'git_branch': 'main',
                 'aliases':  [],
                 'order': -1,
             },
         'mupdf':
             {
-                'github_name': 'ArtifexSoftware/mupdf',
+                'git_remote': 'git@github.com:ArtifexSoftware/mupdf.git',
                 'git_branch': 'master',
                 'aliases':  ['m'],
                 'order': 0,
             },
         'pdf2docx':
             {
-                'github_name': 'ArtifexSoftware/pdf2docx',
+                'git_remote': 'git@github.com:ArtifexSoftware/pdf2docx.git',
                 'git_branch': 'master',
                 'aliases':  [],
                 'order': 2,
             },
         'pymupdf':
             {
-                'github_name': 'pymupdf/PyMuPDF',
+                'git_remote': 'git@github.com:pymupdf/PyMuPDF.git',
                 'git_branch': 'main',
                 'aliases':  ['p'],
                 'order': 1,
             },
         'pymupdf4llm':
             {
-                'github_name': 'pymupdf/pymupdf4llm',
+                'git_remote': 'git@github.com:pymupdf/pymupdf4llm.git',
                 'git_branch': 'main',
                 'aliases':  ['4llm'],
                 'order': 3, # Need to be higher than pymupdf_layout.
             },
         'pdf4llm':
             {
-                'github_name': 'pymupdf/pymupdf4llm',
+                'git_remote': 'git@github.com:pymupdf/pymupdf4llm.git',
                 'git_branch': 'main',
                 'aliases':  [],
                 'order': 4, # Need to be higher than pymupdf_layout.
             },
         'pymupdfpro':
             {
-                'github_name': 'ArtifexSoftware/PyMuPDFPro',
+                'git_remote': 'git@github.com:ArtifexSoftware/PyMuPDFPro.git',
                 'git_branch': 'main',
                 'aliases':  ['pro'],
                 'order': 2,
             },
         'pymupdf_layout':
             {
-                'github_name': 'ArtifexSoftware/sce',
+                'git_remote': 'git@github.com:ArtifexSoftware/sce.git',
                 'git_branch': 'master',
                 'aliases':  ['layout'],
                 'submodules': False,
@@ -273,30 +274,38 @@ g_package_info = {
             },
         'langchain_pymupdf_layout':
             {
-                'github_name': 'pymupdf/langchain-pymupdf-layout',
+                'git_remote': 'git@github.com:pymupdf/langchain-pymupdf-layout.git',
                 'git_branch': 'main',
                 'aliases':  ['langchain'],
                 'order': 4,
             },
         'smartoffice':
             {
-                'gitlab_name': 'smartoffice/sot',
+                'git_remote': 'git@gitlab.artifex.com:smartoffice/sot.git',
                 'git_branch': 'master',
                 'aliases':  ['sot'],
                 'submodules': False,
                 'order': 1, # Fetch before Layout
             },
+        'smartoffice-marina':
+            {
+                'git_remote': 'git@github.com:epapyrusinc/marina.git',
+                'git_branch': 'master',
+                'aliases':  ['marina'],
+                'submodules': True,
+                'order': 1, # Fetch before Layout
+            },
         'smartoffice-neo':
             {
-                'gitlab_name': 'smartoffice/smartoffice',
+                'git_remote': 'git@gitlab.artifex.com:smartoffice/smartoffice.git',
                 'git_branch': 'master',
                 'aliases':  ['sot-neo', '--neoso'],
-                'submodules': False,
+                'submodules': True,
                 'order': 1, # Fetch before Layout
             },
         'pdf_feature_inspector':
             {
-                'github_name': 'ArtifexSoftware/pdf_feature_inspector',
+                'git_remote': 'git@github.com:ArtifexSoftware/pdf_feature_inspector.git',
                 'git_branch': 'main',
                 'aliases':  ['pfi'],
                 'order': 5,
@@ -305,7 +314,7 @@ g_package_info = {
         # Experimental, doesn't work.
         'presidio':
             {
-                'github_name': 'ArtifexSoftware/presidio',
+                'git_remote': 'git@github.com:ArtifexSoftware/presidio.git',
                 'git_branch': 'main',
                 'aliases':  list(),
                 'order': 4,
@@ -313,7 +322,7 @@ g_package_info = {
         
         'swig':
             {
-                'github_name': None,
+                'git_remote': None,
                 'order': -1,
             },
         }
@@ -321,10 +330,7 @@ g_package_info = {
 for name, value in g_package_info.items():
     if value.get('submodules') is None:
         value['submodules'] = True
-    if "gitlab_name" in value:
-        value['git_remote'] = f'git@gitlab.artifex.com:{value["gitlab_name"]}.git'
-    else:
-        value['git_remote'] = f'git@github.com:{value["github_name"]}.git'
+    assert 'git_remote' in value, f'Need "git_remote" entry in {name}={value}'
 
 
 def arg_alias(arg):
@@ -399,7 +405,7 @@ def name_info(package):
     if ret:
         return ret
     ret = {
-            'github_name': None,
+            'git_remote': None,
             'git_branch': None,
             'aliases':  list(),
             'submodules': True,
@@ -520,8 +526,11 @@ def add_package(state, name, location):
     
     state.packages[name] = location_pos
     
-    assert not ('smartoffice' in state.packages and 'smartoffice-neo' in state.packages), \
-            f'Only one of `smartoffice` and `smartoffice-neo` can be specifeid.'
+    n_smartoffice = 0
+    for p in state.packages:
+        if p.startswith('smartoffice'):
+            n_smartoffice += 1
+    assert n_smartoffice <= 1, f'Only one `smartoffice*` package can be specified.'
     
     state.packages_build.append(name)
     state.packages_test.append(name)
@@ -957,9 +966,6 @@ def get_args(argv):
                     #
                     new_args += ' -b pymupdf --remote-github-runners linux --cibw-skip-add-defaults=0 -e CIBW_BUILD="cp314t*" -e CIBW_SKIP="*musllinux*" -e PYMUPDF_SETUP_PY_LIMITED_API=0'
                 
-                #elif arg == '--release-7':
-                #    new_args += ' -b pymupdf,pymupdfpro,pymupdf_layout,pymupdf4llm --remote-github-runners macos-15-intel'
-                    
                 else:
                     assert 0, f'Unrecognised {arg=}.'
                 
@@ -1149,6 +1155,14 @@ def _get_token_pypi(state):
     return pipcl.fs_read(path).strip()
 
 
+def github_api_url(info):
+    git_remote = info['git_remote']
+    m = re.match('^git@github.com:(.+).git$', git_remote)
+    assert m, f'Unrecognised remote: {git_remote=}'
+    name = m.group(1)
+    return f'https://api.github.com/repos/{name}'
+
+
 def do_remote_github(state, args):
     assert isinstance(args, cli.Args)
     pipcl.run('pip install requests')
@@ -1206,10 +1220,9 @@ def do_remote_github(state, args):
                         raise Exception(f'Expected <name>=<value> in {nv!r} from {state.remote_github_yml_inputs=}.') from e
                     inputs[n] = v
                 data['inputs'] = inputs
-            url = f'https://api.github.com/repos/{info["github_name"]}'
             workflow_id = github.gh_run_workflow(
                     token_github,
-                    url,
+                    github_api_url(info),
                     state.remote_github_yml,
                     data,
                     doit=state.remote_do,
@@ -1236,11 +1249,10 @@ def do_remote_github(state, args):
             pipcl.log(f'args_string is:')
             args_string_lines = '\n-'.join(args_string.split(' -'))
             pipcl.log(textwrap.indent(args_string_lines, '    '))
-            url = f'https://api.github.com/repos/{info["github_name"]}'
             yml = 'test.yml'
             workflow_id = github.gh_run_workflow(
                     token_github,
-                    url,
+                    github_api_url(info),
                     yml,
                     data,
                     doit=state.remote_do,
@@ -1248,7 +1260,7 @@ def do_remote_github(state, args):
             
     if state.remote_do:
         assert isinstance(workflow_id, str)
-        url = f'https://api.github.com/repos/{info["github_name"]}'
+        url = github_api_url(info)
         upload = 'pypi' if state.github_upload else None
         pipcl.log(f'Calling github.gh_workflow_download_multiple() with {url=} {workflow_id=} {upload=}.')
         github.gh_workflow_download_multiple(
@@ -1505,10 +1517,12 @@ def do_build_single(state, package):
         if package == 'mupdf':
             state.env_extra['PYMUPDF_SETUP_MUPDF_BUILD'] = directory_abs
             # fixme: be able to set to '' for system install?
-        elif package in ('smartoffice', 'smartoffice-neo'):
+        elif package.startswith('smartoffice'):
             # We don't build smartoffice here, instead we tell pymupdfpro
             # where the local smartoffice checkout is.
             state.env_extra['PYMUPDFPRO_SETUP_SOT'] = directory_abs
+            #if package == 'smartoffice-marina':
+            #    state.env_extra['PYMUPDFPRO_SOT_MARINA'] = '1'
         elif package == 'swig':
             swig_env_extra = dict()
             pipcl.swig_prepare_build(swig_env_extra)
@@ -1604,14 +1618,30 @@ def do_build_single(state, package):
 
 
 def do_build(state):
+    
     if 'mupdf' in state.packages:
         directory = _get_local('mupdf', state)
         if directory:
             state.env_extra['PYMUPDF_SETUP_MUPDF_BUILD'] = os.path.abspath(directory)
+    
     if 'mupdf' in state.packages and 'mupdf' not in state.packages_build:
         PYMUPDF_SETUP_MUPDF_REBUILD = '0'
         pipcl.log(f'Setting {PYMUPDF_SETUP_MUPDF_REBUILD=}')
         state.env_extra['PYMUPDF_SETUP_MUPDF_REBUILD'] = PYMUPDF_SETUP_MUPDF_REBUILD
+    
+    for p in state.packages:
+        if p.startswith('smartoffice'):
+            directory = _get_local(p, state)
+            if directory:
+                PYMUPDFPRO_SETUP_SOT = os.path.abspath(directory)
+                pipcl.log(f'Setting {PYMUPDFPRO_SETUP_SOT=}')
+                state.env_extra['PYMUPDFPRO_SETUP_SOT'] = PYMUPDFPRO_SETUP_SOT
+            if p not in state.packages_build:
+                PYMUPDFPRO_SETUP_SOT_BUILD = '0'
+                pipcl.log(f'Setting {PYMUPDFPRO_SETUP_SOT_BUILD=}')
+                state.env_extra['PYMUPDFPRO_SETUP_SOT_BUILD'] = PYMUPDFPRO_SETUP_SOT_BUILD
+        if p == 'smartoffice-marina':
+            state.env_extra['PYMUPDFPRO_SOT_MARINA'] = '1'
     
     package_to_wheel = dict()
     
@@ -1775,7 +1805,7 @@ def do_cibw(state):
                 state.env_extra['PYMUPDF_SETUP_MUPDF_BUILD'] = directory_abs
             # fixme: be able to set to '' for system install?
             continue
-        elif package == 'smartoffice':
+        elif package.startswith('smartoffice'):
             if platform.system() == 'Linux' and not state.cibw_pyodide:
                # Need /host/ prefix so accessible from within manylinux docker.
                 state.env_extra['PYMUPDFPRO_SETUP_SOT'] = f'/host{directory_abs}'
@@ -1796,6 +1826,8 @@ def do_cibw(state):
                 pipcl.run(f'git config --global --add safe.directory {directory_abs}', check=0)
             else:
                 state.env_extra['PYMUPDFPRO_SETUP_SOT'] = directory_abs
+            #if package == 'smartoffice-marina':
+            #    state.env_extra['PYMUPDFPRO_SOT_MARINA'] = '1'
             continue
         
         if state.sdists and platform.system() == 'Linux':
@@ -2385,7 +2417,9 @@ def do_test_single(state, package, failed_packages):
     location, _ = state.packages[package]
     if not location:
         return
-    if package in ('mupdf', 'smartoffice', 'smartoffice-neo'):
+    if package == 'mupdf':
+        return
+    if package.startswith(f'smartoffice'):
         return
     directory = _get_local(package, state, test=1)
     if not directory:
@@ -2709,7 +2743,9 @@ def main(argv):
         else:
             # With non-github builds we rely on this file existing.
             PYMUPDFPRO_SETUP_SOT_KEY_PATH = os.path.abspath(state.path_pro_key)
-            if os.path.isfile(PYMUPDFPRO_SETUP_SOT_KEY_PATH):
+            if 'smartoffice-neo' in state.packages:
+                pass
+            elif os.path.isfile(PYMUPDFPRO_SETUP_SOT_KEY_PATH):
                 state.env_extra['PYMUPDFPRO_SETUP_SOT_KEY_PATH'] = PYMUPDFPRO_SETUP_SOT_KEY_PATH
                 pipcl.log(f'Using {PYMUPDFPRO_SETUP_SOT_KEY_PATH=}.')
             else:
@@ -2898,7 +2934,8 @@ def _get_local(package, state, test=False):
             
             ssh_key = None
             ssh_keyfile = None
-            if package in ('smartoffice', 'smartoffice-neo'):
+            pipcl.log(f'{package=}')
+            if package == 'smartoffice':
                 # Special handling uses PYMUPDFPRO_SETUP_SOT_KEY on Github from
                 # repository secret.
                 PYMUPDFPRO_SETUP_SOT_KEY = os.environ.get('PYMUPDFPRO_SETUP_SOT_KEY')
@@ -2910,7 +2947,9 @@ def _get_local(package, state, test=False):
                     pipcl.log(f'{isfile=}')
                     if isfile:
                         ssh_keyfile = state.path_pro_key
-                    
+            pipcl.log(f'{ssh_key=}')
+            pipcl.log(f'{ssh_keyfile=}')
+            pipcl.log(f'{env_extra=}')
             directory = pipcl.git_get(
                     local,
                     remote=info['git_remote'],
@@ -3130,8 +3169,12 @@ if __name__ == '__main__':
                 # diagnostics already.
                 pass
             else:
-                backtrace.show(reverse_chain=1, limit=None if g_devel else 0, brief=1)
-            pipcl.log(f'Aptest terminating with error.')
+                backtrace.show(
+                        reverse_chain=1,
+                        #limit=None if g_devel else 0,
+                        brief=1,
+                        )
+            #pipcl.log(f'Aptest terminating with error. {isinstance(e, subprocess.CalledProcessError)=} {isinstance(e, subprocess.TimeoutExpired)=} {e=}')
             sys.exit(1)
         finally:
             if g_atexit:
