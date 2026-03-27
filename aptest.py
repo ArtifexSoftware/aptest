@@ -90,15 +90,30 @@ def git_push(path, repository, remote_branch, state, *, tmpcommit=True, doit=Tru
             except Exception:
                 pipcl.log(f'Temporary commit failed. {diff=}.')
                 raise
+    tmp_path_remove = None
     try:
+        key_path, key_env = _get_key(state, repository)
+        if key_path or key_env:
+            if not key_path:
+                key_path = os.path.abspath('aptest-tmp-git-key')
+                tmp_path_remove = key_path
+                pipcl.fs_write_key(keyfile, os.environ.get[key_env])
+            GIT_SSH_COMMAND = f'ssh -i {os.path.abspath(key_path)} -o StrictHostKeyChecking=no'
+            GIT_SSH_COMMAND = GIT_SSH_COMMAND.replace('\\', '/')    # Required on windows.
+            env_extra = state.env_extra | dict(GIT_SSH_COMMAND = GIT_SSH_COMMAND)
+        else:
+            env_extra = state.env_extra
         pipcl.run(
                 f'cd {path} && git push -fv {repository or "origin"} HEAD:{remote_branch}',
                 prefix='git push: ',
-                env_extra=state.env_extra,
+                env_extra=env_extra,
                 )
     finally:
         if tmpcommit and diff:
             pipcl.run(f'cd {path} && git reset HEAD~1')
+        if tmp_path_remove:
+            assert '-tmp-' in tmp_path_remove
+            pipcl.fs_remove(tmp_path_remove)
     return branch
 
 
@@ -212,7 +227,7 @@ def sync(remote, remote_dir, path, ssh_command, verbose, state):    # pylint: di
 
 # Hard-coded information about supported packages. This used when deferring
 # to Github with `-r @github`. The `aliases` items are used when looking at
-# command-line arguments.
+# command-line arguments etc.
 #
 g_package_info = {
         'aptest':
@@ -424,11 +439,6 @@ def _test_completion(COMP_LINE):
     os.environ['COMP_TYPE'] = '63'
     text = pipcl.run(COMP_LINE, capture=str, check=1)
     print(text)
-    #return main(shlex.split(COMP_LINE))
-    #print(f'{e=}')
-    #print(f'{text=}')
-    #print(textwrap.indent(text, '    '))
-    #return text
 
 
 def dummy_completion1():
@@ -628,15 +638,13 @@ def get_args(argv):
     state.gnn_show_select = None
     state.gnn_show_select_root = None
     state.graal = False
-    state.huggingface_key_path_abs = None
+    state.keys = list()
     state.os_names = list()
     state.packages2 = dict()   # map from name to location.
     state.packages_build = list() # Sorted list of names.
     state.packages = dict()   # map from name to location.
     state.packages_test = list()  # Sorted list of names.
     state.packages_for_release = dict()
-    state.path_artifex_key = 'artifex-software-ssh-key'
-    state.path_huggingface_key = 'huggingface-key'
     state.path_pro_key = 'thirdparty-so-key'
     state.pybind = False
     state.pymupdf4llm_unified = False
@@ -679,12 +687,10 @@ def get_args(argv):
     state.test_gnn_out = None
     state.test_gnn_push = 0
     state.ticker = 0
-    state.token_github_path = None
-    state.token_pypi_path = None
     state.valgrind = False
     state.venv = 2
     state.venv_name = None
-    state.verbose = True
+    state.verbose = False
     state.wheelhouse = 'aptest-wheelhouse'
     state.wheelhouse_union = None
     state.wheelhouse_union_release = None
@@ -846,6 +852,21 @@ def get_args(argv):
             elif arg == '-i':
                 _name = next(args).as_str()
                 add_package(state, _name, next(args))
+            
+            elif arg == '--key':
+                prefix = next(args).as_str()
+                pos = args.pos
+                text = next(args).as_str().split(',')
+                if len(text) == 1:
+                    path, env = text[0], None
+                elif len(text) == 2:
+                    path, env = text
+                else:
+                    assert 0, f'Expected one or two comma-separted items in {text!r}'
+                if path:
+                    path = os.path.expanduser(path)
+                state.keys.append((prefix, path, env, pos))
+                state.keys.sort(reverse=True)
             
             elif arg == '--log-prefix':
                 _prefix = next(args).as_text()
@@ -1063,12 +1084,6 @@ def get_args(argv):
             elif arg == '--test-gnn-push':
                 state.test_gnn_push = args.get_bool()
             
-            elif arg == '--token-github-path':
-                state.token_github_path = next(args).as_text()
-            
-            elif arg == '--token-pypi-path':
-                state.token_pypi_path = next(args).as_text()
-            
             elif arg == '--cibw-ignore-test-failures':
                 state.cibw_ignore_test_failures = args.get_bool()
 
@@ -1081,7 +1096,7 @@ def get_args(argv):
                 state.github_upload = args.get_bool()
             
             elif arg == '--use-release-args':
-                assert state.wheelhouse_union_release, f'Must specify `--wheelhouse-union <dir>` for releases.'
+                assert state.wheelhouse_union_release, f'Must specify `--wheelhouse-union-release <dir>` for releases.'
                 state.wheelhouse_union = state.wheelhouse_union_release
                 
                 assert state.packages_for_release, f'Must specify upper-case packages for release.'
@@ -1141,18 +1156,53 @@ def get_args(argv):
     return args, state
 
 
-def _get_token_github(state):
-    assert state.token_github_path is not None, \
-            f'No github token specified, use `--token-github-path <path>`.'
-    path = os.path.expanduser(state.token_github_path)
-    return pipcl.fs_read(path).strip()
+def _get_key(state, url, on_error=None):
+    '''
+    Finds key for specified url or git remote.
+    
+    Returns (<path>, <env>), where:
+    * <path> is None or path of file containing key.
+    * <env> is None or name of environment variable containing key.
+    '''
+    ret_path = None
+    ret_env = None
+    if url:
+        for prefix, path, env, _pos in state.keys:
+            if url.startswith(prefix):
+                pipcl.log(f'{url=}: {path=} {env=}')
+                pipcl.log(f'{os.path.exists(path)=}')
+                pipcl.log(f'{env and env in os.environ=}')
+                if path and os.path.exists(path):
+                    ret_path = path
+                if env and env in os.environ:
+                    ret_env = env
+                if ret_path or ret_env:
+                    break
+    pipcl.log(f'_get_key(): {url=} returning {ret_path=} {ret_env=}.')
+    return ret_path, ret_env
 
 
-def _get_token_pypi(state):
-    assert state.token_pypi_path is not None, \
-            f'No pypi token specified, use `--token-github-path <path>`.'
-    path = os.path.expanduser(state.token_pypi_path)
-    return pipcl.fs_read(path).strip()
+def _get_key2(state, url, on_error=None):
+    '''
+    Wrapper for _get_key(), returning the key itself from contents of path or
+    env.
+    '''
+    key_path, key_env = _get_key(state, url, on_error)
+    ret = None
+    if key_path:
+        ret = pipcl.fs_read(key_path)
+    elif key_env:
+        ret = os.environ[key_env]
+    pipcl.log(f'Returning {url=} => {ret=}.')
+    return ret
+
+
+def _get_key_github_rest(state, on_error='raise'):
+    return _get_key2(state, 'https://api.github.com/', on_error).strip()
+
+
+def _get_key_pypi(state, on_error='raise'):
+    return _get_key2(state, 'https://upload.pypi.org/', on_error).strip()
 
 
 def github_api_url(info):
@@ -1174,7 +1224,7 @@ def do_remote_github(state, args):
         branch = f'aptest-{os.environ["USER"]}'    # -{g_date_time}'
     pipcl.log(f'{branch=}.')
     
-    token_github = _get_token_github(state)
+    token_github_rest = _get_key_github_rest(state)
 
     if state.remote_github_workflow_id:
         # Wait for existing workflow instead of creating a new one.
@@ -1221,7 +1271,7 @@ def do_remote_github(state, args):
                     inputs[n] = v
                 data['inputs'] = inputs
             workflow_id = github.gh_run_workflow(
-                    token_github,
+                    token_github_rest,
                     github_api_url(info),
                     state.remote_github_yml,
                     data,
@@ -1243,15 +1293,18 @@ def do_remote_github(state, args):
             matrix_json = json.dumps(matrix)
             data = dict(
                     ref = branch,
-                    inputs = dict(args=args_string, matrix=matrix_json),
-                    
+                    inputs = dict(
+                            args=args_string,
+                            matrix=matrix_json),
+                            
                     )
             pipcl.log(f'args_string is:')
             args_string_lines = '\n-'.join(args_string.split(' -'))
             pipcl.log(textwrap.indent(args_string_lines, '    '))
             yml = 'test.yml'
+            key = _get_key_github_rest(state)
             workflow_id = github.gh_run_workflow(
-                    token_github,
+                    key,
                     github_api_url(info),
                     yml,
                     data,
@@ -1264,12 +1317,12 @@ def do_remote_github(state, args):
         upload = 'pypi' if state.github_upload else None
         pipcl.log(f'Calling github.gh_workflow_download_multiple() with {url=} {workflow_id=} {upload=}.')
         github.gh_workflow_download_multiple(
-                token_github,
+                token_github_rest,
                 url,
                 workflow_id,
                 #extra_wheels=upload_extra_wheels,
                 upload=upload,
-                token_pypi=_get_token_pypi(state) if upload else None,
+                token_pypi=_get_key_pypi(state) if upload else None,
                 local_dir_union=state.wheelhouse_union,
                 )
         if state.wheelhouse_union:
@@ -1281,7 +1334,7 @@ def do_remote_github(state, args):
 def do_remote(state, argv):
     remote = state.remote
     remote_dir = state.remote_dir
-    verbose = 1
+    verbose = 0
     jumps = None
     if ' ' not in remote:
         jumps = remote.split('::')
@@ -1335,39 +1388,10 @@ def do_remote(state, argv):
         if sync2(g_root):
             git_paths.append(g_root)
 
-        # Sync Artifex github key.
-        if sync_artifex_software_ssh_key:
-            if os.path.isfile(state.path_artifex_key):
-                sync2(state.path_artifex_key)
-            else:
-                pipcl.log(
-                        f'## Warning: may not be able to remote'
-                        f' clone/update pro or layout checkouts'
-                        f' because not a file: {state.path_artifex_key}'
-                        )
-
-        # Sync Huggingface key.
-        if 'gnn' in state.commands:
-            if os.path.isfile(state.path_huggingface_key):
-                sync2(state.path_huggingface_key)
-            else:
-                pipcl.log(
-                        f'## Warning: may not be able to remote'
-                        f' use Huggingface because not a file:'
-                        f' {state.path_huggingface_key}'
-                        )
-
-        # Sync pymupdfpro build key.
-        if 'pymupdfpro' in state.packages_build:
-            if os.path.isfile(state.path_pro_key):
-                sync2(state.path_pro_key)
-            else:
-                pipcl.log(
-                        f'## Warning: may not be able to remote build'
-                        f' SmartOffice because not a file:'
-                        f' {state.path_artifex_key}'
-                        )
-            sync2(state.path_pro_key)
+        # Sync keys.
+        for prefix, path, _env, _pos in state.keys:
+            if path and os.path.exists(path):
+                sync2(path)
 
         # Run remote command.
         #
@@ -1591,9 +1615,8 @@ def do_build_single(state, package):
                     state.env_extra['PYMUPDFPRO_SETUP_BUILD_TYPE'] = state.build_type
                 if package == 'pymupdf_layout':
                     state.env_extra['PYMUPDF_LAYOUT_SETUP_BUILD_TYPE'] = state.build_type
-
+            
             pipcl.run(
-                    #f'pip wheel -v --extra-index-url {pip_index_url} --no-cache-dir -w {state.wheelhouse} {directory_abs}',
                     f'pip wheel -v --extra-index-url {pip_index_url} -w {state.wheelhouse} {directory_abs}',
                     env_extra=state.env_extra,
                     prefix=f'build {package}: ',
@@ -1601,7 +1624,6 @@ def do_build_single(state, package):
             ret_wheel = new_files.get_one()
 
             pipcl.run(
-                    #f'pip install -v --extra-index-url {pip_index_url} --no-cache-dir {wheel}',
                     f'pip install -v --extra-index-url {pip_index_url} {ret_wheel}',
                     env_extra=state.env_extra,
                     prefix=f'install {package}: ',
@@ -1901,23 +1923,26 @@ def do_cibw(state):
             #
             env_extra = state.env_extra.copy()
 
+            CIBW_ENVIRONMENT_PASS_LINUX = list(env_extra.keys())
+            
             if platform.system() == 'Linux':
-                prefix = '/host'
-                # Update GIT_SSH_COMMAND and
-                # PYMUPDFPRO_SETUP_SOT_KEY_PATH if set, to be within
-                # /host in manylinux docker. Otherwise for example
-                # tests that access remote git repositories will not
-                # use the appropriate key.
-                GIT_SSH_COMMAND_0 = env_extra.get('GIT_SSH_COMMAND')
-                if GIT_SSH_COMMAND_0:
-                    GIT_SSH_COMMAND = f'ssh -i {prefix}{state.ssh_key_path_abs} -o StrictHostKeyChecking=no'
-                    pipcl.log(f'Changing GIT_SSH_COMMAND from {GIT_SSH_COMMAND_0!r} to {GIT_SSH_COMMAND!r}.')
-                    env_extra['GIT_SSH_COMMAND'] = GIT_SSH_COMMAND
-
-                PYMUPDFPRO_SETUP_SOT_KEY_PATH = env_extra.get('PYMUPDFPRO_SETUP_SOT_KEY_PATH')
-                if PYMUPDFPRO_SETUP_SOT_KEY_PATH:
-                    env_extra['PYMUPDFPRO_SETUP_SOT_KEY_PATH'] = \
-                            f'{prefix}{os.path.abspath(PYMUPDFPRO_SETUP_SOT_KEY_PATH)}'
+                # Update key files to be within /host in manylinux
+                # docker. Otherwise for example tests that access remote git
+                # repositories will not use the appropriate key.
+                #
+                # Also add key environment variables to CIBW_ENVIRONMENT_PASS_LINUX.
+                #
+                new_keys = list()
+                for prefix, path, env, pos in state.keys:
+                    if path or env:
+                        if path:
+                            path = f'/host{os.path.abspath(path)}'
+                        if env:
+                            CIBW_ENVIRONMENT_PASS_LINUX.append(env)
+                        new_keys.append((prefix, path, env, pos))
+                state.keys += new_keys
+                state.keys.sort(reverse=True)
+                    
             else:
                 prefix = ''
 
@@ -1949,7 +1974,7 @@ def do_cibw(state):
                     ):
                 # 2026-02-08: onnxruntime is not available on macos-intel-python3.14.
                 #
-                pipcl.log(f'Excluding cp314* because onnxruntime not available on macos/intel/python-3.14.')
+                pipcl.log(f'Excluding cp314* because onnxruntime not available on macos-intel/python-3.14.')
                 env_extra['CIBW_BUILD'] = CIBW_BUILD.replace(' cp314*', '')
             else:
                 env_extra['CIBW_BUILD'] = CIBW_BUILD
@@ -1957,8 +1982,6 @@ def do_cibw(state):
             # Pass all the environment variables we have set in
             # state.env_extra, to Linux docker. Note that this will
             # miss any settings in the original environment.
-            CIBW_ENVIRONMENT_PASS_LINUX = env_extra.keys()
-            CIBW_ENVIRONMENT_PASS_LINUX = list(CIBW_ENVIRONMENT_PASS_LINUX)
             CIBW_ENVIRONMENT_PASS_LINUX.append('PYMUPDFPRO_SETUP_SOT_KEY')  # This can be set in os.environ.
             # Some tests look at GITHUB_ACTIONS e.g. if known to fail on Github.
             CIBW_ENVIRONMENT_PASS_LINUX.append('GITHUB_ACTIONS')
@@ -2051,7 +2074,7 @@ def do_gnn_download(state):
                 pipcl.log(f'Already exists: {path=}')
             else:
                 if state.gnn_doit:
-                    github._gh_download(_get_token_github(state), url, path, gh=0)    # pylint: disable=protected-access
+                    github._gh_download(_get_key_github_rest(state), url, path, gh=0)    # pylint: disable=protected-access
                 else:
                     assert 0, f'Would download but {state.gnn_doit=}: {url} {path=}'
         download(url_doclaynet_core_zip)
@@ -2610,12 +2633,23 @@ def main(argv):
     
     # Rerun with different python if `--python` is specified.
     if not state.remote and state.python:
-        python_version = pipcl.run(f'{state.python} -c "import platform; print(platform.python_version())"', capture=1)
+        python_version = pipcl.run(
+                f'{state.python} -c "import platform;'
+                    f' print(platform.python_version())"',
+                capture=1,
+                )
         python_version_tuple = tuple(python_version.split('.'))
         if platform.python_version_tuple()[:2] == python_version_tuple[:2]:
-            pipcl.log(f'Already running on required python. {platform.python_version_tuple()=} {python_version_tuple=}')
+            pipcl.log(
+                    f'Already running on required python.'
+                        f' {platform.python_version_tuple()=} {python_version_tuple=}'
+                    )
         else:
-            pipcl.log(f'{state.python=}: rerunning because {platform.python_version_tuple()[:2]=} != {python_version_tuple[:2]=}')
+            pipcl.log(
+                    f'{state.python=}: rerunning because'
+                        f' {platform.python_version_tuple()[:2]=}'
+                        f' != {python_version_tuple[:2]=}'
+                    )
             e = pipcl.run(
                     f'{state.python} {shlex.join(args.argv)}',
                     check=0,
@@ -2650,9 +2684,16 @@ def main(argv):
                         assert venv_name.startswith('venv-')
                         pipcl.fs_remove(venv_name)
                     if state.venv == 1 and os.path.exists(pyenv_dir) and os.path.exists(venv_name):
-                        pipcl.log(f'{state.venv=} and {venv_name=} already exists so not building pyenv or creating venv.')
+                        pipcl.log(
+                                f'{state.venv=} and {venv_name=} already exists'
+                                    f' so not building pyenv or creating venv.'
+                                )
                     else:
-                        pipcl.git_get(pyenv_dir, remote='https://github.com/pyenv/pyenv.git', branch='master')
+                        pipcl.git_get(
+                                pyenv_dir,
+                                remote='https://github.com/pyenv/pyenv.git',
+                                branch='master',
+                                )
                         pipcl.run(f'cd {pyenv_dir} && src/configure && make -C src')
                         pipcl.run(f'which pyenv')
                         pipcl.run(f'pyenv install -v -s {graalpy}')
@@ -2695,66 +2736,7 @@ def main(argv):
     # required git repositories.
     #
     paths_to_delete = list()
-    if 1:
-        # Allow access to private github.com/ArtifexSoftware/* repositories.
-        
-        # On Github ARTIFEX_SOFTWARE_SSH_KEY is set from repository secret.
-        ARTIFEX_SOFTWARE_SSH_KEY = os.environ.get('ARTIFEX_SOFTWARE_SSH_KEY')
-        if ARTIFEX_SOFTWARE_SSH_KEY:
-            # Write to temp file.
-            temp_key_path = f'{state.path_artifex_key}-tmp'
-            paths_to_delete.append(temp_key_path)
-            pipcl.fs_write_key(temp_key_path, ARTIFEX_SOFTWARE_SSH_KEY)
-            state.ssh_key_path_abs = os.path.abspath(temp_key_path)
-        elif os.path.isfile(state.path_artifex_key):
-            state.ssh_key_path_abs = os.path.abspath(state.path_artifex_key)
-        else:
-            if 0:
-                pipcl.log(
-                        f'## May not be able to clone/update/test pymupdfpro/layout'
-                        f' because ARTIFEX_SOFTWARE_SSH_KEY unset and file'
-                        f' {state.path_artifex_key!r} does not exist'
-                        )
-            state.ssh_key_path_abs = None
-        if state.ssh_key_path_abs:
-            # We need to use forward slashes on Windows.
-            ssh_key_path_abs = state.ssh_key_path_abs.replace('\\', '/')
-            GIT_SSH_COMMAND = f'ssh -i {ssh_key_path_abs} -o StrictHostKeyChecking=no'
-            state.env_extra['GIT_SSH_COMMAND'] = GIT_SSH_COMMAND
-            #pipcl.log(f'Using {GIT_SSH_COMMAND=}.')
-        
-        HUGGINGFACE_KEY = os.environ.get('ARTIFEX_HUGGINGFACE_KEY')
-        if HUGGINGFACE_KEY:
-            # Write to temp file.
-            temp_key_path = f'{state.path_huggingface_key}-tmp'
-            paths_to_delete.append(temp_key_path)
-            pipcl.fs_write_key(temp_key_path, HUGGINGFACE_KEY)
-            state.huggingface_keys_path_abs = os.path.abspath(temp_key_path)
-        elif os.path.isfile(state.path_huggingface_key):
-            state.huggingface_key_path_abs = os.path.abspath(state.path_huggingface_key)
 
-    if 'pymupdfpro' in state.packages_build:
-        # The SmartOffice build requires remote git access.
-        
-        # On Github PYMUPDFPRO_SETUP_SOT_KEY is set from repository secret.
-        PYMUPDFPRO_SETUP_SOT_KEY = os.environ.get('PYMUPDFPRO_SETUP_SOT_KEY')
-        if PYMUPDFPRO_SETUP_SOT_KEY:
-            pipcl.log(f'PYMUPDFPRO_SETUP_SOT_KEY is set.')
-        else:
-            # With non-github builds we rely on this file existing.
-            PYMUPDFPRO_SETUP_SOT_KEY_PATH = os.path.abspath(state.path_pro_key)
-            if 'smartoffice-neo' in state.packages:
-                pass
-            elif os.path.isfile(PYMUPDFPRO_SETUP_SOT_KEY_PATH):
-                state.env_extra['PYMUPDFPRO_SETUP_SOT_KEY_PATH'] = PYMUPDFPRO_SETUP_SOT_KEY_PATH
-                pipcl.log(f'Using {PYMUPDFPRO_SETUP_SOT_KEY_PATH=}.')
-            else:
-                pipcl.log(
-                        f'## May not be able to build pymupdfpro because'
-                        f' PYMUPDFPRO_SETUP_SOT_KEY unset and file'
-                        f' {PYMUPDFPRO_SETUP_SOT_KEY_PATH!r} does not exist'
-                        )
-    
     if state.remote:  # pylint: disable=too-many-nested-blocks
         args.args_eq.set(state.remote_arg, '')  # So we don't recurse.
         if state.remote == '@github':
@@ -2811,7 +2793,6 @@ def main(argv):
                             f'piprepo build {state.wheelhouse}',
                             prefix='piprepo build: ',
                             )
-
                 if 0:
                     pass
 
@@ -2831,7 +2812,15 @@ def main(argv):
                     # --pep-references Recognize and link to standalone PEP references (like "PEP 258").
                     # -g Include a "Generated by Docutils" credit and link.
                     #
-                    pipcl.run(f'docutils -g -d -s -t --pep-references --compact-lists --stylesheet={g_root}/rst.css {g_root}/README.rst {out}')
+                    pipcl.run(
+                            f'docutils'
+                                f' -g -d -s -t'
+                                f' --pep-references'
+                                f' --compact-lists'
+                                f' --stylesheet={g_root}/rst.css'
+                                f' {g_root}/README.rst'
+                                f' {out}'
+                            )
                     if 1:
                         # Make lists more compact vertically.
                         html = pipcl.fs_read(out)
@@ -2858,7 +2847,10 @@ def main(argv):
                     layout_location_abs = os.path.abspath(layout_location)
                     pipcl.log(f'{layout_location=} {layout_location_abs=}')
                     pipcl.run(
-                            f'cd gnn && {sys.executable} {layout_location_abs}/train/tools/test_gnn.py {layout_location_abs}/train/cfgs/config.yaml',
+                            f'cd gnn'
+                                f' && {sys.executable}'
+                                f' {layout_location_abs}/train/tools/test_gnn.py'
+                                f' {layout_location_abs}/train/cfgs/config.yaml',
                             env_extra=dict(PYTHONPATH=layout_location_abs),
                             )
 
@@ -2876,7 +2868,8 @@ def main(argv):
                 elif command == 'run':
                     for package, command in state.run_commands:
                         directory = _get_local(package, state, test=True)
-                        assert directory, f'Cannot run command within {package=} because no local directory.'
+                        assert directory, \
+                                f'Cannot run command within {package=} because no local directory.'
                         pipcl.run(f'cd {directory} && {command}')
 
                 elif command == 'test':
@@ -2884,10 +2877,11 @@ def main(argv):
                 
                 elif command == 'upload':
                     if not state.wheelhouse_union:
-                        assert state.wheelhouse_union_release, f'Need `--wheelhouse-union-release <wheelhouse_union_dir>`'
+                        assert state.wheelhouse_union_release, \
+                                f'Need `--wheelhouse-union-release <wheelhouse_union_dir>`'
                         state.wheelhouse_union = state.wheelhouse_union_release
                     github._upload( # pylint: disable=protected-access
-                            token_pypi=_get_token_pypi(state),
+                            token_pypi=_get_key_pypi(state),
                             local_dir_union=state.wheelhouse_union,
                             pyodide_wheels=None,
                             upload='pypi',
@@ -2934,19 +2928,16 @@ def _get_local(package, state, test=False):
             
             ssh_key = None
             ssh_keyfile = None
-            pipcl.log(f'{package=}')
-            if package == 'smartoffice':
-                # Special handling uses PYMUPDFPRO_SETUP_SOT_KEY on Github from
-                # repository secret.
-                PYMUPDFPRO_SETUP_SOT_KEY = os.environ.get('PYMUPDFPRO_SETUP_SOT_KEY')
-                pipcl.log(f'{bool(PYMUPDFPRO_SETUP_SOT_KEY)=}')
-                if PYMUPDFPRO_SETUP_SOT_KEY:
-                    ssh_key = PYMUPDFPRO_SETUP_SOT_KEY
-                elif state.path_pro_key:
-                    isfile = os.path.isfile(state.path_pro_key)
-                    pipcl.log(f'{isfile=}')
-                    if isfile:
-                        ssh_keyfile = state.path_pro_key
+            key_path, key_env = _get_key(
+                    state,
+                    name_info(package)['git_remote'],
+                    on_error=None,
+                    )
+            if key_path:
+                ssh_keyfile = key_path
+            elif key_env:
+                ssh_key = os.environ[key_env]
+                
             pipcl.log(f'{ssh_key=}')
             pipcl.log(f'{ssh_keyfile=}')
             pipcl.log(f'{env_extra=}')
@@ -2965,12 +2956,14 @@ def _get_local(package, state, test=False):
         directory = location
         if state.check_unchanged:
             _, _, diff, _ = pipcl.git_info(directory)
-            assert not diff, f'{state.check_unchanged=} but checkout has uncommitted changes: {directory!r}.'
+            assert not diff, \
+                    f'{state.check_unchanged=} but checkout has uncommitted changes: {directory!r}.'
             pipcl.log(f'{state.check_unchanged=}, local checkout ok: {directory!r}')
         if state.check_pushed:
             out = pipcl.run(f'cd {directory} && git branch -r --contains', capture=1)
             assert isinstance(out, str)
-            assert out.strip(), f'{state.check_pushed=} but local checkout has un-pushed commits: {directory!r}'
+            assert out.strip(), \
+                    f'{state.check_pushed=} but local checkout has un-pushed commits: {directory!r}'
             pipcl.log(f'{state.check_pushed=}, local checkout ok ({out=}): {directory!r}')
     if not test:
         if package in state.clean_git:
@@ -3004,7 +2997,8 @@ def _get_local(package, state, test=False):
             pipcl.log(f'{diff=}')
     
     if state.check_unchanged:
-        assert not diff, f'Checkout is changed but {state.check_unchanged=}: {package=} {directory=}.'
+        assert not diff, \
+                f'Checkout is changed but {state.check_unchanged=}: {package=} {directory=}.'
         # todo: also check that sha is on remote.
     
     return directory
@@ -3164,7 +3158,10 @@ if __name__ == '__main__':
         except Exception as e:
             if 0:
                 backtrace.show(reverse_chain=1, brief=1)
-            elif isinstance(e, (subprocess.CalledProcessError, subprocess.TimeoutExpired)) and not g_devel:
+            elif (
+                    isinstance(e, (subprocess.CalledProcessError, subprocess.TimeoutExpired))
+                    and not g_devel
+                    ):
                 # Terminate quietly, because failed commands will have generated
                 # diagnostics already.
                 pass
@@ -3174,7 +3171,12 @@ if __name__ == '__main__':
                         #limit=None if g_devel else 0,
                         brief=1,
                         )
-            #pipcl.log(f'Aptest terminating with error. {isinstance(e, subprocess.CalledProcessError)=} {isinstance(e, subprocess.TimeoutExpired)=} {e=}')
+            if 0:
+                pipcl.log(f'Aptest terminating with error.'
+                        f' {isinstance(e, subprocess.CalledProcessError)=}'
+                            f' {isinstance(e, subprocess.TimeoutExpired)=}'
+                            f' {e=}'
+                        )
             sys.exit(1)
         finally:
             if g_atexit:
