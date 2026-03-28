@@ -1607,6 +1607,24 @@ def do_build_single(state, package):
                 # Tell pipcl to use <venv_native> when it
                 # builds pymupdfpro/layout later on.
                 state.env_extra['PIPCL_GRAAL_NATIVE_VENV'] = os.path.abspath(venv_native)
+            
+            if (package == 'pymupdfpro'
+                    and not 'smartoffice' in state.packages
+                    and not 'smartoffice-neo' in state.packages
+                    and not 'smartoffice-marina' in state.packages
+                    ):
+                # Pro's setup.py needs PYMUPDFPRO_SETUP_SOT_KEY or
+                # PYMUPDFPRO_SETUP_SOT_KEY_PATH to be set in order to clone
+                # smartoffice.
+                #
+                # This will need to be changed if/when we change pro to use
+                # smartoffice-marina by default.
+                #
+                key_path, key_env = _get_key(state, 'git@gitlab.artifex.com:', on_error='raise')
+                if key_path:
+                    state.env_extra['PYMUPDFPRO_SETUP_SOT_KEY_PATH'] = os.path.abspath(key_path)
+                elif key_env:
+                    state.env_extra['PYMUPDFPRO_SETUP_SOT_KEY'] = os.environ['key_env']
 
             if state.build_type:
                 if package == 'pymupdf':
