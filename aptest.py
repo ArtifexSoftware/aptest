@@ -97,7 +97,7 @@ def git_push(path, repository, remote_branch, state, *, tmpcommit=True, doit=Tru
             if not key_path:
                 key_path = os.path.abspath('aptest-tmp-git-key')
                 tmp_path_remove = key_path
-                pipcl.fs_write_key(keyfile, os.environ.get[key_env])
+                pipcl.fs_write_key(key_path, os.environ[key_env])
             GIT_SSH_COMMAND = f'ssh -i {os.path.abspath(key_path)} -o StrictHostKeyChecking=no'
             GIT_SSH_COMMAND = GIT_SSH_COMMAND.replace('\\', '/')    # Required on windows.
             env_extra = state.env_extra | dict(GIT_SSH_COMMAND = GIT_SSH_COMMAND)
@@ -1179,6 +1179,9 @@ def _get_key(state, url, on_error=None):
                 if ret_path or ret_env:
                     break
     pipcl.log(f'_get_key(): {url=} returning {ret_path=} {ret_env=}.')
+    if (ret_path, ret_env) == (None, None):
+        if on_error == 'raise':
+            raise Exception(f'Failed to find key for {url=}.')
     return ret_path, ret_env
 
 
@@ -1362,7 +1365,6 @@ def do_remote(state, argv):
 
     if state.remote_do:
         git_paths = list()
-        sync_artifex_software_ssh_key = False
 
         def sync2(path):
             return sync(
@@ -1381,15 +1383,13 @@ def do_remote(state, argv):
                 pipcl.log(f'{remote=} {remote_dir=} {package_location=} {ssh_command=}')
                 if sync2(package_location):
                     git_paths.append(package_location)
-            if package_location.startswith('git:'):
-                sync_artifex_software_ssh_key = True
 
         # Sync aptest itself.
         if sync2(g_root):
             git_paths.append(g_root)
 
         # Sync keys.
-        for prefix, path, _env, _pos in state.keys:
+        for _prefix, path, _env, _pos in state.keys:
             if path and os.path.exists(path):
                 sync2(path)
 
@@ -1629,7 +1629,7 @@ def do_build_single(state, package):
                     prefix=f'install {package}: ',
                     )
 
-    if 0 and package == 'pymupdf':
+    if 0 and package == 'pymupdf':  # pylint: disable=condition-evals-to-constant
         # Set PYMUPDF_SETUP_VERSION so subsequent builds are configured
         # for the PyMuPDF we have just built.
         PYMUPDF_SETUP_VERSION = importlib.metadata.version('pymupdf')
@@ -1788,7 +1788,7 @@ def do_cibw(state):
         state.env_extra['CIBW_PYODIDE_VERSION'] = state.cibw_pyodide_version
         state.env_extra['CIBW_ENABLE'] = 'pyodide-prerelease'
 
-    for package in state.packages_build:
+    for package in state.packages_build:    # pylint: disable=too-many-nested-blocks
         pipcl.log(f'{package=}')
         directory = _get_local(package, state)
         
@@ -1819,6 +1819,7 @@ def do_cibw(state):
         
         pipcl.log(f'{package} _get_local() => {directory=}')
         directory_abs = os.path.abspath(directory)
+        
         if package == 'mupdf':
             if platform.system() == 'Linux' and not state.cibw_pyodide:
                 # Need /host/ prefix so accessible from within manylinux docker.
@@ -1827,11 +1828,11 @@ def do_cibw(state):
                 state.env_extra['PYMUPDF_SETUP_MUPDF_BUILD'] = directory_abs
             # fixme: be able to set to '' for system install?
             continue
-        elif package.startswith('smartoffice'):
+        
+        if package.startswith('smartoffice'):
             if platform.system() == 'Linux' and not state.cibw_pyodide:
-               # Need /host/ prefix so accessible from within manylinux docker.
+                # Need /host/ prefix so accessible from within manylinux docker.
                 state.env_extra['PYMUPDFPRO_SETUP_SOT'] = f'/host{directory_abs}'
-                
                 
                 # This doesn't work:
                 #
@@ -1926,6 +1927,7 @@ def do_cibw(state):
             CIBW_ENVIRONMENT_PASS_LINUX = list(env_extra.keys())
             
             if platform.system() == 'Linux':
+                prefix = '/host'
                 # Update key files to be within /host in manylinux
                 # docker. Otherwise for example tests that access remote git
                 # repositories will not use the appropriate key.
@@ -1933,13 +1935,13 @@ def do_cibw(state):
                 # Also add key environment variables to CIBW_ENVIRONMENT_PASS_LINUX.
                 #
                 new_keys = list()
-                for prefix, path, env, pos in state.keys:
+                for url_prefix, path, env, pos in state.keys:
                     if path or env:
                         if path:
-                            path = f'/host{os.path.abspath(path)}'
+                            path = f'{prefix}{os.path.abspath(path)}'
                         if env:
                             CIBW_ENVIRONMENT_PASS_LINUX.append(env)
-                        new_keys.append((prefix, path, env, pos))
+                        new_keys.append((url_prefix, path, env, pos))
                 state.keys += new_keys
                 state.keys.sort(reverse=True)
                     
@@ -2013,15 +2015,14 @@ def do_cibw(state):
                     st = os.stat(path_dir)
                     pipcl.log(f'{st=}: {path_dir=}')
     
-    pipcl.log(f'Build/test succeeded for packages {state.packages_build}.')
+        if package == 'pymupdf':
+            # Set PYMUPDF_SETUP_VERSION so subsequent builds are configured
+            # for the PyMuPDF we have just built.
+            PYMUPDF_SETUP_VERSION = importlib.metadata.version('pymupdf')
+            state.env_extra['PYMUPDF_SETUP_VERSION'] = PYMUPDF_SETUP_VERSION
+            pipcl.log(f'### Have set {PYMUPDF_SETUP_VERSION=}')
     
-    if package == 'pymupdf':
-        # Set PYMUPDF_SETUP_VERSION so subsequent builds are configured
-        # for the PyMuPDF we have just built.
-        PYMUPDF_SETUP_VERSION = importlib.metadata.version('pymupdf')
-        state.env_extra['PYMUPDF_SETUP_VERSION'] = PYMUPDF_SETUP_VERSION
-        pipcl.log(f'### Have set {PYMUPDF_SETUP_VERSION=}')
-
+    pipcl.log(f'Build/test succeeded for packages {state.packages_build}.')
 
 
 def do_gnn_download(state):
