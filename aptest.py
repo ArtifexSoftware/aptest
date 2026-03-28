@@ -620,8 +620,6 @@ def get_args(argv):
     state.cibw_pyodide = None
     state.cibw_pyodide_version = None
     state.cibw_skip_add_defaults = True
-    state.cibw_test_project = None
-    state.cibw_test_project_setjmp = False
     state.clean_git = list()
     state.clean_setup = list()
     state.clean_setup_all = list()
@@ -645,8 +643,6 @@ def get_args(argv):
     state.packages = dict()   # map from name to location.
     state.packages_test = list()  # Sorted list of names.
     state.packages_for_release = dict()
-    state.path_pro_key = 'thirdparty-so-key'
-    state.pybind = False
     state.pymupdf4llm_unified = False
     state.pytest_options = ''
     state.pytest_paths = list()
@@ -922,9 +918,6 @@ def get_args(argv):
                 _names = _names.split(',') if _names else list()
                 apply_deltas(state.packages_test, _names, aliasfn=package_alias)
 
-            elif arg == '--pybind':
-                state.pybind = args.get_bool()
-
             elif arg == '--4llm-unified':
                 state.pymupdf4llm_unified = args.get_bool()
             
@@ -1037,9 +1030,6 @@ def get_args(argv):
 
             elif arg == '--sdists':
                 state.sdists = args.get_bool()
-
-            elif arg == '--system-site-packages':
-                state.system_site_packages = args.get_bool()
 
             elif arg == '--set-swig':
                 state.swig = next(args).as_text()
@@ -1609,9 +1599,9 @@ def do_build_single(state, package):
                 state.env_extra['PIPCL_GRAAL_NATIVE_VENV'] = os.path.abspath(venv_native)
             
             if (package == 'pymupdfpro'
-                    and not 'smartoffice' in state.packages
-                    and not 'smartoffice-neo' in state.packages
-                    and not 'smartoffice-marina' in state.packages
+                    and 'smartoffice' not in state.packages
+                    and 'smartoffice-neo' not in state.packages
+                    and 'smartoffice-marina' not in state.packages
                     ):
                 # Pro's setup.py needs PYMUPDFPRO_SETUP_SOT_KEY or
                 # PYMUPDFPRO_SETUP_SOT_KEY_PATH to be set in order to clone
@@ -2942,8 +2932,6 @@ def _get_local(package, state, test=False):
         with pipcl.LogPrefix(f'{local}: '):
             env_extra = state.env_extra
             pipcl.log(f'{package=}')
-            pipcl.log(f'{state.path_pro_key=}')
-            pipcl.log(f'{os.path.isfile(state.path_pro_key)=}')
             
             ssh_key = None
             ssh_keyfile = None
