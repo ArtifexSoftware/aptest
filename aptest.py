@@ -656,7 +656,6 @@ def get_args(argv):
             'macos-14',
             #'macos-15-intel',
             'ubuntu-latest',
-            #'windows-11-arm',
             'windows-2022',
             ]
     state.remote_github_yml_inputs = None
@@ -1470,6 +1469,30 @@ def build_sdist(state, package, directory):
                 )
 
 
+def _modify_build_env(state, package):
+    '''
+    Set state.env_extra PYMUPDFPRO_SETUP_SOT_KEY_PATH /
+    PYMUPDFPRO_SETUP_SOT_KEY if required.
+    '''
+    if (package == 'pymupdfpro'
+            and 'smartoffice' not in state.packages
+            and 'smartoffice-neo' not in state.packages
+            and 'smartoffice-marina' not in state.packages
+            ):
+        # Pro's setup.py needs PYMUPDFPRO_SETUP_SOT_KEY or
+        # PYMUPDFPRO_SETUP_SOT_KEY_PATH to be set in order to clone
+        # smartoffice.
+        #
+        # This will need to be changed if/when we change pro to use
+        # smartoffice-marina by default.
+        #
+        key_path, key_env = _get_key(state, 'git@gitlab.artifex.com:', on_error='raise')
+        if key_path:
+            state.env_extra['PYMUPDFPRO_SETUP_SOT_KEY_PATH'] = os.path.abspath(key_path)
+        elif key_env:
+            state.env_extra['PYMUPDFPRO_SETUP_SOT_KEY'] = os.environ['key_env']
+
+
 def do_build_single(state, package):
     '''
     Build and install <package>.
@@ -1598,23 +1621,7 @@ def do_build_single(state, package):
                 # builds pymupdfpro/layout later on.
                 state.env_extra['PIPCL_GRAAL_NATIVE_VENV'] = os.path.abspath(venv_native)
             
-            if (package == 'pymupdfpro'
-                    and 'smartoffice' not in state.packages
-                    and 'smartoffice-neo' not in state.packages
-                    and 'smartoffice-marina' not in state.packages
-                    ):
-                # Pro's setup.py needs PYMUPDFPRO_SETUP_SOT_KEY or
-                # PYMUPDFPRO_SETUP_SOT_KEY_PATH to be set in order to clone
-                # smartoffice.
-                #
-                # This will need to be changed if/when we change pro to use
-                # smartoffice-marina by default.
-                #
-                key_path, key_env = _get_key(state, 'git@gitlab.artifex.com:', on_error='raise')
-                if key_path:
-                    state.env_extra['PYMUPDFPRO_SETUP_SOT_KEY_PATH'] = os.path.abspath(key_path)
-                elif key_env:
-                    state.env_extra['PYMUPDFPRO_SETUP_SOT_KEY'] = os.environ['key_env']
+            _modify_build_env(state, package)
 
             if state.build_type:
                 if package == 'pymupdf':
@@ -1903,6 +1910,8 @@ def do_cibw(state):
         
         else:
             # Run cibuildwheeel.
+            
+            _modify_build_env(state, package)
             
             # Tell cibuildwheel how to test <package>.
             if package in state.packages_test:
