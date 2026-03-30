@@ -2830,6 +2830,7 @@ def main(argv):
                     pipcl.run(
                             f'docutils'
                                 f' -g -d -s -t'
+                                f' --halt=3'
                                 f' --pep-references'
                                 f' --compact-lists'
                                 f' --stylesheet={g_root}/rst.css'
@@ -3190,6 +3191,8 @@ if __name__ == '__main__':
                             f' {isinstance(e, subprocess.TimeoutExpired)=}'
                             f' {e=}'
                         )
+            else:
+                pipcl.log(f'Aptest exiting with error.')
             sys.exit(1)
         finally:
             if g_atexit:
