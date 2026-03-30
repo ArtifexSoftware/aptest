@@ -19,11 +19,12 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
+        # This list should match default aptest.py:state.remote_github_runners,
+        # because that is what is used with `--release-1`.
         os: [
                 ubuntu-latest,
                 windows-2022,
                 macos-14,
-                macos-15-intel,
                 ]
 
       # Avoid cancelling of all runs after a single failure.
@@ -41,7 +42,7 @@ jobs:
           ARTIFEX_SOFTWARE_SSH_KEY: ${{secrets.ARTIFEX_SOFTWARE_SSH_KEY}}
           PYMUPDFPRO_SETUP_SOT_KEY: ${{secrets.PYMUPDFPRO_SETUP_SOT_KEY}}
         run:
-          'python aptest.py -p git: --pro git: --layout git: --4llm git: --pdf4llm git: cibw -a APTEST_args'
+          'python aptest.py -P git: --PRO git: --LAYOUT git: --4LLM git: --PDF4LLM git: --release-1'
       
       # Upload generated wheels, to be accessible from github Actions page.
       #
