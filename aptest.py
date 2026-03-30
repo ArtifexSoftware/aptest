@@ -2749,7 +2749,13 @@ def main(argv):
     if state.remote:  # pylint: disable=too-many-nested-blocks
         args.args_eq.set(state.remote_arg, '')  # So we don't recurse.
         if state.remote == '@github':
-            return do_remote_github(state, args)
+            if GITHUB_ACTIONS == 'true':
+                pipcl.log(
+                        f'Ignoring {state.remote=} because already running on Github,'
+                            f' {GITHUB_ACTIONS=}.'
+                        )
+            else:
+                return do_remote_github(state, args)
         else:
             # Use rsync/ssh to sync to/run on remote machine.
             return do_remote(state, args.argv)
