@@ -85,11 +85,11 @@ def git_push(path, repository, remote_branch, state, *, tmpcommit=True, doit=Tru
     if tmpcommit:
         diff = pipcl.run(f'cd {path} && git diff --ignore-submodules=dirty', capture=1)
         if diff:
-            try:
-                pipcl.run(f'cd {path} && git commit -m "ghtest.py temporary commit" -a')
-            except Exception:
-                pipcl.log(f'Temporary commit failed. {diff=}.')
-                raise
+            # `git stash && git apply` leaves everything unchanged, but creates
+            # an item on stash list that will restore all changes including
+            # newly-added files.
+            pipcl.run(f'cd {path} && git stash && git stash apply')
+            pipcl.run(f'cd {path} && git commit -m "Aptest temporary commit" -a')
     tmp_path_remove = None
     try:
         key_path, key_env = _get_key(state, repository)
@@ -110,7 +110,9 @@ def git_push(path, repository, remote_branch, state, *, tmpcommit=True, doit=Tru
                 )
     finally:
         if tmpcommit and diff:
-            pipcl.run(f'cd {path} && git reset HEAD~1')
+            # Restore all uncommitted changes, including newly added files.
+            pipcl.run(f'cd {path} && git reset --hard HEAD~1')
+            pipcl.run(f'cd {path} && git stash pop')
         if tmp_path_remove:
             assert '-tmp-' in tmp_path_remove
             pipcl.fs_remove(tmp_path_remove)
@@ -1406,8 +1408,8 @@ def do_remote(state, argv):
             def make_tee_out_remote():
                 from_ = f'aptest-out-{remote}'
                 to_ = g_log_tee
-                pipcl.log(f'Creating symlink {from_} => {to_}.')
-                pipcl.fs_symlink(f'aptest-out-{remote}', to_)
+                #pipcl.log(f'Creating symlink {from_} => {to_}.')
+                pipcl.fs_symlink(from_, to_)
             atexit.register(make_tee_out_remote)
         
         pipcl.run(
