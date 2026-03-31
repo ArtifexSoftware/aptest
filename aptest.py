@@ -645,7 +645,6 @@ def get_args(argv):
     state.packages = dict()   # map from name to location.
     state.packages_test = list()  # Sorted list of names.
     state.packages_for_release = dict()
-    state.pymupdf4llm_unified = False
     state.pytest_options = ''
     state.pytest_paths = list()
     state.pytest_wrap = None
@@ -919,9 +918,6 @@ def get_args(argv):
                 _names = _names.split(',') if _names else list()
                 apply_deltas(state.packages_test, _names, aliasfn=package_alias)
 
-            elif arg == '--4llm-unified':
-                state.pymupdf4llm_unified = args.get_bool()
-            
             elif arg == '--pytest':
                 state.pytest_options = next(args).as_text()
 
@@ -1588,10 +1584,6 @@ def do_build_single(state, package):
                     env_extra=swig_env_extra,
                     prefix='{directory} make: ',
                     )
-        elif state.pymupdf4llm_unified and package == 'pymupdf_layout':
-            # pymupdf_layout is now purely for testing the gnn aspects of
-            # the unified 4llm+layout.
-            pipcl.log(f'Not building {package=} because {state.pymupdf4llm_unified=}.')
         else:
             if package:
                 pipcl.run(f'pip uninstall -y {package}')
@@ -2346,7 +2338,7 @@ def do_test_gnn(state):
 
     ret['packages'] = dict()
     for package, (location, _) in state.packages.items():
-        if package == 'mupdf' or (state.pymupdf4llm_unified and package == 'pymupdf_layout'):
+        if package == 'mupdf':
             # There is no mupdf package - it's only part of pymupdf.
             directory = None
             metadata_version = None
