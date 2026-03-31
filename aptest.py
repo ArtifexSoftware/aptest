@@ -879,11 +879,17 @@ def get_args(argv):
             elif arg == '--tee-auto':
                 tee_auto = args.get_bool()
                 # Ignore if we are being run by an outer aptest or by bash completion.
-                if tee_auto and not APTEST_NESTED and not COMP_LINE:
+                if APTEST_NESTED or COMP_LINE:
+                    pass
+                elif tee_auto:
                     state.tee_auto = tee_auto
                     global g_log_tee
-                    g_log_tee = f'aptest-out-{g_date_time}'
-                    pipcl.log_tee(g_log_tee, 'aptest-out')
+                    if state.tee_auto:
+                        g_log_tee = f'aptest-out-{g_date_time}'
+                        pipcl.log_tee(g_log_tee, 'aptest-out')
+                else:
+                    g_log_tee = None
+                    pipcl.log_tee(None)
 
             elif arg == '--tee-path':
                 pos = args.pos
