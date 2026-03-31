@@ -337,6 +337,7 @@ class Package:
             name,
             version,
             *,
+            pure=False,
             platform = None,    # pylint: disable=redefined-outer-name
             supported_platform = None,
             summary = None,
@@ -385,6 +386,9 @@ class Package:
                 Used for metadata `Version`.
                 A string, the version of the Python package. Also see PEP-440
                 `Version Identification and Dependency Specification`.
+            pure:
+                If true we mark wheels as pure python - for example default
+                wheel tag will be `py3-none-any`.
             platform:
                 Used for metadata `Platform`.
                 A string or list of strings.
@@ -547,9 +551,6 @@ class Package:
                 First element of wheel tag defined in PEP-425. If None we use
                 `cp{version}`.
 
-                For example if code works with any Python version, one can use
-                'py3'.
-
             tag_abi:
                 Second element of wheel tag defined in PEP-425. If None we use
                 `none`.
@@ -561,8 +562,6 @@ class Package:
                 `setuptools.distutils.util.get_platform(), before that
                 `distutils.util.get_platform()` as specified in the PEP), e.g.
                 `openbsd_7_0_amd64`.
-
-                For pure python packages use: `tag_platform=any`
 
             py_limited_api:
                 If true we build wheels that use the Python Limited API. We use
@@ -634,6 +633,7 @@ class Package:
 
         self.name = name
         self.version = version
+        self.pure = pure
         self.platform = platform
         self.supported_platform = supported_platform
         self.summary = summary
@@ -786,7 +786,7 @@ class Package:
             add_str(
                     f'Wheel-Version: 1.0\n'
                     f'Generator: pipcl\n'
-                    f'Root-Is-Purelib: false\n'
+                    f'Root-Is-Purelib: {"true" if self.pure else "false"}\n'
                     f'Tag: {self.wheel_tag_string()}\n'
                     ,
                     f'{dist_info_dir}/WHEEL',
@@ -916,6 +916,8 @@ class Package:
         '''
         if self.tag_python_:
             ret = self.tag_python_
+        elif self.pure:
+            return 'py3'
         else:
             ret = 'cp' + ''.join(platform.python_version().split('.')[:2])
         assert '-' not in ret
@@ -928,6 +930,8 @@ class Package:
         Py_GIL_DISABLED = sysconfig.get_config_var('Py_GIL_DISABLED')
         if self.tag_abi_:
             return self.tag_abi_
+        elif self.pure:
+            return 'none'
         elif self.py_limited_api:
             assert Py_GIL_DISABLED != 1, \
                     f'py_limited_api and Py_GIL_DISABLED are not supported together as of 2026-02-20, e.g. see PEP 803 and PEP 809.'
@@ -947,6 +951,9 @@ class Package:
         '''
         ret = self.tag_platform_
         log0(f'From self.tag_platform_: {ret=}.')
+        
+        if not ret and self.pure:
+            return 'any'
         
         if not ret:
             # Prefer this to PEP-425. Appears to be undocumented,
