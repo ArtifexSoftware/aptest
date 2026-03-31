@@ -1495,6 +1495,14 @@ def _modify_build_env(state, package):
             state.env_extra['PYMUPDFPRO_SETUP_SOT_KEY'] = os.environ['key_env']
 
 
+def _4llm_new_layout(directory):
+    '''
+    Returns true if pymupdf4llm checkout <directory> has new layout from 2026-3, with
+    top-level setup.py.
+    '''
+    return os.path.exists(f'{directory}/setup.py')
+
+
 def do_build_single(state, package):
     '''
     Build and install <package>.
@@ -1545,7 +1553,7 @@ def do_build_single(state, package):
     else:
         directory = _get_local(package, state)
 
-        if package == 'pymupdf4llm' and not state.pymupdf4llm_unified:
+        if package == 'pymupdf4llm' and not _4llm_new_layout(directory):
             # setup.py is in subdirectory pymupdf4llm/.
             directory += '/pymupdf4llm'
         elif package == 'pdf4llm':
@@ -1828,7 +1836,7 @@ def do_cibw(state):
             #name = f'{package}{location[4:]}'
             #state.env_extra['CIBW_BUILD_FRONTEND'] = f'pip wheel {name}'
         
-        if package == 'pymupdf4llm' and not state.pymupdf4llm_unified:
+        if package == 'pymupdf4llm' and not _4llm_new_layout(directory):
             # setup.py is in subdirectory pymupdf4llm/.
             directory += '/pymupdf4llm'
         elif package == 'pdf4llm':
