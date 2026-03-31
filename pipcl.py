@@ -3645,17 +3645,33 @@ _log_text_line_start = True
 
 _log_f = [sys.stdout]
 
+_log_tee_f = None
+_log_tee_exit_fn = None
+
 def log_tee(path, path_simple=None):
     '''
     Copies log output to <path>. If path_simple is specified, on
     exit we make a convenience symlink from <path_simple> to <path>.
     '''
-    f = open(path, 'w') # pylint: disable=consider-using-with
-    if path_simple:
-        def final():
-            fs_symlink(path_simple, path)
-        atexit.register(final)
-    _log_f.append(f)
+    global _log_tee_f
+    global _log_tee_exit_fn
+    
+    # Remove any current tee setting.
+    if _log_tee_f:
+        _log_f.remove(_log_tee_f)
+        _log_tee_f = None
+    if _log_tee_exit_fn:
+        atexit.unregister(_log_tee_exit_fn)
+        _log_tee_exit_fn = None
+    
+    if path:
+        _log_tee_f = open(path, 'w') # pylint: disable=consider-using-with
+        _log_f.append(_log_tee_f)
+        if path_simple:
+            def final():
+                fs_symlink(path_simple, path)
+            _log_tee_exit_fn =  final
+            atexit.register(final)
 
 def _log2(text):
     #print(f'####### {_log_f=}')
