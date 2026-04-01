@@ -544,6 +544,13 @@ To create a github ReST token:
       https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#creating-a-personal-access-token-classic.
 * In ``scopes``, select just ``repo``.
 
+Default keys when running on Github
+...................................
+If running as a Github action (``GITHUB_ACTIONS==true``), we add the
+Aptest github repository secrets ``ARTIFEX_SOFTWARE_SSH_KEY`` and
+``PYMUPDFPRO_SETUP_SOT_KEY`` as keys for use with git operations on Github and
+Gitlab.
+
 Also see:
 
 * `--key`_.
@@ -2258,6 +2265,12 @@ completion
 
 Changelog
 ---------
+
+**2026-04-01**
+
+* Fixed scheduled Github tests - use Aptest repository secrets for Github/Gitlab keys.
+  See `Default keys when running on Github`_.
+
 
 **2026-03-31**
 
