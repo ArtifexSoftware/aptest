@@ -59,7 +59,7 @@ def plotly_figure(data, graph_height=400):
     pipcl.run(f'pip install plotly')
     import plotly.subplots  # pylint: disable=import-error
     import plotly.graph_objects # pylint: disable=import-error
-    import numpy
+    import numpy # pylint: disable=import-error
     
     # Define a color for each tool.
     #
