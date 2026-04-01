@@ -3670,7 +3670,7 @@ def log_tee(path, path_simple=None):
         if path_simple:
             def final():
                 fs_symlink(path_simple, path)
-            _log_tee_exit_fn =  final
+            _log_tee_exit_fn = final
             atexit.register(final)
 
 def _log2(text):
