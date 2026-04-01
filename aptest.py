@@ -557,6 +557,13 @@ def add_package(state, name, location):
     state.packages_test.sort(key=keyfn)
 
 
+def _add_key(state, prefix, path, env, pos):
+    if path:
+        path = os.path.expanduser(path)
+    state.keys.append((prefix, path, env, pos))
+    state.keys.sort(reverse=True)
+    
+
 def get_args(argv):
     '''
     Parses command-line args in <argv> and returns a State instance. Any
@@ -638,7 +645,15 @@ def get_args(argv):
     state.gnn_show_select = None
     state.gnn_show_select_root = None
     state.graal = False
+    
     state.keys = list()
+    if GITHUB_ACTIONS == 'true':
+        # Add known keys from aptest's Github repository secrets. This is
+        # required - otherwise scheduled workflow runs are unable to clone
+        # Github/Gitlab repositories.
+        _add_key(state, 'git@github.com:', '', 'ARTIFEX_SOFTWARE_SSH_KEY', 0)
+        _add_key(state, 'git@gitlab.artifex.com:', '', 'PYMUPDFPRO_SETUP_SOT_KEY', 0)
+    
     state.os_names = list()
     state.packages2 = dict()   # map from name to location.
     state.packages_build = list() # Sorted list of names.
@@ -859,10 +874,7 @@ def get_args(argv):
                     path, env = text
                 else:
                     assert 0, f'Expected one or two comma-separted items in {text!r}'
-                if path:
-                    path = os.path.expanduser(path)
-                state.keys.append((prefix, path, env, pos))
-                state.keys.sort(reverse=True)
+                _add_key(state, prefix, path, env, pos)
             
             elif arg == '--log-prefix':
                 _prefix = next(args).as_text()
