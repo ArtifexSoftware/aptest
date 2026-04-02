@@ -708,7 +708,7 @@ def get_args(argv):
     
     state.wheelhouse = 'aptest-wheelhouse'
     state.wheelhouse_union = None
-    state.wheelhouse_union_release = None
+    state.wheelhouse_union_release = 'aptest-wheelhouse-release'
     
     global g_devel
     g_devel = state.devel
