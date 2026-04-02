@@ -2266,6 +2266,11 @@ completion
 Changelog
 ---------
 
+**2026-04-02**
+
+* Fix build of ``pymupdfpro`` on Github.
+
+
 **2026-04-01**
 
 * Fixed scheduled Github tests - use Aptest repository secrets for Github/Gitlab keys.
