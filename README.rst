@@ -692,22 +692,33 @@ cibw
     * We do not install wheels and it is generally not useful to do
       ``cibw test``.
 
-    If ``CIBW_BUILD`` is unset, we set it as follows:
+    If ``CIBW_BUILD`` is unset:
     
-    * On Github we build and test with all supported Python versions.
-    * Otherwise we build and test with the current Python version only.
+    * On Github we set ``CIBW_BUILD`` to build and test with all supported Python versions.
+    * Otherwise we set ``CIBW_BUILD`` to build and test with the current Python version only.
 
-    If ``CIBW_ARCHS`` is unset, we set ``CIBW_ARCHS_WINDOWS``, ``CIBW_ARCHS_MACOS``
-    and ``CIBW_ARCHS_LINUX`` to ``auto64`` if they are unset.
+    If ``CIBW_ARCHS`` is unset:
     
-    The cibuildwheel tool cannot handle pure python packages, so we manually
-    build+test such packages.
+    * We set ``CIBW_ARCHS_WINDOWS``, ``CIBW_ARCHS_MACOS`` and ``CIBW_ARCHS_LINUX``
+      to ``auto64`` if they are unset.
+    
+    `cibuildwheel <https://cibuildwheel.pypa.io>`_ cannot handle pure python packages,
+    so we manually build+test such packages.
     
     * This will use the current python version only,
-      and not (for example) use a manylinux docker on Linux.
+      and not (for example) a manylinux docker on Linux.
       
     * For example with the pure-python package ``pymupdf4llm``,
       we only test ``pymupdf4llm`` + ``pymupdf_layout`` + ``pymupdf`` together on native Python.
+    
+    * Unlike the `build`_ and `test`_ commands,
+      `cibw`_ requires that packages have compatible version numbers,
+      otherwise it will fail.
+    
+      * It's non-trivial to support incompatible version numbers with
+        `cibuildwheel <https://cibuildwheel.pypa.io>`_.
+      * `cibw`_ is generally used to build releases,
+        for which version numbers should match anyway.
 
     Also see:
 
@@ -1337,6 +1348,11 @@ Options
     
     * ``pymupdf``'s ``setup.py clean --all`` deletes files for pymupdf's extension and
       mupdf's C++/Python APIs and the mupdf C API.
+
+
+--clean-wheelhouse
+..................
+    Delete directory ``aptest-wheelhouse/`` if it exists.
 
 
 .. _--devel:
@@ -2265,6 +2281,13 @@ completion
 
 Changelog
 ---------
+
+**2026-04-02**
+
+* Fixed bug in release builds.
+* Document that the `cibw`_ command requires that package versions are compatible.
+* Added `--clean-wheelhouse`_.
+
 
 **2026-04-02**
 
