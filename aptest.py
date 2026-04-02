@@ -701,7 +701,11 @@ def get_args(argv):
     state.valgrind = False
     state.venv = 2
     state.venv_name = None
+    
     state.verbose = False
+    if GITHUB_ACTIONS == 'true':
+        state.verbose = True
+    
     state.wheelhouse = 'aptest-wheelhouse'
     state.wheelhouse_union = None
     state.wheelhouse_union_release = None
@@ -1289,9 +1293,6 @@ def do_remote_github(state, args):
             # Run ourselves on Github using test.yml, passing argv.
             info = name_info('aptest')
             args_string = shlex.join(args.args_eq.argv[1:])
-            if not state.verbose:
-                # Run with verbose on Github, e.g. to show os.environ etc.
-                args_string += ' -V=1'
             # We define the .yml's `matrix: os: ...` by passing in a dict encoded with json, as
             # expected by test.yml's workflow_dispatch:inputs:matrix
             assert state.remote_github_runners, f'No runner specified.'
@@ -1506,7 +1507,7 @@ def _modify_build_env(state, package):
         if key_path:
             state.env_extra['PYMUPDFPRO_SETUP_SOT_KEY_PATH'] = os.path.abspath(key_path)
         elif key_env:
-            state.env_extra['PYMUPDFPRO_SETUP_SOT_KEY'] = os.environ['key_env']
+            state.env_extra['PYMUPDFPRO_SETUP_SOT_KEY'] = os.environ[key_env]
 
 
 def _4llm_new_layout(directory):
