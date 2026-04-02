@@ -632,6 +632,7 @@ def get_args(argv):
     state.clean_git = list()
     state.clean_setup = list()
     state.clean_setup_all = list()
+    state.clean_wheelhouse = False
     state.commands = list()
     state.devel = False
     state.draft_location = None
@@ -821,6 +822,9 @@ def get_args(argv):
             elif arg == '--clean-git':
                 packages = package_aliases(next(args))
                 state.clean_git += packages
+            
+            elif arg == '--clean-wheelhouse':
+                state.clean_wheelhouse = args.get_bool()
             
             elif arg == '--clean-setup':
                 packages = package_aliases(next(args))
@@ -2053,13 +2057,6 @@ def do_cibw(state):
                     st = os.stat(path_dir)
                     pipcl.log(f'{st=}: {path_dir=}')
     
-        if package == 'pymupdf':
-            # Set PYMUPDF_SETUP_VERSION so subsequent builds are configured
-            # for the PyMuPDF we have just built.
-            PYMUPDF_SETUP_VERSION = importlib.metadata.version('pymupdf')
-            state.env_extra['PYMUPDF_SETUP_VERSION'] = PYMUPDF_SETUP_VERSION
-            pipcl.log(f'### Have set {PYMUPDF_SETUP_VERSION=}')
-    
     pipcl.log(f'Build/test succeeded for packages {state.packages_build}.')
 
 
@@ -2768,6 +2765,9 @@ def main(argv):
         pipcl.log(f'aptest: {sha=}')
         pipcl.log(f'aptest: {comment=}')
         pipcl.log(f'aptest: diff:\n{textwrap.indent(diff, "    ")}')
+    
+    if state.clean_wheelhouse:
+        pipcl.fs_remove(state.wheelhouse)
         
     os.makedirs(state.wheelhouse, exist_ok=1)
         
