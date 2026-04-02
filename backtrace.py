@@ -752,6 +752,22 @@ def show_frame(frame, limit=None, cwd='', framef=None):
     return text, match
 
 
+def _demo2():
+    try:
+        raise Exception('_demo2 deliberate error')
+    except Exception as e:
+        raise Exception('_demo2 sub-error')
+
+
+def _demo():
+    try:
+        _demo2()
+    except Exception as e:
+        print(f'### With reverse_chain=0')
+        show(brief=1, reverse_chain=0)
+        print(f'### With reverse_chain=1')
+        show(brief=1, reverse_chain=1)
+
 if __name__ == '__main__':
     if sys.argv[1:2] == ['--doctest']:
         # Support for running individual tests.
@@ -761,6 +777,8 @@ if __name__ == '__main__':
                 fff = globals()[ff]
                 doctest.run_docstring_examples(fff, globals())
         else:
-            doctest.testmod(None)
+            doctest.testmod(None, verbose=0)
+    elif sys.argv[1:] == ['demo']:
+        _demo()
     else:
         assert 0, f'Unrecognised {sys.argv[1:]=}.'
