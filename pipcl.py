@@ -3307,7 +3307,9 @@ def run_if( command, out, *prerequisites, caller=1):
             #log(f'Failed to get hash of {path=}: {e}')
             return None
     
-    command_args = shlex.split(command or '')
+    lines = _command_lines( command)
+    command2 = ' '.join(lines)
+    command_args = shlex.split(command2 or '')
     command_arg0_path = fs_find_in_paths(command_args[0])
     command_arg0_hash = hash_get(command_arg0_path)
     
