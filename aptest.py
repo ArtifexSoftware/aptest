@@ -341,10 +341,12 @@ g_package_info = {
             {
                 'git_remote': None,
                 'order': -1,
+                'aliases':  list(),
             },
         }
 
 for name, value in g_package_info.items():
+    assert 'aliases' in value, f'g_package_info[{name!r}] has no alias list'
     if value.get('submodules') is None:
         value['submodules'] = True
     assert 'git_remote' in value, f'Need "git_remote" entry in {name}={value}'
@@ -370,10 +372,10 @@ def package_alias(package):
     Returns full name if arg is an alias in g_package_info.
     '''
     for fullname, info in g_package_info.items():
-        #pipcl.log(f'{package=}')
+        #pipcl.log(f'{fullname=} {info=}')
         if package in [fullname] + info['aliases']:
             return fullname
-    assert 0, f'Not package name/alias: {package!r}'
+    assert 0, f'Unrecognised package name/alias: {package!r}'
 
 
 def package_aliases(packages):
@@ -3212,7 +3214,7 @@ if __name__ == '__main__':
             else:
                 backtrace.show(
                         reverse_chain=1,
-                        #limit=None if g_devel else 0,
+                        limit=None if g_devel else 0,
                         brief=1,
                         )
             if 0:
