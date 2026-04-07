@@ -313,6 +313,22 @@ class Package:
         >>> _ = subprocess.run(
         ...         f'. pipcl_test/pylocal/bin/activate && foo_cli',
         ...         shell=1, check=1)
+    
+    Check that wheel contents' unix permissions are readable by all.
+    
+        >>> wheel_path = glob.glob('pipcl_test/dist/*.whl')[0]
+        >>> with zipfile.ZipFile(wheel_path) as z:
+        ...     for zi in z.infolist():
+        ...         external_attr_lo = zi.external_attr & 15
+        ...         external_attr_hi = zi.external_attr >> 16
+        ...         assert external_attr_lo + (external_attr_hi << 16) == zi.external_attr
+        ...         assert external_attr_hi & 0o444 == 0o444, (
+        ...                 f'info.external_attr not readable by all:'
+        ...                 f' {zi.external_attr=:#x}'
+        ...                 f' {external_attr_hi=:#o}'
+        ...                 f' {external_attr_lo=:#o}'
+        ...                 f' {zi.filename=}'
+        ...                 )
 
     Wheels and sdists
 
@@ -765,7 +781,7 @@ class Package:
                     z.write(from_, to_)
                     record.add_file(from_, to_)
                 elif isinstance(from_, bytes):
-                    z.writestr(to_, from_)
+                    zipfile_writestr(z, to_, from_, 0o644)
                     record.add_content(from_, to_)
                 else:
                     assert 0
@@ -806,7 +822,12 @@ class Package:
 
             # Update <name>-<version>.dist-info/RECORD. This must be last.
             #
-            z.writestr(f'{dist_info_dir}/RECORD', record.get(f'{dist_info_dir}/RECORD'))
+            zipfile_writestr(
+                    z,
+                    f'{dist_info_dir}/RECORD',
+                    record.get(f'{dist_info_dir}/RECORD'),
+                    0o644,
+                    )
 
         st = os.stat(path)
         log1( f'Have created wheel size={st.st_size:,}: {path}')
@@ -3987,6 +4008,21 @@ def install_dir(root=None):
             return os.path.join( root, root2.lstrip( os.sep))
     else:
         return root2
+
+
+def zipfile_writestr(zf, name, contents, unix_permissions=0o600):
+    '''
+    Alternative to zipfile.ZipFile.writestr(), which allows control over
+    permissions. Our default 0o600 matches zipfile.ZipFile.writestr().
+    '''
+    zipinfo = zipfile.ZipInfo(
+            filename = name,
+            date_time = time.localtime(time.time())[:6],
+            )
+    zipinfo.compress_type = zf.compression
+    zipinfo.compress_level = zf.compresslevel
+    zipinfo.external_attr = unix_permissions << 16
+    zf.writestr(zipinfo, contents)
 
 
 class _Record:
