@@ -1607,7 +1607,9 @@ class Package:
         log2(f'returning {from_=} {to_=}')
         return from_, to_
 
+
 _extensions_to_py_limited_api = dict()
+
 
 def build_extension(
         name,
@@ -1726,10 +1728,7 @@ def build_extension(
     Returns the leafname of the generated library file within `outdir`, e.g.
     `_{name}.so` on Unix or `_{name}.cp311-win_amd64.pyd` on Windows.
     '''
-    if compiler_extra is None:
-        compiler_extra = ''
-    if linker_extra is None:
-        linker_extra = ''
+    
     if builddir is None:
         builddir = outdir
     if not swig:
@@ -1740,13 +1739,11 @@ def build_extension(
     if isinstance(source_extra, str):
         source_extra = [source_extra]
     
-    includes_text = _flags( includes, '-I')
-    defines_text = _flags( defines, '-D')
-    libpaths_text = _flags( libpaths, '/LIBPATH:', '"') if windows() else _flags( libpaths, '-L')
-    libs_text = _flags( libs, '' if windows() else '-l')
+    libpaths_text = _flags(libpaths, '/LIBPATH:', '"') if windows() else _flags(libpaths, '-L')
+    libs_text = _flags(libs, '' if windows() else '-l')
     path_cpp = f'{builddir}/{os.path.basename(path_i)}'
     path_cpp += '.cpp' if cpp else '.c'
-    os.makedirs( outdir, exist_ok=True)
+    os.makedirs(outdir, exist_ok=True)
 
     # Run SWIG.
     #
@@ -1767,8 +1764,7 @@ def build_extension(
         swig_includes_extra = swig_includes_extra.strip()
     deps_path = f'{path_cpp}.d'
     prerequisites_swig2 = _get_prerequisites( deps_path)
-    run_if(
-            f'''
+    run_if(f'''
             {swig}
                 -Wall
                 {"-c++" if cpp else ""}
@@ -1777,7 +1773,7 @@ def build_extension(
                 -outdir {outdir}
                 -o {path_cpp}
                 -MD -MF {deps_path}
-                {includes_text}
+                {_flags( includes, '-I')}
                 {swig_includes_extra}
                 {path_i}
             '''
@@ -1788,6 +1784,23 @@ def build_extension(
             prerequisites_swig2,
             )
 
+    # Get basic compiler and linker commands.
+    #
+    compiler_command, linker_command = compiler_linker(
+            includes=includes,
+            defines=defines,
+            libpaths=libpaths,
+            libs=libs,
+            optimise=optimise,
+            debug=debug,
+            compiler_extra=compiler_extra,
+            linker_extra=linker_extra,
+            cpp=cpp,
+            python=True,
+            py_limited_api=py_limited_api,
+            rpath=True,
+            )
+    
     if pyodide():
         so_suffix = '.so'
         log0(f'pyodide: PEP-3149 suffix untested, so omitting. {_so_suffix()=}.')
@@ -1796,53 +1809,18 @@ def build_extension(
     path_so_leaf = f'_{name}{so_suffix}'
     path_so = f'{outdir}/{path_so_leaf}'
 
-    py_limited_api2 = current_py_limited_api() if py_limited_api else None
-
-    compiler_command, pythonflags = base_compiler(cpp=cpp)
-    linker_command, _ = base_linker(cpp=cpp)
     # setuptools on Linux seems to use slightly different compile flags:
     #
     # -fwrapv -O3 -Wall -O2 -g0 -DPY_CALL_TRAMPOLINE
     #
 
-    general_flags = ''
-    if windows():
-        permissive = '/permissive-'
-        EHsc = '/EHsc'
-        T = '/Tp' if cpp else '/Tc'
-        optimise2 = '/DNDEBUG /O2' if optimise else '/D_DEBUG'
-        debug2 = '/Zi' if debug else ''
-        py_limited_api3 = f'/DPy_LIMITED_API={py_limited_api2}' if py_limited_api2 else ''
-
-    else:
-        if debug:
-            general_flags += '/Zi' if windows() else ' -g'
-        if optimise:
-            general_flags += ' /DNDEBUG /O2' if windows() else ' -O2 -DNDEBUG'
-
-        py_limited_api3 = f'-DPy_LIMITED_API={py_limited_api2}' if py_limited_api2 else ''
-
-    if windows():
-        pass
-    elif darwin():
-        # MacOS's linker does not like `-z origin`.
-        rpath_flag = "-Wl,-rpath,@loader_path/"
-        # Avoid `Undefined symbols for ... "_PyArg_UnpackTuple" ...'.
-        general_flags += ' -undefined dynamic_lookup'
-    elif pyodide():
-        # Setting `-Wl,-rpath,'$ORIGIN',-z,origin` gives:
-        #   emcc: warning: ignoring unsupported linker flag: `-rpath` [-Wlinkflags]
-        #   wasm-ld: error: unknown -z value: origin
-        #
-        rpath_flag = "-Wl,-rpath,'$ORIGIN'"
-    else:
-        rpath_flag = "-Wl,-rpath,'$ORIGIN',-z,origin"
-    
     # Fun fact - on Linux, if the -L and -l options are before '{path_cpp}'
     # they seem to be ignored...
     #
+    
+    # Compile source files to object files.
+    #
     path_os = list()
-
     for path_source in [path_cpp] + source_extra:
         path_o = f'{path_source}.obj' if windows() else f'{path_source}.o'
         path_os.append(path_o)
@@ -1852,61 +1830,28 @@ def build_extension(
         if windows():
             compiler_command2 = f'''
                     {compiler_command}
-                        # General:
-                        /c                          # Compiles without linking.
-                        {EHsc}                      # Enable "Standard C++ exception handling".
-
-                        #/MD                         # Creates a multithreaded DLL using MSVCRT.lib.
-                        {'/MDd' if debug else '/MD'}
-
                         # Input/output files:
                         {T}{path_source}            # /Tp specifies C++ source file.
                         /Fo{path_o}                 # Output file. codespell:ignore
-
-                        # Include paths:
-                        {includes_text}
-                        {pythonflags.includes}      # Include path for Python headers.
-
-                        # Code generation:
-                        {optimise2}
-                        {debug2}
-                        {permissive}                # Set standard-conformance mode.
-
-                        # Diagnostics:
-                        #/FC                         # Display full path of source code files passed to cl.exe in diagnostic text.
-                        /W3                         # Sets which warning level to output. /W3 is IDE default.
-                        /diagnostics:caret          # Controls the format of diagnostic messages.
-                        /nologo                     #
-
-                        {defines_text}
-                        {compiler_extra}
-
-                        {py_limited_api3}
                     '''
 
         else:
             compiler_command2 = f'''
                     {compiler_command}
+                        {path_source}
                         -fPIC
-                        {general_flags.strip()}
-                        {pythonflags.includes}
-                        {includes_text}
-                        {defines_text}
                         -MD -MF {prerequisites_path}
-                        -c {path_source}
                         -o {path_o}
-                        {compiler_extra}
-                        {py_limited_api3}
                     '''
         run_if(
                 compiler_command2,
                 path_o,
                 path_source,
                 [path_source] + _get_prerequisites(prerequisites_path),
-                prerequisites_compile,
                 )
 
-    # Link
+    # Link object files to shared library.
+    #
     prerequisites_path = f'{path_so}.d'
     if windows():
         debug2 = '/DEBUG' if debug else ''
@@ -1917,13 +1862,9 @@ def build_extension(
                     /EXPORT:PyInit__{name}  # Exports a function.
                     /IMPLIB:{base}.lib      # Overrides the default import library name.
                     {libpaths_text}
-                    {pythonflags.ldflags}
                     /OUT:{path_so}          # Specifies the output file name.
-                    {debug2}
-                    /nologo
                     {libs_text}
                     {' '.join(path_os)}
-                    {linker_extra}
                 '''
     elif pyodide():
         command2 = f'''
@@ -1931,26 +1872,14 @@ def build_extension(
                     -MD -MF {prerequisites_path}
                     -o {path_so}
                     {' '.join(path_os)}
-                    {libpaths_text}
-                    {libs_text}
-                    {linker_extra}
-                    {pythonflags.ldflags}
-                    {rpath_flag}
                 '''
     else:
         command2 = f'''
                 {linker_command}
                     -shared
-                    {general_flags.strip()}
                     -MD -MF {prerequisites_path}
                     -o {path_so}
                     {' '.join(path_os)}
-                    {libpaths_text}
-                    {libs_text}
-                    {linker_extra}
-                    {pythonflags.ldflags}
-                    {rpath_flag}
-                    {py_limited_api3}
                 '''
     link_was_run = run_if(
             command2,
@@ -1958,32 +1887,13 @@ def build_extension(
             path_cpp,
             *path_os,
             *_get_prerequisites(f'{path_so}.d'),
-            prerequisites_link,
             )
 
     if link_was_run and darwin():
-        # We need to patch up references to shared libraries in `libs`.
-        sublibraries = list()
-        for lib in () if libs is None else libs:
-            for libpath in libpaths:
-                found = list()
-                for suffix in '.so', '.dylib':
-                    path = f'{libpath}/lib{os.path.basename(lib)}{suffix}'
-                    if os.path.exists( path):
-                        found.append( path)
-                if found:
-                    assert len(found) == 1, f'More than one file matches lib={lib!r}: {found}'
-                    sublibraries.append( found[0])
-                    break
-            else:
-                log2(f'Warning: can not find path of lib={lib!r} in libpaths={libpaths}')
-        macos_patch( path_so, *sublibraries)
-
-        #run(f'ls -l {path_so}', check=0)
-        #run(f'file {path_so}', check=0)
+        macos_patch2(libpaths, libs)
 
     _extensions_to_py_limited_api[os.path.abspath(path_so)] = py_limited_api
-    
+
     return path_so_leaf
 
 
@@ -2085,6 +1995,252 @@ def base_linker(vs=None, pythonflags=None, cpp=False, use_env=True):
     return linker, pythonflags
 
 
+def compiler_linker(
+        *,
+        includes=None,
+        defines=None,
+        libpaths=None,
+        libs=None,
+        optimise=True,
+        debug=False,
+        compiler_extra='',
+        linker_extra='',
+        cpp=True,
+        prerequisites_compile=None,
+        prerequisites_link=None,
+        python=False,
+        py_limited_api=False,
+        rpath=False
+        ):
+    '''
+    Returns generic compiler and linker commands. Used by build_extension().
+    
+    Args:
+        includes:
+            A string, or a sequence of extra include directories to be prefixed
+            with `-I`.
+        defines:
+            A string, or a sequence of extra preprocessor defines to be
+            prefixed with `-D`.
+        libpaths
+            A string, or a sequence of library paths to be prefixed with
+            `/LIBPATH:` on Windows or `-L` on Unix.
+        libs
+            A string, or a sequence of library names. Each item is prefixed
+            with `-l` on non-Windows.
+        optimise:
+            Whether to use compiler optimisations and define NDEBUG.
+        debug:
+            Whether to build with debug symbols.
+        compiler_extra:
+            Extra compiler flags. Can be None.
+        linker_extra:
+            Extra linker flags. Can be None.
+        cpp:
+            If true we tell SWIG to generate C++ code instead of C.
+        prerequisites_compile:
+        prerequisites_link:
+
+            [These are mainly for use on Windows. On other systems we
+            automatically generate dynamic dependencies using swig/compile/link
+            commands' `-MD` and `-MF` args.]
+
+            Sequences of extra input files/directories that should force
+            running of swig, compile or link commands if they are newer than
+            any existing generated SWIG `.i` file, compiled object file or
+            shared library file.
+
+            If present, the first occurrence of `True` or `False` forces re-run
+            or no re-run. Any occurrence of None is ignored. If an item is a
+            directory path we look for newest file within the directory tree.
+
+            If not a sequence, we convert into a single-item list.
+
+            prerequisites_swig
+
+                We use swig's -MD and -MF args to generate dynamic dependencies
+                automatically, so this is not usually required.
+
+            prerequisites_compile
+            prerequisites_link
+
+                On non-Windows we use cc's -MF and -MF args to generate dynamic
+                dependencies so this is not usually required.
+        python:
+            If true we include flags for using Python headers and librarie.
+        py_limited_api:
+            If true we build for current Python's limited API / stable ABI.
+
+            Note that we will assert false if this extension is added to a
+            pipcl.Package that has a different <py_limited_api>, because
+            on Windows importing a non-py_limited_api extension inside a
+            py_limited=True package fails.
+        rpath:
+            If true we include an rpath arg to linker command, and patch up
+            libraries on MacOS.
+    '''
+    if compiler_extra is None:
+        compiler_extra = ''
+    if linker_extra is None:
+        linker_extra = ''
+        
+    includes_text = _flags( includes, '-I')
+    defines_text = _flags( defines, '-D')
+    libpaths_text = _flags( libpaths, '/LIBPATH:', '"') if windows() else _flags( libpaths, '-L')
+    libs_text = _flags( libs, '' if windows() else '-l')
+
+    py_limited_api2 = current_py_limited_api() if py_limited_api else None
+
+    compiler_command, pythonflags = base_compiler(cpp=cpp)
+    linker_command, _ = base_linker(cpp=cpp)
+    # setuptools on Linux seems to use slightly different compile flags:
+    #
+    # -fwrapv -O3 -Wall -O2 -g0 -DPY_CALL_TRAMPOLINE
+    #
+
+    general_flags = ''
+    if windows():
+        permissive = '/permissive-'
+        EHsc = '/EHsc'
+        T = '/Tp' if cpp else '/Tc'
+        optimise2 = '/DNDEBUG /O2' if optimise else '/D_DEBUG'
+        debug2 = '/Zi' if debug else ''
+        py_limited_api3 = f'/DPy_LIMITED_API={py_limited_api2}' if py_limited_api2 else ''
+
+    else:
+        if debug:
+            general_flags += ' -g'
+        if optimise:
+            general_flags += ' -O2 -DNDEBUG'
+        py_limited_api3 = f'-DPy_LIMITED_API={py_limited_api2}' if py_limited_api2 else ''
+
+    if rpath:
+        if windows():
+            pass
+        elif darwin():
+            # MacOS's linker does not like `-z origin`.
+            rpath_flag = "-Wl,-rpath,@loader_path/"
+            # Avoid `Undefined symbols for ... "_PyArg_UnpackTuple" ...'.
+        elif pyodide():
+            # Setting `-Wl,-rpath,'$ORIGIN',-z,origin` gives:
+            #   emcc: warning: ignoring unsupported linker flag: `-rpath` [-Wlinkflags]
+            #   wasm-ld: error: unknown -z value: origin
+            #
+            rpath_flag = "-Wl,-rpath,'$ORIGIN'"
+        else:
+           rpath_flag = "-Wl,-rpath,'$ORIGIN',-z,origin"
+    
+    if darwin():
+        general_flags += ' -undefined dynamic_lookup'
+    
+    # Fun fact - on Linux, if the -L and -l options are before '{path_cpp}'
+    # they seem to be ignored...
+    #
+
+    # Compiler.
+    if windows():
+        compiler_command = f'''
+                {compiler_command}
+                    # General:
+                    /c                          # Compiles without linking.
+                    {EHsc}                      # Enable "Standard C++ exception handling".
+
+                    #/MD                         # Creates a multithreaded DLL using MSVCRT.lib.
+                    {'/MDd' if debug else '/MD'}
+
+                    # Include paths:
+                    {includes_text}
+                    {pythonflags.includes if python else ''}      # Include path for Python headers.
+
+                    # Code generation:
+                    {optimise2}
+                    {debug2}
+                    {permissive}                # Set standard-conformance mode.
+
+                    # Diagnostics:
+                    #/FC                         # Display full path of source code files passed to cl.exe in diagnostic text.
+                    /W3                         # Sets which warning level to output. /W3 is IDE default.
+                    /diagnostics:caret          # Controls the format of diagnostic messages.
+                    /nologo                     #
+
+                    {defines_text}
+                    {compiler_extra}
+
+                    {py_limited_api3}
+                '''
+
+    else:
+        compiler_command = f'''
+                {compiler_command}
+                    {general_flags.strip()}
+                    {pythonflags.includes if python else ''}
+                    {includes_text}
+                    {defines_text}
+                    {compiler_extra}
+                    {py_limited_api3}
+                    -c
+                '''
+
+    # Linker.
+    if windows():
+        debug2 = '/DEBUG' if debug else ''
+        base, _ = os.path.splitext(path_so_leaf)
+        linker_command = f'''
+                {linker_command}
+                    {libpaths_text}
+                    {pythonflags.ldflags if python  else ''}
+                    {debug2}
+                    /nologo
+                    {libs_text}
+                    {linker_extra}
+                '''
+    elif pyodide():
+        linker_command = f'''
+                {linker_command}
+                    {libpaths_text}
+                    {libs_text}
+                    {linker_extra}
+                    {pythonflags.ldflags if python else ''}
+                    {rpath_flag}
+                '''
+    else:
+        linker_command = f'''
+                {linker_command}
+                    {general_flags.strip()}
+                    {libpaths_text}
+                    {libs_text}
+                    {linker_extra}
+                    {pythonflags.ldflags if python else ''}
+                    {rpath_flag}
+                    {py_limited_api3}
+                '''
+    
+    return compiler_command, linker_command
+
+
+def macos_patch2(libpaths, libs):
+    assert darwin()
+    # We need to patch up references to shared libraries in `libs`.
+    sublibraries = list()
+    for lib in () if libs is None else libs:
+        for libpath in libpaths:
+            found = list()
+            for suffix in '.so', '.dylib':
+                path = f'{libpath}/lib{os.path.basename(lib)}{suffix}'
+                if os.path.exists( path):
+                    found.append( path)
+            if found:
+                assert len(found) == 1, f'More than one file matches lib={lib!r}: {found}'
+                sublibraries.append( found[0])
+                break
+        else:
+            log2(f'Warning: can not find path of lib={lib!r} in libpaths={libpaths}')
+    macos_patch( path_so, *sublibraries)
+
+    #run(f'ls -l {path_so}', check=0)
+    #run(f'file {path_so}', check=0)
+    
+        
 def fs_ensure_empty_dir(path):
     os.makedirs(path, exist_ok=True)
     fs_remove_dir_contents( path)
@@ -4169,6 +4325,35 @@ def sysconfig_python_flags():
         ldflags_ = f'-L {ldflags_}'
     includes_ = ' '.join(includes_)
     return includes_, ldflags_
+
+
+def _commands_similar(a, b):
+    '''
+    Experimental debug fn for comparing command lines.
+    '''
+    def canonalisee(command):
+        args = shlex.split(command)
+        i = 0
+        j = 1
+        lines = list()
+        while 1:
+            if j == len(args) or args[j].startswith(('-', '/')):
+                line = shlex.join(args[i:j])
+                i = j
+                lines.append(line)
+                if j == len(args):
+                    break
+            j += 1
+        lines = lines[:1] + sorted(lines[1:])
+        ret = '\n'.join(lines)
+        return ret
+    a = canonalisee(a)
+    b = canonalisee(b)
+    log(f'a:')
+    log(f'{textwrap.indent(a, "    ")}')
+    log(f'b:')
+    log(f'{textwrap.indent(b, "    ")}')
+    return a == b
 
 
 if __name__ == '__main__':
