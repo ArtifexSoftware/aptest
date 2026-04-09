@@ -328,6 +328,14 @@ g_package_info = {
                 'order': 5,
             },
         
+        'pipcl':
+            {
+                'git_remote': 'git@github.com:ArtifexSoftware/pipcl.git',
+                'git_branch': 'main',
+                'aliases':  [],
+                'order': -2,
+            },
+        
         # Experimental, doesn't work.
         'presidio':
             {
