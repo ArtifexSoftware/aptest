@@ -2584,6 +2584,9 @@ def git_get(
         log(f'{GIT_SSH_COMMAND=}')
         env_extra = (env_extra or dict()) | dict(GIT_SSH_COMMAND=GIT_SSH_COMMAND)
     
+    if ':' not in remote:
+        remote = os.path.abspath(remote)
+    
     try:
         def do_update():
             # This seems to pull in the entire repository.
