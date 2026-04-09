@@ -977,6 +977,8 @@ Options
             ``aptest-git-<package-name>``, from which we build/install from source.
             
             * If the local checkout already exists, any local changes are deleted.
+            * ``<remote>`` can also be a local checkout,
+              from which Aptest will clone/fetch in the usual way.
             
             Defaults:
             
@@ -2281,6 +2283,12 @@ completion
 
 Changelog
 ---------
+
+**2026-04-09**
+
+* When a package location is specified with ``git:...``,
+  allow ``<remote>`` to be a local checkout. See `-i`_.
+
 
 **2026-04-02**
 
