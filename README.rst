@@ -15,11 +15,19 @@ Overview of Aptest
 The ``aptest.py`` script can build, test and release (to https://pypi.org) multiple
 Python packages together.
 
-Aptest is intended to be used directly from a Git checkout, for example::
+Aptest can be used directly from a Git checkout, for example::
 
     git clone git@github.com:ArtifexSoftware/aptest.git
     
     aptest/aptest.py ...
+
+It can also be installed using pip, which provides command ``aptest``::
+
+    pip install aptest@git+ssh://git@github.com/ArtifexSoftware/aptest.git
+    
+    aptest ...
+
+(This might to not work properly on Windows.)
 
 
 Supported packages
@@ -296,6 +304,8 @@ Instructions for releasing wheels for:
   ``julian@ghostscript.com:public_html/pyodide/``, for example:
   
     ``rsync -ai release-1.27.2/pymupdf-1.27.2-cp313-abi3-pyodide_2025_0_wasm32.whl julian@ghostscript.com:public_html/pyodide/``
+
+  This will be available in: https://ghostscript.com/~julian/pyodide/.
   
   Tell ``@jamie`` about the Pyodide wheel.
   
@@ -920,6 +930,20 @@ Options
 -e <name>=<value>
 .................
     Set specified environment variable.
+
+
+.. _--git-remote-modify:
+
+--git-remote-modify <prefix> <replacement>
+..........................................
+
+    When cloning/fetching from git remotes, replace <prefix> with <replacement>.
+
+    For example: ``--git-remote-modify git@github.com: https://github.com/``
+    
+    Also see:
+    
+    * `-i`_.
 
 
 -h
@@ -2215,6 +2239,14 @@ Options
     for example ``venv-aptest-3.14.2-64``.
 
 
+.. _--wheelhouse:
+
+--wheelhouse <wheelhouse_dir>
+.............................
+    Directory in which to place wheels, instead of
+    default ``aptest-wheelhouse``.
+
+
 .. _--wheelhouse-union:
 
 --wheelhouse-union <wheelhouse_union_dir>
@@ -2283,6 +2315,18 @@ completion
 
 Changelog
 ---------
+
+**2026-04-16**
+
+* Added `--git-remote-modify`_.
+* Added `--wheelhouse`_.
+* Fix `--cibw-pyodide-version`_.
+* Add support on Unix for building/installing as a Python package, providing console command ``aptest``.
+  
+  * Can still be used directly from a checkout.
+* Uses `pipcl package from pypi.org <https://pypi.org/project/pipcl/>`_
+  (have removed local pipcl.py and wdev.py).
+
 
 **2026-04-09**
 
