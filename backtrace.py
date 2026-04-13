@@ -755,14 +755,14 @@ def show_frame(frame, limit=None, cwd='', framef=None):
 def _demo2():
     try:
         raise Exception('_demo2 deliberate error')
-    except Exception as e:
-        raise Exception('_demo2 sub-error')
+    except Exception:
+        raise Exception('_demo2 sub-error') # pylint:disable=raise-missing-from
 
 
 def _demo():
     try:
         _demo2()
-    except Exception as e:
+    except Exception:
         print(f'### With reverse_chain=0')
         show(brief=1, reverse_chain=0)
         print(f'### With reverse_chain=1')
