@@ -453,13 +453,21 @@ def gh_runner_alias(name):
     return name
 
 
-def name_info(package):
+def name_info(state, package):
     '''
     Returns dict with info about a package from g_package_info, or a dict with
     empty info if not found.
     '''
     ret = g_package_info.get(package)
     if ret:
+        for a, b in sorted(state.git_remote_modifications, reverse=1):
+            git_remote0 = ret['git_remote']
+            if git_remote0.startswith(a):
+                git_remote = b + git_remote0[len(a):]
+                ret = ret.copy()
+                ret['git_remote'] = git_remote
+                pipcl.log(f'For {package=} have changed git_remote from {git_remote0!r} to {git_remote!r}.')
+                break
         return ret
     ret = {
             'git_remote': None,
@@ -678,6 +686,7 @@ def get_args(argv):
     state.draft_location = None
     state.env_extra = dict()
     state.git_depth = 1
+    state.git_remote_modifications = list()
     state.github_upload = None
     state.gnn_doit = False
     state.gnn_show_graph = None
@@ -886,6 +895,11 @@ def get_args(argv):
             
             elif arg == '--git-depth':
                 state.git_depth = next(args).as_int()
+            
+            elif arg == '--git-remote-modify':
+                a = next(args).as_str()
+                b = next(args).as_str()
+                state.git_remote_modifications.append( (a, b))
             
             elif arg == '--gnn-doit':
                 state.gnn_doit = args.get_bool()
@@ -1286,7 +1300,7 @@ def do_remote_github(state, args):
         # Wait for existing workflow instead of creating a new one.
         workflow_id = state.remote_github_workflow_id
         remote_github_workflow_package = 'aptest'
-        info = name_info(remote_github_workflow_package)
+        info = name_info(state, remote_github_workflow_package)
     else:
         # Push ourselves to Git.
         git_push(g_root, 'git@github.com:ArtifexSoftware/aptest.git', branch, state, doit=state.remote_do)
@@ -1297,7 +1311,7 @@ def do_remote_github(state, args):
             if not package_location.startswith(('git:', 'pip:')):
                 # Push to a Github branch and update argv[] to refer to this
                 # Github branch.
-                info = name_info(package_name)
+                info = name_info(state, package_name)
                 pipcl.log(f'{package_name=}.')
                 pipcl.log(f'{info["git_remote"]=}.')
                 git_push(package_location, info["git_remote"], branch, state, doit=state.remote_do)
@@ -1308,11 +1322,11 @@ def do_remote_github(state, args):
             pipcl.log(f'Running .yml instead of aptest.py: {state.remote_github_yml}')
             if not state.packages:
                 # Run on aptest.
-                info = name_info('aptest')
+                info = name_info(state, 'aptest')
             elif len(state.packages) == 1:
                 for package_name, (package_location, args_pos) in state.packages.items():
                     pass
-                info = name_info(package_name)
+                info = name_info(state, package_name)
             else:
                 assert 0, 'Running yml directly requires exactly zero or one package, but {len(state.packages)=}.'
             data = dict()
@@ -1335,7 +1349,7 @@ def do_remote_github(state, args):
                     )
         else:
             # Run ourselves on Github using test.yml, passing argv.
-            info = name_info('aptest')
+            info = name_info(state, 'aptest')
             args_string = shlex.join(args.args_eq.argv[1:])
             # We define the .yml's `matrix: os: ...` by passing in a dict encoded with json, as
             # expected by test.yml's workflow_dispatch:inputs:matrix
@@ -2979,7 +2993,7 @@ def _get_local(package, state, test=False):
     if location is None or location.startswith('pip:'):
         return None
     if location.startswith('git:'):
-        info = name_info(package)
+        info = name_info(state, package)
         local = f'aptest-git-{package}'
         with pipcl.LogPrefix(f'{local}: '):
             env_extra = state.env_extra
@@ -2989,7 +3003,7 @@ def _get_local(package, state, test=False):
             ssh_keyfile = None
             key_path, key_env = _get_key(
                     state,
-                    name_info(package)['git_remote'],
+                    name_info(state, package)['git_remote'],
                     on_error=None,
                     )
             if key_path:
