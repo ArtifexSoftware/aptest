@@ -16,17 +16,54 @@ import shlex
 import shutil
 import subprocess
 import sys
-import sysconfig
 import textwrap
 import time
 import xml.dom.minidom
 
-import backtrace
-import cli
-import doct
-import graph
-import github
-import pipcl
+try:
+    import autovenv
+except ImportError:
+    from . import autovenv
+
+# Things for bash command-line completion.
+COMP_LINE = os.environ.get('COMP_LINE')
+COMP_POINT = os.environ.get('COMP_POINT')
+#COMP_TYPE = os.environ.get('COMP_TYPE')
+
+
+# Use autovenv.py to create/enter a venv.
+create = 2
+verbose = 1
+packages = ['pipcl']
+if sys.argv[1:] == ['completion'] or COMP_LINE:
+    # We don't want autovenv to output debug info because it'll badly mess
+    # up completion. And we use `create = 1` for speed.
+    create = 1
+    verbose = 0
+    packages = None
+
+autovenv.enter(
+        venv_prefix=f'venv-aptest',
+        create=create,
+        packages=packages,
+        verbose=verbose,
+        )
+
+import pipcl    # pylint:disable=wrong-import-position
+
+# Import local files directly or from our package if we are installed.
+try:
+    import backtrace
+    import cli
+    import doct
+    import graph
+    import github
+except ImportError:
+    from . import backtrace
+    from . import cli
+    from . import doct
+    from . import graph
+    from . import github
 
 
 # Get improved display of exceptions and stacktraces.
@@ -50,13 +87,6 @@ APTEST_NESTED = os.environ.get('APTEST_NESTED')
 
 # Sometimes we modify defaults if running on Github.
 GITHUB_ACTIONS = os.environ.get('GITHUB_ACTIONS')
-
-# Things for bash command-line completion.
-COMP_LINE = os.environ.get('COMP_LINE')
-COMP_POINT = os.environ.get('COMP_POINT')
-#COMP_TYPE = os.environ.get('COMP_TYPE')
-#pipcl.log(f'{COMP_LINE=}')
-#pipcl.log(f'{COMP_POINT=}')
 
 
 def cibw_cp(*version_minors):
@@ -2656,7 +2686,7 @@ def main(argv):
         pipcl.g_log_format = ''
     else:
         # Just output elapsed time by default.
-        pipcl.g_log_format = '[+%d]: '
+        pipcl.g_log_format = f'[+%d]: {os.path.basename(sys.prefix)}: '
     
     if state.show_help:
         p = os.path.abspath(f'{__file__}/../README.rst')
@@ -2703,71 +2733,46 @@ def main(argv):
                     )
             sys.exit(e)
     
-    # Rerun ourselves in a venv or Github if necessary.
-    if (not state.remote and state.commands) or state.remote == '@github':
-        if state.venv:
-            # Rerun ourselves inside a venv if not already in a venv.
-            if venv_in(state.venv_name):
-                pipcl.log(f'Already in venv; {sys.prefix=} {state.venv_name=}.')
+    # Rerun ourselves in a Graal venv if necessary.
+    if not state.remote and state.graal:
+        if 'cibw' in state.commands:
+            # We don't create graal/pyenv, so wheel/build commands
+            # will not work.
+            assert 'build' not in state.commands
+        else:
+            # Re-run ourselves in a pyenv/Graal venv.
+            # 2025-07-24: We need the latest pyenv.
+            graalpy = 'graalpy-24.2.1'
+            venv_name = f'venv-aptest-{graalpy}'
+            pyenv_dir = f'{g_root_abs}/pyenv-git'
+            os.environ['PYENV_ROOT'] = pyenv_dir
+            os.environ['PATH'] = f'{pyenv_dir}/bin:{os.environ["PATH"]}'
+            os.environ['PIPCL_GRAAL_PYTHON'] = sys.executable
+
+            if state.venv >= 3:
+                assert venv_name.startswith('venv-')
+                pipcl.fs_remove(venv_name)
+            if state.venv == 1 and os.path.exists(pyenv_dir) and os.path.exists(venv_name):
+                pipcl.log(
+                        f'{state.venv=} and {venv_name=} already exists'
+                            f' so not building pyenv or creating venv.'
+                        )
             else:
-            
-                if not state.remote and state.graal:
-                    if 'cibw' in state.commands:
-                        # We don't create graal/pyenv so wheel/build commands
-                        # will not work.
-                        assert 'build' not in state.commands
-                if not state.remote and state.graal and 'cibw' not in state.commands:
-                    # Re-run ourselves in a pyenv/Graal venv.
-                    # 2025-07-24: We need the latest pyenv.
-                    graalpy = 'graalpy-24.2.1'
-                    venv_name = f'venv-aptest-{graalpy}'
-                    pyenv_dir = f'{g_root_abs}/pyenv-git'
-                    os.environ['PYENV_ROOT'] = pyenv_dir
-                    os.environ['PATH'] = f'{pyenv_dir}/bin:{os.environ["PATH"]}'
-                    os.environ['PIPCL_GRAAL_PYTHON'] = sys.executable
-                    
-                    if state.venv >= 3:
-                        assert venv_name.startswith('venv-')
-                        pipcl.fs_remove(venv_name)
-                    if state.venv == 1 and os.path.exists(pyenv_dir) and os.path.exists(venv_name):
-                        pipcl.log(
-                                f'{state.venv=} and {venv_name=} already exists'
-                                    f' so not building pyenv or creating venv.'
-                                )
-                    else:
-                        pipcl.git_get(
-                                pyenv_dir,
-                                remote='https://github.com/pyenv/pyenv.git',
-                                branch='master',
-                                )
-                        pipcl.run(f'cd {pyenv_dir} && src/configure && make -C src')
-                        pipcl.run(f'which pyenv')
-                        pipcl.run(f'pyenv install -v -s {graalpy}')
-                        pipcl.run(f'{pyenv_dir}/versions/{graalpy}/bin/graalpy -m venv {venv_name}')
-                    e = pipcl.run(f'. {venv_name}/bin/activate && python {shlex.join(args.argv)}',
-                            check=False,
-                            prefix='{venv_name}: ',
-                            env_extra=dict(APTEST_NESTED='1'),
-                            )
-                else:
-                    # Re-run ourselves in a Python venv.
-                    pipcl.log(f'{state.venv=}')
-                    Py_GIL_DISABLED = sysconfig.get_config_var('Py_GIL_DISABLED')
-                    t = '-t' if Py_GIL_DISABLED else ''
-                    if state.venv_name:
-                        venv_name = state.venv_name
-                    else:
-                        venv_name = f'venv-aptest-{platform.python_version()}{t}-{int.bit_length(sys.maxsize+1)}'
-                    e = venv_run(
-                            args.argv,
-                            venv_name,
-                            recreate=(state.venv>=2),
-                            clean=(state.venv>=3),
-                            makelink='venv-aptest',
-                            env_extra=dict(APTEST_NESTED='1'),
-                            ticker=state.ticker,
-                            )
-                sys.exit(e)
+                pipcl.git_get(
+                        pyenv_dir,
+                        remote='https://github.com/pyenv/pyenv.git',
+                        branch='master',
+                        )
+                pipcl.run(f'cd {pyenv_dir} && src/configure && make -C src')
+                pipcl.run(f'which pyenv')
+                pipcl.run(f'pyenv install -v -s {graalpy}')
+                pipcl.run(f'{pyenv_dir}/versions/{graalpy}/bin/graalpy -m venv {venv_name}')
+            e = pipcl.run(f'. {venv_name}/bin/activate && python {shlex.join(args.argv)}',
+                    check=False,
+                    prefix='{venv_name}: ',
+                    env_extra=dict(APTEST_NESTED='1'),
+                    )
+            sys.exit(e)
     
     if state.verbose:
         pipcl.show_system()
@@ -3088,59 +3093,6 @@ def venv_in(path=None):
         return sys.prefix != sys.base_prefix
 
 
-def venv_run(args, path, *, recreate=True, clean=False, makelink=None, env_extra=None, ticker=0):
-    '''
-    Runs command inside venv and returns termination code.
-    
-    Args:
-        args:
-            List of args.
-        path:
-            Name of venv.
-        recreate:
-            If false we do not run `<sys.executable> -m venv <path>` if <path>
-            already exists. This avoids a delay in the common case where <path>
-            is already set up, but fails if <path> exists but does not contain
-            a valid venv.
-        clean:
-            If true we first delete <path>.
-        makelink:
-            If true, we make a softlink from <makelink> to <path>.
-        env_extra:
-            Extra environment values.
-    '''
-    #pipcl.log(f'{path=} {recreate=} {clean=}')
-    if clean:
-        pipcl.log(f'Removing any existing venv {path}.')
-        assert path.startswith('venv-')
-        pipcl.fs_remove(path)
-    if recreate or not os.path.isdir(path):
-        if platform.system() == 'Windows':
-            pipcl.run(f'"{sys.executable}" -m venv {path}')
-        else:
-            pipcl.run(f'{shlex.quote(sys.executable)} -m venv {path}')
-    if platform.system() == 'Windows':
-        command = f'{path}\\Scripts\\activate && python'
-        # shlex not reliable on Windows.
-        # Use crude quoting with "...". Seems to work.
-        for arg in args:
-            if arg.startswith('"') and arg.endswith('"'):
-                command += f'{arg}'
-            else:
-                assert '"' not in arg, f'{arg=}'
-                command += f' "{arg}"'
-    else:
-        command = f'. {path}/bin/activate && python {shlex.join(args)}'
-    if makelink:
-        pipcl.fs_remove(makelink)
-        try:
-            os.symlink(path, makelink)
-        except Exception as e:
-            pipcl.log(f'Warning: failed to create link from {makelink=} to {path=}: {e}')
-    e = pipcl.run(command, check=0, prefix=f'{path}: ', env_extra=env_extra, ticker=ticker)
-    return e
-
-
 def push_results(
         path,
         env_extra,
@@ -3190,7 +3142,7 @@ def push_results(
     pipcl.log(f'Have pushed results to {remote}.')
 
 
-if __name__ == '__main__':
+def main0():
     if sys.argv[1:2] == ['--doctest']:
         import doctest
         if sys.argv[2:]:
@@ -3209,6 +3161,10 @@ if __name__ == '__main__':
             else:
                 pipcl.log(f'Aptest: exiting with success.')
             sys.exit(e)
+        except BrokenPipeError:
+            # We end up here if our output is being piped into less, then less
+            # is killed.
+            sys.exit(1)
         except Exception as e:
             if 0:
                 backtrace.show(reverse_chain=1, brief=1)
@@ -3240,3 +3196,7 @@ if __name__ == '__main__':
                     e = pipcl.run(g_atexit, check=0)
                     if e:
                         pipcl.log(f'Warning, {g_atexit=} failed: {e=}')
+
+
+if __name__ == '__main__':
+    main0()
