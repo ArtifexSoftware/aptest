@@ -863,7 +863,7 @@ def get_args(argv):
                 state.cibw_pyodide = args.get_bool()
 
             elif arg == '--cibw-pyodide-version':
-                state.cibw_pyodide_version = next(args)
+                state.cibw_pyodide_version = next(args).as_str()
 
             elif arg == '--cibw-skip-add-defaults':
                 state.cibw_skip_add_defaults = args.get_bool()
