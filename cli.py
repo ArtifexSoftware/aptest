@@ -5,7 +5,11 @@ import shlex
 import sys
 import textwrap
 
-import backtrace
+try:
+    import backtrace
+except ImportError:
+    from . import backtrace
+
 import pipcl
 
 class ArgsEq:
