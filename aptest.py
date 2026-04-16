@@ -1182,6 +1182,9 @@ def get_args(argv):
                 state.verbose = next(args).as_int()
                 assert state.verbose in (0, 1), f'Verbose level should be 0 or 1'
             
+            elif arg == '--wheelhouse':
+                state.wheelhouse = next(args).as_str()
+
             elif arg == '--wheelhouse-union':
                 state.wheelhouse_union = next(args).as_str()
 
@@ -1536,6 +1539,7 @@ def build_sdist(state, package, directory):
             'pdf4llm',
             'pymupdf',
             'pymupdf4llm',
+            'pipcl',
             ):
         # pymupdf4llm's setup.py requires `-d` is after `sdist`.
         pipcl.run(
