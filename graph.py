@@ -4,10 +4,16 @@ import glob
 import sys
 import time
 
-import backtrace
-import doct
-import json
-import pipcl
+try:
+    import backtrace
+    import doct
+    import json
+    import pipcl
+except ImportError:
+    from . import backtrace
+    from . import doct
+    from . import json
+    from . import pipcl
 
 
 # Get improved display of exceptions and stacktraces.
