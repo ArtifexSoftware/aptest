@@ -32,6 +32,7 @@ COMP_POINT = os.environ.get('COMP_POINT')
 
 
 # Use autovenv.py to create/enter a venv.
+# Note that we don't have a way to use anything other than pypi's pipcl.
 create = 2
 verbose = 1
 packages = ['pipcl']
@@ -1971,9 +1972,9 @@ def do_cibw(state):
                 ):
             pipcl.log(f'Not doing build/test on macos/intel/python-3.14 because onnxruntime not available: {package=}')
         
-        elif package in ('pdf2docx', 'pdf4llm', 'pymupdf4llm'):
+        elif package in ('pdf2docx', 'pdf4llm', 'pymupdf4llm', 'pipcl'):
             # Build/test directly.
-            pipcl.log(f'Not using cibuildwheel for {package=} because does not support pure python wheels.')
+            pipcl.log(f'Not using cibuildwheel for {package=} because cibuildwheel does not support pure python wheels.')
             new_files = pipcl.NewFiles(f'{state.wheelhouse}/*.whl')
             do_build_single(state, package)
             failed_packages = list()
