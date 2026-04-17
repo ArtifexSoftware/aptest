@@ -2316,6 +2316,13 @@ completion
 Changelog
 ---------
 
+**2026-04-18**
+
+* Fixed building of pipcl.
+* Fixed handling of PIP_EXTRA_INDEX_URL on manylinux.
+* Avoid spurious differences between line endings in wheels when building on Windows.
+
+
 **2026-04-16**
 
 * Added `--git-remote-modify`_.
