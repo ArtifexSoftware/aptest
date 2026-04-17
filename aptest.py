@@ -2088,6 +2088,7 @@ def do_cibw(state):
             CIBW_ENVIRONMENT_PASS_LINUX.append('PYMUPDFPRO_SETUP_SOT_KEY')  # This can be set in os.environ.
             # Some tests look at GITHUB_ACTIONS e.g. if known to fail on Github.
             CIBW_ENVIRONMENT_PASS_LINUX.append('GITHUB_ACTIONS')
+            CIBW_ENVIRONMENT_PASS_LINUX.append('PIP_EXTRA_INDEX_URL')
             CIBW_ENVIRONMENT_PASS_LINUX.sort()
             CIBW_ENVIRONMENT_PASS_LINUX = ' '.join(CIBW_ENVIRONMENT_PASS_LINUX)
             env_extra['CIBW_ENVIRONMENT_PASS_LINUX'] = CIBW_ENVIRONMENT_PASS_LINUX
