@@ -3020,6 +3020,11 @@ def _get_local(package, state, test=False):
             pipcl.log(f'{ssh_key=}')
             pipcl.log(f'{ssh_keyfile=}')
             pipcl.log(f'{env_extra=}')
+            # Ensure that we don't get Windows line endings for text files on
+            # Github windows runners, which causes non-identical pure-python wheels depending
+            # on where they are built. This is a workaround for pipcl-1.
+            if GITHUB_ACTIONS == 'true':
+                pipcl.run(f'git config --global core.autocrlf input')
             directory = pipcl.git_get(
                     local,
                     remote=info['git_remote'],
@@ -3030,6 +3035,13 @@ def _get_local(package, state, test=False):
                     key=ssh_key,
                     keyfile=ssh_keyfile,
                     depth=state.git_depth,
+                    # Ensure that we don't get Windows line endings for text
+                    # files when running `git clone`; otherwise we can get
+                    # non-identical pure-python wheels depending on where they
+                    # were built.
+                    #
+                    # Enable this after pipcl-2 is released.
+                    # clone_extra='--config core.autocrlf=input',
                     )
     else:
         directory = location
