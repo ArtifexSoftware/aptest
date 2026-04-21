@@ -723,6 +723,8 @@ def get_args(argv):
     state.packages_for_release = dict()
     state.pytest_options = ''
     state.pytest_paths = list()
+    state.pytest_timeout = None
+    state.pytest_timeout_method = None
     state.pytest_wrap = None
     state.python = None
     state.remote_dir = 'artifex-remote'
@@ -1014,6 +1016,12 @@ def get_args(argv):
 
             elif arg == '--pytest-path':
                 state.pytest_paths.append(next(args).as_text())
+            
+            elif arg == '--pytest-timeout':
+                state.pytest_timeout = next(args).as_float()
+
+            elif arg == '--pytest-timeout-method':
+                state.pytest_timeout_method = next(args).as_str()
 
             elif arg == '--pytest-wrap':
                 state.pytest_wrap = next(args)
@@ -1813,6 +1821,8 @@ def do_cibw(state):
             prefix=f'pip install {state.cibw_name}: ',
             )
     pipcl.run(f'pip install --upgrade pytest')
+    if state.pytest_timeout:
+        pipcl.run(f'pip install --upgrade pytest-timeout')
 
     # Some general flags.
     if 'CIBW_BUILD_VERBOSITY' not in state.env_extra:
@@ -2012,7 +2022,13 @@ def do_cibw(state):
             # Tell cibuildwheel how to test <package>.
             if package in state.packages_test:
                 CIBW_TEST_COMMAND = f'pip install --upgrade pytest'
+                if state.pytest_timeout:
+                    CIBW_TEST_COMMAND += f' && pip install --upgrade pytest-timeout'
                 CIBW_TEST_COMMAND += f' && pytest'
+                if state.pytest_timeout:
+                    CIBW_TEST_COMMAND += f' --timeout {state.pytest_timeout}'
+                if state.pytest_timeout_method:
+                    CIBW_TEST_COMMAND += f' --timeout-method {state.pytest_timeout_method}'
                 CIBW_TEST_COMMAND += f' --junit-xml={os.path.abspath(state.wheelhouse)}/aptest-pytest-junit.xml'
                 if state.pytest_options:
                     CIBW_TEST_COMMAND += f' {state.pytest_options}'
@@ -2673,6 +2689,8 @@ def do_test(state):
         pipcl.run(f'valgrind --version')
 
     pipcl.run(f'pip install --upgrade pytest')
+    if state.pytest_timeout:
+        pipcl.run(f'pip install --upgrade pytest-timeout')
     pipcl.log(f'packages_test:')
     for i in state.packages_test:
         pipcl.log(f'    {i!r}')
