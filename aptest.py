@@ -2585,116 +2585,115 @@ def do_test_single(state, package, failed_packages):
     if not directory:
         return
     
-    if package == 'langchain_pymupdf_layout':
-        command = f'{sys.executable} {directory}/simple_test.py'
-        e = pipcl.run(
-                command,
-                env_extra=state.env_extra,
-                prefix=f'langchain_pymupdf_layout simple_test.py: ',
-                check=0,
-                )
-        pipcl.log(f'langchain_pymupdf_layout command returned {e=}.')
-    elif package == 'pdf2docx':
-        # No pytest tests, instead a Makefile.
-        if platform.system() == 'Windows':
-            pipcl.log(f'Not attempting to test on Windows because needs make.')
-            e = 0
-        else:
-            pipcl.run(f'pip install pytest-cov')
-            e = pipcl.run(f'cd {directory} && make test', check=0)
-    elif package == 'swig':
-        e = pipcl.run(f'cd {directory}/build/build && make check-python-test-suite', check=0)
-    else:
-        #pipcl.run(f'pip install pytest-reportlog')
-        # Change directory into package checkout, otherwise on Github pytest
-        # can use aptest's pytest.ini, and not find any matching test files.
-        if package == 'aptest':
-            pipcl.run(f'pip install swig')
-        
-        path_junit_xml = f'{os.path.abspath(state.wheelhouse)}/{package}-pytest-junit.xml'
-        
-        command = f'cd {directory} && pytest'
-        if state.pytest_timeout:
-            command += f' --timeout {state.pytest_timeout}'
-        if state.pytest_timeout_method:
-            command += f' --timeout-method {state.pytest_timeout_method}'
-        #command += f' --report-log=aptest-pytest.jsonl'
-        command += f' --junit-xml={path_junit_xml}'
-        #command += f' --durations=10'
-        if state.pytest_options:
-            command += f' {state.pytest_options}'
-        if state.pytest_paths:
-            for path in state.pytest_paths:
-                command += f' {path}'
-        elif package == 'pdf4llm':
-            command += f' pdf4llm/tests'
-        else:
-            # We need to somehow limit things to {package}/tests/
-            # because otherwise pytest can recurse into other
-            # directories (e.g. mupdf checkout in pympdf) and get
-            # hopelessly confused.
-            #
-            # Would like to do `pytest {directory}` and let
-            # pytest.ini identify `tests/` as the directory look
-            # in for tests. But unfortunately pytest configuration
-            # doesn't seem to allow this sort of thing, for example
-            # `testpaths = tests` only effects `cd {package} &&
-            # pytest` - i.e. running pytest on current directory
-            # without specifying any location.
-            #
-            command += f' tests'
-        
-        if state.pytest_wrap in ('valgrind', 'helgrind'):
-            if not state.pytest_options:
-                command += ' -sv'
-        if state.pytest_wrap:
-            command = f'python -m {command}'
-            if state.pytest_wrap == 'gdb':
-                command = f'gdb --args {command}'
-            elif state.pytest_wrap == 'valgrind':
-                state.env_extra['PYMUPDF_RUNNING_ON_VALGRIND'] = '1'
-                state.env_extra['PYTHONMALLOC'] = 'malloc'
-                command = (
-                        f' valgrind'
-                        f' --suppressions={g_root_abs}/valgrind.supp'
-                        f' --trace-children=no'
-                        f' --num-callers=20'
-                        f' --error-exitcode=100'
-                        f' --errors-for-leak-kinds=none'
-                        f' --fullpath-after='
-                        f' {command}'
-                        )
-            elif state.pytest_wrap == 'helgrind':
-                state.env_extra['PYMUPDF_RUNNING_ON_VALGRIND'] = '1'
-                state.env_extra['PYTHONMALLOC'] = 'malloc'
-                command = (
-                        f' valgrind'
-                        f' --tool=helgrind'
-                        f' --trace-children=no'
-                        f' --num-callers=20'
-                        f' --error-exitcode=100'
-                        f' --fullpath-after='
-                        f' {command}'
-                        )
+    with pipcl.LogPrefix(f'test {package}: '):
+        if package == 'langchain_pymupdf_layout':
+            command = f'{sys.executable} {directory}/simple_test.py'
+            e = pipcl.run(
+                    command,
+                    env_extra=state.env_extra,
+                    check=0,
+                    )
+            pipcl.log(f'langchain_pymupdf_layout command returned {e=}.')
+        elif package == 'pdf2docx':
+            # No pytest tests, instead a Makefile.
+            if platform.system() == 'Windows':
+                pipcl.log(f'Not attempting to test on Windows because needs make.')
+                e = 0
             else:
-                assert 0, f'Unrecognised {state.pytest_wrap=}.'
-        e = pipcl.run(
-                command,
-                env_extra=state.env_extra,
-                prefix=f'pytest: ',
-                check=0,
-                )
-        try:
-            junit_xml_pretty = xml.dom.minidom.parse(path_junit_xml).toprettyxml()
-            pipcl.fs_write(f'{path_junit_xml}.xml', junit_xml_pretty)
-        except Exception as ee:
-            e = ee
-            pipcl.log(f'Failed to prettyfy {path_junit_xml=}: {e}')
-    if e:
-        pipcl.log(f'Tests failed for {package=}.')
-        failed_packages.append(package)
-    else:
-        pipcl.log(f'Tests succeeded for {package=}.')
+                pipcl.run(f'pip install pytest-cov')
+                e = pipcl.run(f'cd {directory} && make test', check=0)
+        elif package == 'swig':
+            e = pipcl.run(f'cd {directory}/build/build && make check-python-test-suite', check=0)
+        else:
+            #pipcl.run(f'pip install pytest-reportlog')
+            # Change directory into package checkout, otherwise on Github pytest
+            # can use aptest's pytest.ini, and not find any matching test files.
+            if package == 'aptest':
+                pipcl.run(f'pip install swig')
+
+            path_junit_xml = f'{os.path.abspath(state.wheelhouse)}/{package}-pytest-junit.xml'
+
+            command = f'cd {directory} && pytest'
+            if state.pytest_timeout:
+                command += f' --timeout {state.pytest_timeout}'
+            if state.pytest_timeout_method:
+                command += f' --timeout-method {state.pytest_timeout_method}'
+            #command += f' --report-log=aptest-pytest.jsonl'
+            command += f' --junit-xml={path_junit_xml}'
+            #command += f' --durations=10'
+            if state.pytest_options:
+                command += f' {state.pytest_options}'
+            if state.pytest_paths:
+                for path in state.pytest_paths:
+                    command += f' {path}'
+            elif package == 'pdf4llm':
+                command += f' pdf4llm/tests'
+            else:
+                # We need to somehow limit things to {package}/tests/
+                # because otherwise pytest can recurse into other
+                # directories (e.g. mupdf checkout in pympdf) and get
+                # hopelessly confused.
+                #
+                # Would like to do `pytest {directory}` and let
+                # pytest.ini identify `tests/` as the directory look
+                # in for tests. But unfortunately pytest configuration
+                # doesn't seem to allow this sort of thing, for example
+                # `testpaths = tests` only effects `cd {package} &&
+                # pytest` - i.e. running pytest on current directory
+                # without specifying any location.
+                #
+                command += f' tests'
+
+            if state.pytest_wrap in ('valgrind', 'helgrind'):
+                if not state.pytest_options:
+                    command += ' -sv'
+            if state.pytest_wrap:
+                command = f'python -m {command}'
+                if state.pytest_wrap == 'gdb':
+                    command = f'gdb --args {command}'
+                elif state.pytest_wrap == 'valgrind':
+                    state.env_extra['PYMUPDF_RUNNING_ON_VALGRIND'] = '1'
+                    state.env_extra['PYTHONMALLOC'] = 'malloc'
+                    command = (
+                            f' valgrind'
+                            f' --suppressions={g_root_abs}/valgrind.supp'
+                            f' --trace-children=no'
+                            f' --num-callers=20'
+                            f' --error-exitcode=100'
+                            f' --errors-for-leak-kinds=none'
+                            f' --fullpath-after='
+                            f' {command}'
+                            )
+                elif state.pytest_wrap == 'helgrind':
+                    state.env_extra['PYMUPDF_RUNNING_ON_VALGRIND'] = '1'
+                    state.env_extra['PYTHONMALLOC'] = 'malloc'
+                    command = (
+                            f' valgrind'
+                            f' --tool=helgrind'
+                            f' --trace-children=no'
+                            f' --num-callers=20'
+                            f' --error-exitcode=100'
+                            f' --fullpath-after='
+                            f' {command}'
+                            )
+                else:
+                    assert 0, f'Unrecognised {state.pytest_wrap=}.'
+            e = pipcl.run(
+                    command,
+                    env_extra=state.env_extra,
+                    check=0,
+                    )
+            try:
+                junit_xml_pretty = xml.dom.minidom.parse(path_junit_xml).toprettyxml()
+                pipcl.fs_write(f'{path_junit_xml}.xml', junit_xml_pretty)
+            except Exception as ee:
+                e = ee
+                pipcl.log(f'Failed to prettyfy {path_junit_xml=}: {e}')
+        if e:
+            pipcl.log(f'Tests failed for {package=}.')
+            failed_packages.append(package)
+        else:
+            pipcl.log(f'Tests succeeded for {package=}.')
 
 
 def do_test(state):
