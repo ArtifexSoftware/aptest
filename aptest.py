@@ -20,6 +20,16 @@ import textwrap
 import time
 import xml.dom.minidom
 
+
+class AptestUserError(Exception):
+    pass
+
+
+def Assert(ok, message):
+    if not ok:
+        raise AptestUserError(message)
+
+
 try:
     import autovenv
 except ImportError:
@@ -414,7 +424,7 @@ def package_alias(package):
         #pipcl.log(f'{fullname=} {info=}')
         if package in [fullname] + info['aliases']:
             return fullname
-    assert 0, f'Unrecognised package name/alias: {package!r}'
+    Assert(0, f'Unrecognised package name/alias: {package!r}')
 
 
 def package_aliases(packages):
@@ -567,7 +577,7 @@ def add_package(state, name, location):
         if location not in ok_locations:
             if COMP_LINE:
                 # Raise exception to force listing of available checkouts.
-                assert location in ok_locations, f'Location is not a Git checkout in current directory: {location}'
+                Assert(location in ok_locations, f'Location is not a Git checkout in current directory: {location}')
             else:
                 # Just output a warning.
                 pipcl.log(f'Warning, location is not a Git checkout in current directory: {location=}')
@@ -591,7 +601,7 @@ def add_package(state, name, location):
     for p in state.packages:
         if p.startswith('smartoffice'):
             n_smartoffice += 1
-    assert n_smartoffice <= 1, f'Only one `smartoffice*` package can be specified.'
+    Assert(n_smartoffice <= 1, f'Only one `smartoffice*` package can be specified.')
     
     state.packages_build.append(name)
     state.packages_test.append(name)
@@ -844,11 +854,11 @@ def get_args(argv):
                 _names = _names.split(',') if _names else list()
                 apply_deltas(state.packages_build, _names, aliasfn=package_alias)
                 for p in state.packages_build:
-                    assert p in state.packages, f'Package location not specified: {p}.'
+                    Assert(p in state.packages, f'Package location not specified: {p}.')
 
             elif arg == '--build-type':
                 build_type = next(args)
-                assert build_type in ('release', 'debug', 'memento')
+                Assert(build_type in ('release', 'debug', 'memento'), f'Unrecognised {build_type=} should be one of: release debug memento')
                 state.build_type = build_type.as_text()
             
             elif arg == '--check-unchanged':
@@ -890,7 +900,7 @@ def get_args(argv):
 
             elif arg == '-e':
                 _nv = next(args).as_text()
-                assert '=' in _nv, f'-e <name>=<value> does not contain "=": {_nv!r}'
+                Assert('=' in _nv, f'-e <name>=<value> does not contain "=": {_nv!r}')
                 _name, _value = _nv.split('=', 1)
                 state.env_extra[_name] = _value
             
@@ -936,7 +946,7 @@ def get_args(argv):
                 elif len(text) == 2:
                     path, env = text
                 else:
-                    assert 0, f'Expected one or two comma-separted items in {text!r}'
+                    Assert(0, f'Expected one or two comma-separted items in {text!r}')
                 _add_key(state, prefix, path, env, pos)
             
             elif arg == '--log-prefix':
@@ -979,14 +989,14 @@ def get_args(argv):
                 state.os_names += next(args).as_text().lower().split(',')
                 names = ('linux', 'windows', 'darwin', 'openbsd')
                 for os_name in state.os_names:
-                    assert os_name in names, f'{os_name=} should be one of {names!r}.'
+                    Assert(os_name in names, f'{os_name=} should be one of {names!r}.')
 
             elif arg == '-r':
                 state.remote_arg = args.pos
                 _remote = next(args)
                 # Provide useful command-line completion if _remote starts with @.
                 if _remote.startswith('@'):
-                    assert _remote == '@github'
+                    Assert(_remote == '@github', f'{_remote=} should be `@github`.')
                 state.remote = _remote.as_text()
 
             elif arg == '--run':
@@ -1007,7 +1017,7 @@ def get_args(argv):
 
             elif arg == '--pytest-wrap':
                 state.pytest_wrap = next(args)
-                assert state.pytest_wrap in ('gdb', 'valgrind', 'helgrind')
+                Assert(state.pytest_wrap in ('gdb', 'valgrind', 'helgrind'), f'{state.pytest_wrap=} should be one of: gdb valgrind helgrind')
 
             elif arg == '--python':
                 pos = args.pos
@@ -1059,7 +1069,7 @@ def get_args(argv):
                     new_args += ' -b pymupdf --remote-github-runners linux --cibw-skip-add-defaults=0 -e CIBW_BUILD="cp314t*" -e CIBW_SKIP="*musllinux*" -e PYMUPDF_SETUP_PY_LIMITED_API=0'
                 
                 else:
-                    assert 0, f'Unrecognised {arg=}.'
+                    Assert(0, f'Unrecognised {arg=}.')
                 
                 new_args = shlex.split(new_args)
                 args.args_eq.replace(arg.pos, args.pos, new_args)
@@ -1084,10 +1094,10 @@ def get_args(argv):
                 _pattern = os.path.normpath(f'{__file__}/../.github/workflows/*.yml')
                 _leafs = [os.path.basename(i) for i in glob.glob(_pattern)]
                 _leafs.sort()
-                assert _yml in _leafs, f'yml should be one of {_leafs}'
+                Assert(_yml in _leafs, f'yml should be one of {_leafs}')
                 
                 state.remote_github_yml = _yml.as_text()
-                assert state.remote_github_yml.endswith('.yml'), f'remote_github_yml={state.remote_github_yml} must end with .yml'
+                Assert(state.remote_github_yml.endswith('.yml'), f'remote_github_yml={state.remote_github_yml} must end with .yml')
 
             elif arg == '--remote-github-yml-inputs':
                 state.remote_github_yml_inputs = next(args).as_text()
@@ -1130,11 +1140,13 @@ def get_args(argv):
             
             elif arg == '--test-gnn-det':
                 test_gnn_det = next(args)
-                assert test_gnn_det in (
-                        'eval/eval_gnn.py',
-                        'eval/eval_oracle_gnn.py',
-                        'eval/eval_pymupdf4llm.py',
-                        'eval/eval_pymupdf_layout.py',
+                Assert(
+                        test_gnn_det in (
+                            'eval/eval_gnn.py',
+                            'eval/eval_oracle_gnn.py',
+                            'eval/eval_pymupdf4llm.py',
+                            'eval/eval_pymupdf_layout.py',
+                            ),
                         )
                 state.test_gnn_det = test_gnn_det.as_str()
                 
@@ -1164,16 +1176,16 @@ def get_args(argv):
                 state.github_upload = args.get_bool()
             
             elif arg == '--use-release-args':
-                assert state.wheelhouse_union_release, f'Must specify `--wheelhouse-union-release <dir>` for releases.'
+                Assert(state.wheelhouse_union_release, f'Must specify `--wheelhouse-union-release <dir>` for releases.')
                 state.wheelhouse_union = state.wheelhouse_union_release
                 
-                assert state.packages_for_release, f'Must specify upper-case packages for release.'
+                Assert(state.packages_for_release, f'Must specify upper-case packages for release.')
                 for package, location in state.packages_for_release.items():
                     add_package(state, package, location)
 
             elif arg == '-v':
                 _venv = next(args)
-                assert _venv in ('0', '1', '2', '3'), f'Invalid venv={_venv.text}.'
+                Assert(_venv in ('0', '1', '2', '3'), f'Invalid venv={_venv.text}.')
                 state.venv = _venv.as_int()
             
             elif arg == '--venv-name':
@@ -1181,7 +1193,7 @@ def get_args(argv):
             
             elif arg == '-V':
                 state.verbose = next(args).as_int()
-                assert state.verbose in (0, 1), f'Verbose level should be 0 or 1'
+                Assert(state.verbose in (0, 1), f'Verbose level should be 0 or 1')
             
             elif arg == '--wheelhouse':
                 state.wheelhouse = next(args).as_str()
@@ -1216,7 +1228,7 @@ def get_args(argv):
             else:
                 if arg.text is StopIteration:
                     break
-                assert 0, f'Unrecognised argument: {arg.text!r}.'
+                Assert(0, f'Unrecognised argument: {arg.text!r}.')
 
     finally:
         # cli.Args.final() will handle writing out completions if COMP_LINE is
@@ -1282,7 +1294,7 @@ def _get_key_pypi(state, on_error='raise'):
 def github_api_url(info):
     git_remote = info['git_remote']
     m = re.match('^git@github.com:(.+).git$', git_remote)
-    assert m, f'Unrecognised remote: {git_remote=}'
+    Assert(m, f'Unrecognised remote: {git_remote=}')
     name = m.group(1)
     return f'https://api.github.com/repos/{name}'
 
@@ -1332,7 +1344,7 @@ def do_remote_github(state, args):
                     pass
                 info = name_info(state, package_name)
             else:
-                assert 0, 'Running yml directly requires exactly zero or one package, but {len(state.packages)=}.'
+                Assert(0, 'Running yml directly requires exactly zero or one package, but {len(state.packages)=}.')
             data = dict()
             data['ref'] = branch
             if state.remote_github_yml_inputs:
@@ -1357,7 +1369,7 @@ def do_remote_github(state, args):
             args_string = shlex.join(args.args_eq.argv[1:])
             # We define the .yml's `matrix: os: ...` by passing in a dict encoded with json, as
             # expected by test.yml's workflow_dispatch:inputs:matrix
-            assert state.remote_github_runners, f'No runner specified.'
+            Assert(state.remote_github_runners, f'No runner specified.')
             matrix = {
                     'os': state.remote_github_runners,
                     }
@@ -1605,7 +1617,7 @@ def do_build_single(state, package):
     new_files = pipcl.NewFiles(f'{state.wheelhouse}/{package}*.whl')
 
     if location.startswith('pip:'):
-        assert package != 'mupdf', f'Not a package on pypi.org: {package}'
+        Assert(package != 'mupdf', f'Not a package on pypi.org: {package}')
         name = location[4:]
         if not name.endswith(('.whl', '.tar.gz')):
             name = f'{package}{name}'
@@ -2911,8 +2923,8 @@ def main(argv):
                     pipcl.log(f'Have created: {out}')
                 
                 elif command == 'draft':
-                    assert state.draft_location
-                    assert state.wheelhouse_union_release
+                    Assert(state.draft_location, f'<draft_location> unset')
+                    Assert(state.wheelhouse_union_release, f'<wheelhouse_union_release> unset')
                     command = f'rsync -ai {state.wheelhouse_union_release}/ {state.draft_location}/'
                     pipcl.run(command)
 
@@ -2949,8 +2961,10 @@ def main(argv):
                 elif command == 'run':
                     for package, command in state.run_commands:
                         directory = _get_local(package, state, test=True)
-                        assert directory, \
-                                f'Cannot run command within {package=} because no local directory.'
+                        Assert(
+                                directory,
+                                f'Cannot run command within {package=} because no local directory.',
+                                )
                         pipcl.run(f'cd {directory} && {command}')
 
                 elif command == 'test':
@@ -2958,8 +2972,10 @@ def main(argv):
                 
                 elif command == 'upload':
                     if not state.wheelhouse_union:
-                        assert state.wheelhouse_union_release, \
-                                f'Need `--wheelhouse-union-release <wheelhouse_union_dir>`'
+                        Assert(
+                                state.wheelhouse_union_release,
+                                f'Need `--wheelhouse-union-release <wheelhouse_union_dir>`',
+                                )
                         state.wheelhouse_union = state.wheelhouse_union_release
                     github._upload( # pylint: disable=protected-access
                             token_pypi=_get_key_pypi(state),
@@ -3047,14 +3063,18 @@ def _get_local(package, state, test=False):
         directory = location
         if state.check_unchanged:
             _, _, diff, _ = pipcl.git_info(directory)
-            assert not diff, \
-                    f'{state.check_unchanged=} but checkout has uncommitted changes: {directory!r}.'
+            Assert(
+                    not diff,
+                    f'{state.check_unchanged=} but checkout has uncommitted changes: {directory!r}.',
+                    )
             pipcl.log(f'{state.check_unchanged=}, local checkout ok: {directory!r}')
         if state.check_pushed:
             out = pipcl.run(f'cd {directory} && git branch -r --contains', capture=1)
             assert isinstance(out, str)
-            assert out.strip(), \
-                    f'{state.check_pushed=} but local checkout has un-pushed commits: {directory!r}'
+            Assert(
+                    out.strip(),
+                    f'{state.check_pushed=} but local checkout has un-pushed commits: {directory!r}',
+                    )
             pipcl.log(f'{state.check_pushed=}, local checkout ok ({out=}): {directory!r}')
     if not test:
         if package in state.clean_git:
@@ -3088,8 +3108,10 @@ def _get_local(package, state, test=False):
             pipcl.log(f'{diff=}')
     
     if state.check_unchanged:
-        assert not diff, \
-                f'Checkout is changed but {state.check_unchanged=}: {package=} {directory=}.'
+        Assert(
+                not diff,
+                f'Checkout is changed but {state.check_unchanged=}: {package=} {directory=}.',
+                )
         # todo: also check that sha is on remote.
     
     return directory
@@ -3198,29 +3220,20 @@ def main0():
             # is killed.
             sys.exit(1)
         except Exception as e:
-            if 0:
-                backtrace.show(reverse_chain=1, brief=1)
-            elif (
-                    isinstance(e, (subprocess.CalledProcessError, subprocess.TimeoutExpired))
-                    and not g_devel
-                    ):
-                # Terminate quietly, because failed commands will have generated
-                # diagnostics already.
-                pass
-            else:
-                backtrace.show(
-                        reverse_chain=1,
-                        limit=None if g_devel else 0,
-                        brief=1,
-                        )
-            if 0:
-                pipcl.log(f'Aptest terminating with error.'
-                        f' {isinstance(e, subprocess.CalledProcessError)=}'
-                            f' {isinstance(e, subprocess.TimeoutExpired)=}'
-                            f' {e=}'
-                        )
-            else:
-                pipcl.log(f'Aptest exiting with error.')
+            show_details = True
+            if g_devel:
+                show_details = True
+            elif isinstance(e, (subprocess.CalledProcessError, subprocess.TimeoutExpired)):
+                # Failed commands will have generated diagnostics already.
+                show_details = False
+            elif isinstance(e, AptestUserError):
+                show_details = False
+            backtrace.show(
+                    reverse_chain=1,
+                    limit=None if show_details else 0,
+                    brief=1,
+                    )
+            pipcl.log(f'Aptest exiting with error.')
             sys.exit(1)
         finally:
             if g_atexit:
