@@ -2601,6 +2601,10 @@ def do_test_single(state, package, failed_packages):
         path_junit_xml = f'{os.path.abspath(state.wheelhouse)}/{package}-pytest-junit.xml'
         
         command = f'cd {directory} && pytest'
+        if state.pytest_timeout:
+            command += f' --timeout {state.pytest_timeout}'
+        if state.pytest_timeout_method:
+            command += f' --timeout-method {state.pytest_timeout_method}'
         #command += f' --report-log=aptest-pytest.jsonl'
         command += f' --junit-xml={path_junit_xml}'
         #command += f' --durations=10'
