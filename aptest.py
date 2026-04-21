@@ -2083,12 +2083,21 @@ def do_cibw(state):
                 # <fontconfig/fonctconfig.h>` works. And for SO build
                 # we need ssh to allow its git submodule commands.
                 #
-                env_extra['CIBW_BEFORE_BUILD_LINUX'] = (
-                        'echo "installing fontconfig-devel and ssh"'
+                CIBW_BEFORE_BUILD_LINUX = (
+                        'echo "aptest: installing fontconfig-devel and ssh"'
                         ' && yum -y install fontconfig-devel'
                         ' && yum groupinstall -y fonts'
                         ' && yum install -y openssh-clients'
                         )
+                # We also need to declare that PYMUPDFPRO_SETUP_SOT is
+                # a safe git directory if set, because ownership of
+                # PYMUPDFPRO_SETUP_SOT in /host/... in docker may have
+                # different owner from current user.
+                PYMUPDFPRO_SETUP_SOT = state.env_extra['PYMUPDFPRO_SETUP_SOT']
+                if PYMUPDFPRO_SETUP_SOT:
+                    CIBW_BEFORE_BUILD_LINUX += f' && git config --global --add safe.directory {PYMUPDFPRO_SETUP_SOT}'
+                
+                env_extra['CIBW_BEFORE_BUILD_LINUX'] = CIBW_BEFORE_BUILD_LINUX
 
             PIP_EXTRA_INDEX_URL = f'file://{prefix}{os.path.abspath(state.wheelhouse)}/simple'.replace('\\', '/')
 
