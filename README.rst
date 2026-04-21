@@ -706,6 +706,10 @@ cibw
     
     * On Github we set ``CIBW_BUILD`` to build and test with all supported Python versions.
     * Otherwise we set ``CIBW_BUILD`` to build and test with the current Python version only.
+    
+    If ``CIBW_BUILD`` is ``all``:
+    
+    * We set CIBW_BUILD to build and test with all supported Python versions.
 
     If ``CIBW_ARCHS`` is unset:
     
@@ -1013,6 +1017,8 @@ Options
         ``<directory>``
             A local directory, typically a git checkout, from which we build/install from source.
 
+    **Separate locations for building and testing**
+    
     If a package is specified twice, the first location will be used
     for building, and the second location used for testing. This allows
     packages on https://pypi.org to be tested, for example:
@@ -1023,6 +1029,14 @@ Options
         ``aptest.py -i pymupdf pip: -i pymupdf git: build test``
             Test current pymupdf release with testsuite in current git.
 
+    **Using upper-case package names**
+    
+    If a package is specifed using an upper-case name, the package location
+    is stored in a separate list that is only used if `--use-release-args`_
+    is specified. This is typically used in `~/.aptest`_ to simplify making
+    releases.
+    
+    **Aliases**
     
     Various convenience options and shortened aliases are provided:
     
@@ -1222,6 +1236,10 @@ Options
 
 -v <venv>
 .........
+    
+    **This option is unsupported at present due to switching to the external ``pipcl`` package.
+    However the information below about the name of the venv and convenience link still applies.**
+    
     Changes how we re-run ourselves in a venv when required.
 
     0 - Never re-run inside a venv.
@@ -1376,9 +1394,17 @@ Options
       mupdf's C++/Python APIs and the mupdf C API.
 
 
---clean-wheelhouse
-..................
-    Delete directory ``aptest-wheelhouse/`` if it exists.
+.. _--clean-wheelhouse:
+
+--clean-wheelhouse (bool)
+.........................
+    If `build`_ or `cibw`_ are specified, delete directory
+    ``aptest-wheelhouse/`` if it exists.
+
+    This avoids potential incorrect behaviour when building/installing
+    packages.
+    
+    * Default is True.
 
 
 .. _--devel:
@@ -1774,6 +1800,23 @@ Options
     
     Can be specified multiple times.
     Default is ``<package_root>/tests/``.
+
+
+.. _--pytest-timeout:
+
+--pytest-timeout <timeout-secs>
+...............................
+    Install `pytest-timeout <https://pypi.org/project/pytest-timeout/>`_ and run
+    pytest with ``--timeout <timeout-secs>``.
+    
+    * Note that this does not interrupt extension code.
+
+
+.. _--pytest-timeout-method:
+
+--pytest-timeout-method <method>
+................................
+    Run pytest with ``--method <method>`` (requires `--pytest-timeout`_).
 
 
 .. _--pytest-wrap:
@@ -2229,6 +2272,16 @@ Options
     0.5.
 
 
+.. _--use-release-args:
+
+--use-release-args (bool)
+.........................
+    Use upper-case package locations, typically specified in `~/.aptest`_.
+
+    Also use `--wheelhouse-union-release`'s value for final wheel directory.
+    
+    Also see: `-i`_.
+
 .. _--venv-name:
 
 --venv-name <venv_name>
@@ -2315,6 +2368,18 @@ completion
 
 Changelog
 ---------
+
+**2026-04-23**
+
+* Improved diagnostics/backtraces on errors.
+* Added `--pytest-timeout`_ and `--pytest-timeout-method`_.
+* Fix git errors in manylinux docker with `cibw`_ by setting ``safe.directory``.
+* Set correct ssh/git key if building ``pymupdfpro`` with ``smartoffice-marina``.
+* Special-case ``CIBW_BUILD=all``; see `cibw`_.
+* Default to deleting wheelhouse if `build`_ or `cibw`_ commands are specified;
+  see `--clean-wheelhouse`_.
+* Control of venv with `-v`_ is currently unsupported.
+
 
 **2026-04-18**
 
