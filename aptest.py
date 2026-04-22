@@ -1869,7 +1869,10 @@ def do_cibw(state):
     # Specify python versions.
     CIBW_BUILD = state.env_extra.get('CIBW_BUILD')
     pipcl.log(f'{CIBW_BUILD=}')
-    if CIBW_BUILD is None:
+    
+    if CIBW_BUILD == 'all':
+        CIBW_BUILD = cibw_cp(*python_versions_minor)
+    elif CIBW_BUILD is None:
         if state.graal:
             CIBW_BUILD = 'gp*'
             state.env_extra['CIBW_ENABLE'] = 'graalpy'
