@@ -2718,7 +2718,10 @@ def do_test(state):
     failed_packages = list()
 
     if state.test_extra_packages:
-        pipcl.run(f'pip install {" ".join(state.test_extra_packages)}')
+        command = 'pip install'
+        for p in state.test_extra_packages:
+            command += f' {shlex.quote(p)}'
+        pipcl.run(command)
 
     for package in state.packages_test:
         with pipcl.LogPrefix(f'{package}: '):
