@@ -53,8 +53,9 @@ if sys.argv[1:] == ['completion'] or COMP_LINE:
     verbose = 0
     packages = None
 
+g_venv_prefix = f'venv-aptest'
 autovenv.enter(
-        venv_prefix=f'venv-aptest',
+        venv_prefix=g_venv_prefix,
         create=create,
         packages=packages,
         verbose=verbose,
@@ -2746,13 +2747,16 @@ def main(argv):
     # string, for example `-r foo` will have been converted to `foo ''`, which
     # avoids recursion when we rerun ourselves on local or remote machine.
     del argv
+    
+    # Update convenience link to venv.
+    pipcl.fs_symlink(g_venv_prefix, os.path.relpath(sys.prefix))
         
     if state.devel:
         # Leave pipcl's default, which includes elapsed time and file:line:fn.
         pass
     elif APTEST_NESTED:
         # No log prefix.
-        pipcl.g_log_format = ''
+        pipcl.g_log_format = f'{os.path.basename(sys.prefix)}: '
     else:
         # Just output elapsed time by default.
         pipcl.g_log_format = f'[+%d]: {os.path.basename(sys.prefix)}: '
