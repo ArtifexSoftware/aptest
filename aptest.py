@@ -3245,39 +3245,39 @@ def main0():
     else:
         try:
             e = main(sys.argv)
-            if g_log_tee:
-                pipcl.log(f'Aptest: log output is in: {g_log_tee}')
-            if e:
-                pipcl.log(f'Aptest: exiting with error {e}.')
-            else:
-                pipcl.log(f'Aptest: exiting with success.')
-            sys.exit(e)
         except BrokenPipeError:
             # We end up here if our output is being piped into less, then less
             # is killed.
-            sys.exit(1)
-        except Exception as e:
+            e = 1
+        except Exception as ee:
             show_details = True
             if g_devel:
-                show_details = True
-            elif isinstance(e, (subprocess.CalledProcessError, subprocess.TimeoutExpired)):
+                pass
+            elif isinstance(ee, (subprocess.CalledProcessError, subprocess.TimeoutExpired)):
                 # Failed commands will have generated diagnostics already.
                 show_details = False
-            elif isinstance(e, AptestUserError):
+            elif isinstance(ee, AptestUserError):
                 show_details = False
             backtrace.show(
                     reverse_chain=1,
                     limit=None if show_details else 0,
                     brief=1,
                     )
-            pipcl.log(f'Aptest exiting with error.')
-            sys.exit(1)
+            e = 1
         finally:
             if g_atexit:
                 with pipcl.LogPrefix('atexit: '):
                     e = pipcl.run(g_atexit, check=0)
                     if e:
                         pipcl.log(f'Warning, {g_atexit=} failed: {e=}')
+        
+        if g_log_tee:
+            pipcl.log(f'Aptest: log output is in: {g_log_tee}')
+        if e:
+            pipcl.log(f'Aptest: exiting with error {e}.')
+        else:
+            pipcl.log(f'Aptest: exiting with success.')
+        sys.exit(e)
 
 
 if __name__ == '__main__':
