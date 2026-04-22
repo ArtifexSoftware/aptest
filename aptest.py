@@ -2100,7 +2100,7 @@ def do_cibw(state):
                 # a safe git directory if set, because ownership of
                 # PYMUPDFPRO_SETUP_SOT in /host/... in docker may have
                 # different owner from current user.
-                PYMUPDFPRO_SETUP_SOT = state.env_extra['PYMUPDFPRO_SETUP_SOT']
+                PYMUPDFPRO_SETUP_SOT = state.env_extra.get('PYMUPDFPRO_SETUP_SOT')
                 if PYMUPDFPRO_SETUP_SOT:
                     CIBW_BEFORE_BUILD_LINUX += f' && git config --global --add safe.directory {PYMUPDFPRO_SETUP_SOT}'
                 
