@@ -2857,7 +2857,10 @@ def main(argv):
         pipcl.log(f'aptest: {comment=}')
         pipcl.log(f'aptest: diff:\n{textwrap.indent(diff, "    ")}')
     
-    if state.clean_wheelhouse:
+    if state.clean_wheelhouse and (
+            'build' in state.commands
+            or 'cibw' in state.commands
+            ):
         pipcl.fs_remove(state.wheelhouse)
         
     os.makedirs(state.wheelhouse, exist_ok=1)
