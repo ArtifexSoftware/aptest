@@ -691,7 +691,7 @@ def get_args(argv):
     state.clean_git = list()
     state.clean_setup = list()
     state.clean_setup_all = list()
-    state.clean_wheelhouse = False
+    state.clean_wheelhouse = True
     state.commands = list()
     state.devel = False
     state.draft_location = None
