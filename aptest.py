@@ -1100,13 +1100,11 @@ def get_args(argv):
 
             elif arg == '--remote-github-yml':
                 _yml = next(args)
-                _pattern = os.path.normpath(f'{__file__}/../.github/workflows/*.yml')
-                _leafs = [os.path.basename(i) for i in glob.glob(_pattern)]
-                _leafs.sort()
-                Assert(_yml in _leafs, f'yml should be one of {_leafs}')
-                
                 state.remote_github_yml = _yml.as_text()
-                Assert(state.remote_github_yml.endswith('.yml'), f'remote_github_yml={state.remote_github_yml} must end with .yml')
+                Assert(
+                        state.remote_github_yml.endswith('.yml'),
+                        f'remote_github_yml={state.remote_github_yml} must end with .yml',
+                        )
 
             elif arg == '--remote-github-yml-inputs':
                 state.remote_github_yml_inputs = next(args).as_text()
