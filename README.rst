@@ -13,21 +13,31 @@ Overview of Aptest
 ------------------
 
 The ``aptest.py`` script can build, test and release (to https://pypi.org) multiple
-Python packages together.
+Artifex Python packages together.
 
-Aptest can be used directly from a Git checkout, for example::
+
+How to run Aptest
+-----------------
+
+Aptest can be used directly from a Git checkout as ``aptest/aptest.py``, for example::
 
     git clone git@github.com:ArtifexSoftware/aptest.git
-    
     aptest/aptest.py ...
 
-It can also be installed using pip, which provides command ``aptest``::
 
-    pip install aptest@git+ssh://git@github.com/ArtifexSoftware/aptest.git
-    
+If one is in a venv, installing Aptest with ``pip`` provides a command
+``aptest``:
+
+* Install from local checkout::
+
+    git clone git@github.com:ArtifexSoftware/aptest.git
+    pip install ./aptest
     aptest ...
+    
+* Install directly from remote Git repository::
 
-(This might to not work properly on Windows.)
+    pip install git+ssh://git@github.com/ArtifexSoftware/aptest.git
+    aptest ...
 
 
 Supported packages
@@ -242,7 +252,8 @@ Instructions for releasing wheels for:
 * Specify package source for releases in `~/.aptest`_.
 
   This is done with upper-case versions of the usual package-specifier options,
-  so that different `--release-*`_ options can select different subsets.
+  so that different `--release-*`_ options can select different subsets
+  (see `-i`_'s `upper-case-package names`_ section).
   
   To use local checkouts:
 
@@ -251,16 +262,18 @@ Instructions for releasing wheels for:
   Or to use specific sha's for each package:
 
       ``-P 'git:--sha ...' --PRO 'git:--sha ...' --LAYOUT 'git:--sha ...' --4LLM 'git:--sha ...' --PDF4LLM 'git:--sha ...'``
+
+  Or to use the latest remote versions in git:
   
-* Specify release directory in `~/.aptest`_:
+      ``-P git: --PRO git: --LAYOUT git: --4LLM git: --PDF4LLM git:``
+  
+* Specify a release directory in `~/.aptest`_:
   
     ``--wheelhouse-union-release release-1.27.2``
 
-* Optionally specify a draft location for wheels and sdists:
+  This will eventually hold all release wheels and sdists prior to them being
+  uploaded to https://pypi.org.
 
-    ``--draft-location julian@ghostscript.com:public_html/wheels-1.27.2/``
-      
-    
 * Build wheels for all packages:
 
     ``aptest/aptest.py --release-1``
@@ -274,6 +287,8 @@ Instructions for releasing wheels for:
     ``aptest/aptest.py --release-5``
   
     ``aptest/aptest.py --release-6``
+
+  These commands can be manually run in parallel using individual terminals.
     
   On success this will populate the release directory with all wheels and sdists
   
@@ -281,22 +296,33 @@ Instructions for releasing wheels for:
   
   * `--release-*`_.
   
-* At this point one can optionally test the wheels locally.
-  
-* Optionally upload to a pypi-style repository with:
-  
-    ``aptest/aptest.py draft``
-    
-  (Assuming `--draft-location`_ was added to `~/.aptest`_.)
-    
-  Testing can then use (for example):
-    
-      ``pip install --extra-index-url https://ghostscript.com/~julian/wheels-1.27.2/simple pymupdf4llm``
-  
+* Make manual tests of the generated wheels before uploading.
 
-* Upload all wheels and sdists to https://pypi.org/ with `upload`_:
+  Install from local wheels:
+  
+  * Use the location specifed by `--wheelhouse-union-release`_ in `~/.aptest`_,
+    with ``pip install``'s ``--extra-index-url``, for example:
 
-      ``aptest/aptest.py upload``
+      ``pip install --extra-index-url release-1.27.2 pdf4llm pymupdfpro``
+
+  Or upload to, and install from, a web server:
+  
+  * ``aptest/aptest.py draft --draft-location julian@ghostscript.com:public_html/wheels-1.27.2/``.
+  
+  * ``pip install --extra-index-url https://ghostscript.com/~julian/wheels-1.27.2/simple pdf4llm pymupdfpro``
+  
+  Test the wheels:
+  
+  * Enter a venv.
+  
+  * ``pip install pytest``
+  
+  * ``pytest PyMuPDF/tests`` etc.
+
+
+* Make the release by uploading all wheels and sdists to https://pypi.org/:
+
+  ``aptest/aptest.py upload``
 
 * Release pyodide wheel.
 
@@ -311,13 +337,24 @@ Instructions for releasing wheels for:
   
   [2026-01-30: hopefully we'll have a more official location soon.]
 
-* Tag the release.
+* Update central repositories:
 
-  * We use the version number as the tag, e.g. ``1.26.7``.
-  * For each repository::
+  * Repositories are:
+  
+    * ``PyMuPDF``
+    * ``PyMuPDFPro``
+    * ``pymupdf4llm``
+    * ``sce``
+  
+  * If building with local checkouts, push each to github.
 
-      git tag <version>
-      git push origin <version>
+  * Tag each repository:
+
+    * We use the version number as the tag, e.g. ``1.26.7``.
+    * For each repository::
+
+        git tag <version>
+        git push origin <version>
 
 * Extra updates to Github's ``pymupdf`` repository.
 
@@ -1029,6 +1066,8 @@ Options
         ``aptest.py -i pymupdf pip: -i pymupdf git: build test``
             Test current pymupdf release with testsuite in current git.
 
+.. _upper-case-package names:
+
     **Using upper-case package names**
     
     If a package is specifed using an upper-case name, the package location
@@ -1421,7 +1460,8 @@ Options
 
 --draft-location <remote>
 .........................
-    Location to which the `draft`_ command rsync's ``wheelhouse_union_release``.
+    Location to which the `draft`_ command rsync's from the local directory
+    specified by `--wheelhouse-union-release`_.
     
     If ``<remote>`` can be accessed via https,
     it can be used as a pypi-style package repository with:
@@ -2276,9 +2316,11 @@ Options
 
 --use-release-args (bool)
 .........................
-    Use upper-case package locations, typically specified in `~/.aptest`_.
+    * Use upper-case package locations
+      (see `-i`_'s `upper-case-package names`_ section),
+      typically specified in `~/.aptest`_.
 
-    Also use `--wheelhouse-union-release`'s value for final wheel directory.
+    * Also use `--wheelhouse-union-release`_'s value for final wheel directory.
     
     Also see: `-i`_.
 
@@ -2368,6 +2410,13 @@ completion
 
 Changelog
 ---------
+
+**2026-04-27**
+
+* Improved `Release procedure`_.
+* Improved description of how to install aptest with pip; see `How to run Aptest`_.
+* Avoid unnecessary backtraces after some command line errors.
+
 
 **2026-04-23**
 
