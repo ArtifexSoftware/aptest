@@ -1976,8 +1976,23 @@ def do_cibw(state):
                 pipcl.run(f'git config --global --add safe.directory {directory_abs}', check=0)
             else:
                 state.env_extra['PYMUPDFPRO_SETUP_SOT'] = directory_abs
-            #if package == 'smartoffice-marina':
-            #    state.env_extra['PYMUPDFPRO_SOT_MARINA'] = '1'
+            
+            if package == 'smartoffice-marina':
+                state.env_extra['PYMUPDFPRO_SOT_MARINA'] = '1'
+                
+            if 0 and platform.system() == 'Linux' and package == 'smartoffice-marina':
+                # Building with cmake in a manylinux docker can go wrong if we've previously built marina
+                # outside of manylinux, because the CMakeCache.txt will contains the non-manylinux paths, leading to:
+                #
+                #   CMake Error: The current CMakeCache.txt directory
+                #   /host/home/.../epage/cmake-build/lib/CMakeCache.txt
+                #   is different than the directory
+                #   /home/.../epage/cmake-build/lib where CMakeCache.txt was
+                #   created. This may result in binaries being created in the
+                #   wrong place. If you are not sure, reedit the CMakeCache.txt
+                #
+                pipcl.fs_remove(f'{directory_abs}/epage/cmake-build/lib/CMakeCache.txt')
+            
             continue
         
         if state.sdists and platform.system() == 'Linux':
