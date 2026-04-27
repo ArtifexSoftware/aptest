@@ -3258,17 +3258,33 @@ def main0():
             # is killed.
             e = 1
         except Exception as ee:
-            show_details = True
+            backtrace_limit = None
             if g_devel:
                 pass
-            elif isinstance(ee, (subprocess.CalledProcessError, subprocess.TimeoutExpired)):
-                # Failed commands will have generated diagnostics already.
-                show_details = False
-            elif isinstance(ee, AptestUserError):
-                show_details = False
+            else:
+                # See whether any chained exception is a type for which we
+                # don't need to show backtraces.
+                #
+                # * Failed commands will have generated diagnostics already.
+                # * AptestUserError exceptions already contain enough
+                #   information.
+                #
+                ee2 = ee
+                while ee2:
+                    if isinstance(
+                            ee2,
+                            (
+                                subprocess.CalledProcessError,
+                                subprocess.TimeoutExpired,
+                                AptestUserError,
+                            )
+                            ):
+                        backtrace_limit = 0
+                        break
+                    ee2 = ee2.__cause__
             backtrace.show(
                     reverse_chain=1,
-                    limit=None if show_details else 0,
+                    limit=backtrace_limit,
                     brief=1,
                     )
             e = 1
