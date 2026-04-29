@@ -1761,8 +1761,10 @@ def do_build_single(state, package):
     return ret_wheel
 
 
-def do_build(state):
-    
+def set_pseudo_package_env(state):
+    '''
+    Set state.env_extra[] to force build of specified pseudo packages.
+    '''
     if 'mupdf' in state.packages:
         directory = _get_local('mupdf', state)
         if directory:
@@ -1786,6 +1788,11 @@ def do_build(state):
                 state.env_extra['PYMUPDFPRO_SETUP_SOT_BUILD'] = PYMUPDFPRO_SETUP_SOT_BUILD
         if p == 'smartoffice-marina':
             state.env_extra['PYMUPDFPRO_SOT_MARINA'] = '1'
+
+
+def do_build(state):
+    
+    set_pseudo_package_env(state)
     
     package_to_wheel = dict()
     
@@ -1827,6 +1834,8 @@ def do_cibw(state):
     if state.pytest_timeout:
         pipcl.run(f'pip install --upgrade pytest-timeout')
 
+    set_pseudo_package_env(state)
+    
     # Some general flags.
     if 'CIBW_BUILD_VERBOSITY' not in state.env_extra:
         state.env_extra['CIBW_BUILD_VERBOSITY'] = '1'
