@@ -12,32 +12,40 @@ Aptest - artifex python packages build/test system
 Overview of Aptest
 ------------------
 
-The ``aptest.py`` script can build, test and release (to https://pypi.org) multiple
-Artifex Python packages together.
+Aptest is a command-line programme that can build, test and release (to
+https://pypi.org) multiple Artifex Python packages together.
 
 
 How to run Aptest
 -----------------
 
-Aptest can be used directly from a Git checkout as ``aptest/aptest.py``, for example::
+Aptest can be run in various ways:
+
+
+* Run directly from local Aptest Git checkout, using command ``aptest/aptest.py``::
 
     git clone git@github.com:ArtifexSoftware/aptest.git
     aptest/aptest.py ...
 
-
-If one is in a venv, installing Aptest with ``pip`` provides a command
-``aptest``:
-
-* Install from local checkout::
+* Install into current venv from local Aptest Git checkout, and use command ``aptest``::
 
     git clone git@github.com:ArtifexSoftware/aptest.git
     pip install ./aptest
     aptest ...
-    
-* Install directly from remote Git repository::
+
+* Install into current venv from remote Aptest Git repository, and use command ``aptest``::
 
     pip install git+ssh://git@github.com/ArtifexSoftware/aptest.git
     aptest ...
+
+* Use `pipx <https://pypi.org/project/pipx/>`_ with local Aptest Git checkout::
+
+    git clone git@github.com:ArtifexSoftware/aptest.git
+    pipx run ./aptest ...
+
+* Use `pipx <https://pypi.org/project/pipx/>`_ with remote Aptest Git repository::
+
+    pipx run artifex_aptest@git+ssh://git@github.com/ArtifexSoftware/aptest.git ...
 
 
 Supported packages
@@ -2410,6 +2418,12 @@ completion
 
 Changelog
 ---------
+
+**2026-04-30**
+
+* Improved `How to run Aptest`_, and added pipx examples.
+* Improved pro/marina builds with `cibw`_.
+
 
 **2026-04-27**
 
