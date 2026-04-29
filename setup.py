@@ -10,6 +10,7 @@ def build():
             ('doct.py', 'artifex_aptest/'),
             ('graph.py', 'artifex_aptest/'),
             ('github.py', 'artifex_aptest/'),
+            ('README.rst', 'artifex_aptest/'),
             ]
 
 
