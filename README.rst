@@ -2419,6 +2419,11 @@ completion
 Changelog
 ---------
 
+**2026-04-31**
+
+* Fix bug if python executable path has spaces, e.g. on Windows.
+
+
 **2026-04-30**
 
 * Improved `How to run Aptest`_, and added pipx examples.
