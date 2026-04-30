@@ -575,7 +575,7 @@ def add_package(state, name, location):
             #ok_locations.append(path[:-5])  # With trailing `/`.
             ok_locations.append(path[:-6])
         ok_locations.sort()
-        if location not in ok_locations:
+        if location not in ok_locations and not os.path.isdir(f'{location.as_str()}/.git'):
             if COMP_LINE:
                 # Raise exception to force listing of available checkouts.
                 Assert(location in ok_locations, f'Location is not a Git checkout in current directory: {location}')
