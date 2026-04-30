@@ -133,7 +133,11 @@ def enter(*,
         packages = list()
     else:
         # Create venv.
-        run(f'{sys.executable} -m venv {venv_name}', verbose, t0)
+        if platform.system() == 'Windows':
+            executable = f'"{sys.executable}"'
+        else:
+            executable = shlex.quote(sys.executable)
+        run(f'{executable} -m venv {venv_name}', verbose, t0)
 
     # Get command to enter venv.
     if platform.system() == 'Windows':
