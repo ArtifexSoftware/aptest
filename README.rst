@@ -2422,6 +2422,7 @@ Changelog
 **2026-04-31**
 
 * Fix bug if python executable path has spaces, e.g. on Windows.
+* Fix incorrect warnings about directories not being a git checkout, e.g. with case changes on Windows or trailing slash.
 
 
 **2026-04-30**
