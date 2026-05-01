@@ -276,8 +276,10 @@ class Args:
     Enhanced args iterator, wrapping ArgsEq, that returns an Arg instead of a
     string, so we can gather completion information.
     '''
-    def __init__(self, argv, pos=0):
-        self.args_eq = ArgsEq(argv, pos=pos)
+    def __init__(self, argv, startpos=0):
+        pipcl.log(f'{startpos=}')
+        self.startpos = startpos
+        self.args_eq = ArgsEq(argv, pos=startpos)
         self.completions = Completions()
         self.current = None # Always the last returned Arg.
     
@@ -300,16 +302,28 @@ class Args:
         #pipcl.log(f'Returning: {arg=}')
         return arg
     
-    def error_text(self):
+    def error_text(self, regions):
         '''
         Returns two-line text containing the command line and caret characters
         pointing to where the command line was incorrect.
         
         fixme: move this into ArgsEq.
         '''
+        regions = regions or list()
+        pos_ = 0
+        pipcl.log(f'{len(self.args_eq._returned_items)=}')
+        
+        region_name, region_pos = None, 0
+        for (region_name, region_pos) in reversed(regions):
+            pipcl.log(f'{region_name=} {region_pos=}')
+            if region_pos <= len(self.args_eq._returned_items):
+                break
+        pipcl.log(f'{region_pos=} {region_name=}')
         line1 = ''
         line2 = ''
-        for i, (text, (_pos, pos_eq)) in enumerate(self.args_eq._returned_items):    # pylint: disable=protected-access)
+        
+        for i, (text, (_pos, pos_eq)) in enumerate(self.args_eq._returned_items[region_pos-self.startpos:]):    # pylint: disable=protected-access)
+            i += region_pos-self.startpos
             #if i:
             #    line1 += ' '
             #    line2 += ' '
@@ -328,7 +342,7 @@ class Args:
                     line2 += '^' * len(t)
                 else:
                     line2 += ' ' * len(t)
-        return f'{line1}\n{line2}\n'
+        return f'{line1}\n{line2}\n', region_name
     
     @property
     def argv(self):
@@ -364,7 +378,7 @@ class Args:
     def suggestions(self):
         return self.completions.items
     
-    def final(self):
+    def final(self, regions=None):
         '''
         Handles command-line parsing errors and base completion. We write out
         completions if COMP_LINE is set. Otherwise we write out diagnostics if
@@ -408,8 +422,12 @@ class Args:
                 sys.exit()
             else:
                 text = ''
-                text += 'Bad args\n'
-                text += self.error_text()
+                text += 'Bad args'
+                text_description, region_name = self.error_text(regions)
+                if region_name:
+                    text += f' in {region_name}'
+                text += '\n'
+                text += text_description
                 if isinstance(exception, StopIteration):
                     text += f'Ran out of arguments.\n'
                 suggestions = get_suggestions()
