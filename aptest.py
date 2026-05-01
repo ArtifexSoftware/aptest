@@ -789,6 +789,8 @@ def get_args(argv):
     args_list = list()
     args_list += [argv[0]]
     
+    regions = list()
+    
     # First read args from ~/.aptest if it exists.
     if os.environ.get('APTEST_DOT_APTEST') != '0' and not APTEST_NESTED:
         aptest_config_path = os.path.expanduser(f'~/.aptest')
@@ -799,12 +801,15 @@ def get_args(argv):
                 if not line.startswith('#'):
                     aptest_config2 += f'{line}\n'
             aptest_config = shlex.split(aptest_config2)
+            regions.append( ('~/.aptest', len(args_list)) )
             args_list += aptest_config
     
     # Read args from APTEST_options if set.
-    APTEST_options = os.environ.get('APTEST_options', '')
-    APTEST_options = shlex.split(APTEST_options)
-    args_list += APTEST_options
+    APTEST_options = os.environ.get('$APTEST_options')
+    if APTEST_options:
+        APTEST_options = shlex.split(APTEST_options)
+        regions.append( ('APTEST_options', len(args_list)) )
+        args_list += APTEST_options
     
     if COMP_LINE:
         # Bash completion, get args from COMP_LINE instead of sys.argv.
@@ -818,6 +823,7 @@ def get_args(argv):
         pipcl.log(f'     {args_list=}')
     else:
         # Normal operation, get args from <argv>.
+        regions.append( ('command line', len(args_list)) )
         args_list += argv[1:]
         if 0:
             pipcl.log(f'args_list ({len(args_list)}):')
@@ -1240,7 +1246,8 @@ def get_args(argv):
     finally:
         # cli.Args.final() will handle writing out completions if COMP_LINE is
         # set, or writing out diagnostics if parsing the command line failed.
-        args.final()
+        pipcl.log(f'{regions=}')
+        args.final(regions)
     #pipcl.log(f'{args.args_eq.argv=}')
     
     return args, state
