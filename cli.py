@@ -408,7 +408,7 @@ class Args:
                 sys.exit()
             else:
                 text = ''
-                text += 'Bad command line\n'
+                text += 'Bad args\n'
                 text += self.error_text()
                 if isinstance(exception, StopIteration):
                     text += f'Ran out of arguments.\n'
@@ -417,7 +417,8 @@ class Args:
                     text += f'Expected one of:\n'
                     text += suggestions
                 else:
-                    text += f'(No suggestions available.)\n'
+                    pass
+                    #text += f'(No suggestions available.)\n'
                 raise Exception(text.strip()) from exception
                 
         else:
