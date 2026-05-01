@@ -8,6 +8,7 @@ import inspect
 import io
 import os
 import sys
+import textwrap
 import traceback
 import types
 
@@ -300,7 +301,9 @@ def show(
                 outer=outer,
                 show_exception_type=show_exception_type,
                 reverse=reverse,
+                reverse_chain=reverse_chain,
                 framef=framef,
+                brief=brief,
                 )
 
     if chain and exception and not reverse_chain:
@@ -327,11 +330,17 @@ def show(
             show = show_exception_type(exception)
         else:
             show = show_exception_type
+        text = ''
         if show:
             for line in traceback.format_exception_only(type(exception), exception):
-                out.write(line)
+                for line2 in line.rstrip('\n').split('\n'):
+                    text += f'{line2}\n'
         else:
-            out.write(f'{exception}\n')
+            text = f'{exception}'
+        for i, line in enumerate(text.rstrip('\n').split('\n')):
+            if i:
+                out.write('    ')
+            out.write(f'{line}\n')
 
     def write_tb():
         outer2 = outer
@@ -353,7 +362,7 @@ def show(
         # Output any inner chained exception(s) after current exception.
         if exception.__cause__:
             if brief:
-                out.write(f'\nBecause: ')
+                out.write(f'Because: ')
             else:
                 out.write(f'\nThe above exception was directly caused by the following exception:\n')
             do_chain(exception.__cause__)
