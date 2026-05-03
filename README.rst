@@ -2419,6 +2419,13 @@ completion
 Changelog
 ---------
 
+**2026-05-03**
+
+* More concise command-line diagnostics if `~/.aptest`_ or `$APTEST_options`_
+  are used.
+* If we fail to create softlink to venv, output warning instead of failing.
+
+
 **2026-04-31**
 
 * Fix bug if python executable path has spaces, e.g. on Windows.
