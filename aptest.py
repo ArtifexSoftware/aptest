@@ -589,7 +589,18 @@ def add_package(state, name, location):
         state.packages_for_release[name.lower()] = location # A cli.Arg.
         return
     
-    location_pos = (location.as_str(), location.pos)
+    location_str = location.as_str()
+    if pipcl.windows() and not location.text.startswith(('git:', 'pip:')):
+        APTEST_PACKAGE_LOCATION_LOWERCASE = state.env_extra.get(f'APTEST_PACKAGE_LOCATION_LOWERCASE')
+        pipcl.log(f'{APTEST_PACKAGE_LOCATION_LOWERCASE=}')
+        pipcl.log(f'{name=}')
+        pipcl.log(f'{location=}')
+        if APTEST_PACKAGE_LOCATION_LOWERCASE == name:
+            pipcl.log(f'{APTEST_PACKAGE_LOCATION_LOWERCASE=} Forcing lower case for {location_str=}.')
+            location_str = location_str.lower()
+            pipcl.log(f'{location_str=}')
+    
+    location_pos = (location_str, location.pos)
     
     if name in state.packages:
         pipcl.log(f'Adding second location for {name=} testing only: {location=}')
