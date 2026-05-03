@@ -590,6 +590,8 @@ def add_package(state, name, location):
         return
     
     location_str = location.as_str()
+    
+    # Internal debugging only.
     if pipcl.windows() and not location.text.startswith(('git:', 'pip:')):
         APTEST_PACKAGE_LOCATION_LOWERCASE = state.env_extra.get(f'APTEST_PACKAGE_LOCATION_LOWERCASE')
         pipcl.log(f'{APTEST_PACKAGE_LOCATION_LOWERCASE=}')
@@ -2792,7 +2794,10 @@ def main(argv):
     del argv
     
     # Update convenience link to venv.
-    pipcl.fs_symlink(g_venv_prefix, os.path.relpath(sys.prefix))
+    try:
+        pipcl.fs_symlink(g_venv_prefix, os.path.relpath(sys.prefix))
+    except Exception as e:
+        pipcl.log(f'Warning: unable to create symlink from {g_venv_prefix!r} to {os.path.relpath(sys.prefix)!r}: {e}')
         
     if state.devel:
         # Leave pipcl's default, which includes elapsed time and file:line:fn.
