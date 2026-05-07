@@ -1396,7 +1396,7 @@ def do_remote_github(state, args):
             args_string = shlex.join(args.args_eq.argv[1:])
             # We define the .yml's `matrix: os: ...` by passing in a dict encoded with json, as
             # expected by test.yml's workflow_dispatch:inputs:matrix
-            Assert(state.remote_github_runners, f'No runner specified.')
+            Assert(state.remote_github_runners, f'No Github runners specified.')
             matrix = {
                     'os': state.remote_github_runners,
                     }
@@ -2659,7 +2659,7 @@ def do_test_single(state, package, failed_packages):
 
             path_junit_xml = f'{os.path.abspath(state.wheelhouse)}/{package}-pytest-junit.xml'
 
-            command = f'cd {directory} && pytest'
+            command = f'pytest'
             if state.pytest_timeout:
                 command += f' --timeout {state.pytest_timeout}'
             if state.pytest_timeout_method:
@@ -2724,6 +2724,7 @@ def do_test_single(state, package, failed_packages):
                             )
                 else:
                     assert 0, f'Unrecognised {state.pytest_wrap=}.'
+            command = f'cd {directory} && {command}'
             e = pipcl.run(
                     command,
                     env_extra=state.env_extra,
