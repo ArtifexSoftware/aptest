@@ -2419,6 +2419,11 @@ completion
 Changelog
 ---------
 
+**2026-05-07**
+
+* Fix `--pytest-wrap`_.
+
+
 **2026-05-03**
 
 * More concise command-line diagnostics if `~/.aptest`_ or `$APTEST_options`_
