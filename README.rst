@@ -15,6 +15,8 @@ Overview of Aptest
 Aptest is a command-line programme that can build, test and release (to
 https://pypi.org) multiple Artifex Python packages together.
 
+Aptest is hosted at https://github.com/ArtifexSoftware/aptest.
+
 
 How to run Aptest
 -----------------
@@ -308,7 +310,7 @@ Instructions for releasing wheels for:
 
   Install from local wheels:
   
-  * Use the location specifed by `--wheelhouse-union-release`_ in `~/.aptest`_,
+  * Use the location specified by `--wheelhouse-union-release`_ in `~/.aptest`_,
     with ``pip install``'s ``--extra-index-url``, for example:
 
       ``pip install --extra-index-url release-1.27.2 pdf4llm pymupdfpro``
@@ -1078,7 +1080,7 @@ Options
 
     **Using upper-case package names**
     
-    If a package is specifed using an upper-case name, the package location
+    If a package is specified using an upper-case name, the package location
     is stored in a separate list that is only used if `--use-release-args`_
     is specified. This is typically used in `~/.aptest`_ to simplify making
     releases.
@@ -2418,6 +2420,11 @@ completion
 
 Changelog
 ---------
+
+**2026-05-10**
+
+* Updated test_multiple, we currently need to patch marina.
+
 
 **2026-05-07**
 
