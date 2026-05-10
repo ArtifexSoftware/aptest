@@ -50,6 +50,7 @@ def test_pylint():
             C0415: Import outside toplevel (pipcl) (import-outside-toplevel)
             C0114: Missing module docstring (missing-module-docstring)
             R0801: Similar lines in 2 files
+            R1727: (condition-evals-to-constant)
             '''
             )
     ignores_list = list()

@@ -302,7 +302,7 @@ class Args:
         #pipcl.log(f'Returning: {arg=}')
         return arg
     
-    def error_text(self, regions):
+    def error_text(self, regions=None):
         '''
         Returns two-line text containing the command line and caret characters
         pointing to where the command line was incorrect.
@@ -310,13 +310,12 @@ class Args:
         fixme: move this into ArgsEq.
         '''
         regions = regions or list()
-        pos_ = 0
-        pipcl.log(f'{len(self.args_eq._returned_items)=}')
+        pipcl.log(f'{len(self.args_eq._returned_items)=}')  # pylint: disable=protected-access)
         
         region_name, region_pos = None, 0
         for (region_name, region_pos) in reversed(regions):
             pipcl.log(f'{region_name=} {region_pos=}')
-            if region_pos <= len(self.args_eq._returned_items):
+            if region_pos <= len(self.args_eq._returned_items): # pylint: disable=protected-access)
                 break
         pipcl.log(f'{region_pos=} {region_name=}')
         line1 = ''

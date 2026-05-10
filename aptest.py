@@ -814,14 +814,14 @@ def get_args(argv):
                 if not line.startswith('#'):
                     aptest_config2 += f'{line}\n'
             aptest_config = shlex.split(aptest_config2)
-            regions.append( ('~/.aptest', len(args_list)) )
+            regions.append( ('~/.aptest', len(args_list)))
             args_list += aptest_config
     
     # Read args from APTEST_options if set.
     APTEST_options = os.environ.get('$APTEST_options')
     if APTEST_options:
         APTEST_options = shlex.split(APTEST_options)
-        regions.append( ('APTEST_options', len(args_list)) )
+        regions.append( ('APTEST_options', len(args_list)))
         args_list += APTEST_options
     
     if COMP_LINE:
@@ -836,7 +836,7 @@ def get_args(argv):
         pipcl.log(f'     {args_list=}')
     else:
         # Normal operation, get args from <argv>.
-        regions.append( ('command line', len(args_list)) )
+        regions.append( ('command line', len(args_list)))
         args_list += argv[1:]
         if 0:
             pipcl.log(f'args_list ({len(args_list)}):')
@@ -969,6 +969,7 @@ def get_args(argv):
                     path, env = text
                 else:
                     Assert(0, f'Expected one or two comma-separted items in {text!r}')
+                    path = env = None # Keep pylint happy.
                 _add_key(state, prefix, path, env, pos)
             
             elif arg == '--log-prefix':
@@ -1173,6 +1174,7 @@ def get_args(argv):
                             'eval/eval_pymupdf4llm.py',
                             'eval/eval_pymupdf_layout.py',
                             ),
+                        f'Unrecognised {test_gnn_det=}',
                         )
                 state.test_gnn_det = test_gnn_det.as_str()
                 
