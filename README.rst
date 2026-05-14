@@ -2421,6 +2421,11 @@ completion
 Changelog
 ---------
 
+**2026-05-14**
+
+* Improved handling of EOF on command line.
+
+
 **2026-05-10**
 
 * Updated test_multiple, we currently need to patch marina.
