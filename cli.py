@@ -12,6 +12,11 @@ except ImportError:
 
 import pipcl
 
+
+class CliError(Exception):
+    pass
+
+
 class ArgsEq:
     '''
     Enhanced iterator for list of arguments, optionally splitting args at '=',
@@ -83,13 +88,9 @@ class ArgsEq:
             self.pos += 1
             self.pos_sub = 0
         else:
-            assert self.pos <= len(self.argv), (
-                    f'Calling code failed to terminate loop after StopIteration(). {self.pos=} {len(self.argv)=}'
-                    )
             if self.pos == len(self.argv):
                 #pipcl.log(f'Returning StopIteration.')
                 ret = StopIteration
-                self.pos += 1
             else:
                 ret = self.argv[self.pos]
                 eq = -1
@@ -277,7 +278,7 @@ class Args:
     string, so we can gather completion information.
     '''
     def __init__(self, argv, startpos=0):
-        pipcl.log(f'{startpos=}')
+        #pipcl.log(f'{startpos=}')
         self.startpos = startpos
         self.args_eq = ArgsEq(argv, pos=startpos)
         self.completions = Completions()
@@ -310,14 +311,14 @@ class Args:
         fixme: move this into ArgsEq.
         '''
         regions = regions or list()
-        pipcl.log(f'{len(self.args_eq._returned_items)=}')  # pylint: disable=protected-access)
+        #pipcl.log(f'{len(self.args_eq._returned_items)=}')  # pylint: disable=protected-access)
         
         region_name, region_pos = None, 0
         for (region_name, region_pos) in reversed(regions):
-            pipcl.log(f'{region_name=} {region_pos=}')
+            #pipcl.log(f'{region_name=} {region_pos=}')
             if region_pos <= len(self.args_eq._returned_items): # pylint: disable=protected-access)
                 break
-        pipcl.log(f'{region_pos=} {region_name=}')
+        #pipcl.log(f'{region_pos=} {region_name=}')
         line1 = ''
         line2 = ''
         
@@ -436,7 +437,7 @@ class Args:
                 else:
                     pass
                     #text += f'(No suggestions available.)\n'
-                raise Exception(text.strip()) from exception
+                raise CliError(text.strip()) from exception
                 
         else:
             if COMP_LINE:
