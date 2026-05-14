@@ -1261,7 +1261,6 @@ def get_args(argv):
     finally:
         # cli.Args.final() will handle writing out completions if COMP_LINE is
         # set, or writing out diagnostics if parsing the command line failed.
-        pipcl.log(f'{regions=}')
         args.final(regions)
     #pipcl.log(f'{args.args_eq.argv=}')
     
@@ -3327,6 +3326,7 @@ def main0():
                                 subprocess.CalledProcessError,
                                 subprocess.TimeoutExpired,
                                 AptestUserError,
+                                cli.CliError,
                             )
                             ):
                         backtrace_limit = 0
