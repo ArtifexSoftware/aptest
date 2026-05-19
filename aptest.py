@@ -706,7 +706,7 @@ def get_args(argv):
     state.clean_git = list()
     state.clean_setup = list()
     state.clean_setup_all = list()
-    state.clean_wheelhouse = True
+    state.clean_wheelhouse = 'auto'
     state.commands = list()
     state.devel = False
     state.draft_location = None
@@ -912,6 +912,9 @@ def get_args(argv):
             
             elif arg == '--clean-wheelhouse':
                 state.clean_wheelhouse = args.get_bool()
+            
+            elif arg == '--clean-wheelhouse-auto':
+                state.clean_wheelhouse = 'auto'
             
             elif arg == '--clean-setup':
                 packages = package_aliases(next(args))
@@ -2939,32 +2942,25 @@ def main(argv):
         pipcl.log(f'aptest: {comment=}')
         pipcl.log(f'aptest: diff:\n{textwrap.indent(diff, "    ")}')
     
-    if state.clean_wheelhouse and (
-            'build' in state.commands
-            or 'cibw' in state.commands
+    clean_wheelhouse = state.clean_wheelhouse
+    if clean_wheelhouse == 'auto':
+        if (
+                set(state.packages) == set(state.packages_build)
+                and (
+                    'build' in state.commands
+                    or 'cibw' in state.commands
+                    )
             ):
-        if 0:
-            pipcl.fs_remove(state.wheelhouse)
-        elif 0:
-            packages_to_preserve = set()
-            for package in state.packages:
-                if package not in state.packages_build:
-                    pipcl.log(f'    Adding to packages_to_preserve: {package}')
-                    packages_to_preserve.add(package)
-            for p in glob.glob(f'{state.wheelhouse}/*.whl'):
-                for package in packages_to_preserve:
-                    if os.path.basename(p).startswith(f'{package}-'):
-                        pipcl.log(f'Not removing {p=} because of {package=}')
-                        break
-                else:
-                    pipcl.log(f'Removing from {state.wheelhouse=}: {p}')
-                    pipcl.fs_remove(p)
-        elif 0:
-            for package in state.packages_build:
-                for p in glob.glob(f'{state.wheelhouse}/{package}-*.whl'):
-                    pipcl.log(f'Removing from {state.wheelhouse=}: {p}')
-                    pipcl.fs_remove(p)
-        
+            # We're building all packages, so clean wheelhouse.
+            clean_wheelhouse = True
+        else:
+            # We're not building all packages, don't clean wheelhouse so that
+            # tests can still be run.
+            pipcl.log(f'Not removing {state.wheelhouse=} because not building all packages.')
+            clean_wheelhouse = False
+    if clean_wheelhouse:
+        pipcl.log(f'Removing {state.wheelhouse=}.')
+        pipcl.fs_remove(state.wheelhouse)
     os.makedirs(state.wheelhouse, exist_ok=1)
         
     # Set environment variable values in <state.env_extra> to give access to
