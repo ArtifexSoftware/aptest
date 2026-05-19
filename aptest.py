@@ -706,7 +706,7 @@ def get_args(argv):
     state.clean_git = list()
     state.clean_setup = list()
     state.clean_setup_all = list()
-    state.clean_wheelhouse = False
+    state.clean_wheelhouse = True
     state.commands = list()
     state.devel = False
     state.draft_location = None
@@ -1039,6 +1039,9 @@ def get_args(argv):
 
             elif arg == '--pytest':
                 state.pytest_options = next(args).as_text()
+            
+            elif arg == '--pytest-junit-xml':
+                state.pytest_junit_xml = args.get_bool()
 
             elif arg == '--pytest-path':
                 state.pytest_paths.append(next(args).as_text())
