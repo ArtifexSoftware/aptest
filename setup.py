@@ -2,6 +2,9 @@ import pipcl
 
 
 def build():
+    
+    sha, comment, diff, branch = pipcl.git_info('.')
+    gitinfo = f'{sha=}\n{comment=}\n{branch=}\n{diff=}\n'
     return [
             ('aptest.py', 'artifex_aptest/__init__.py'),
             ('autovenv.py', 'artifex_aptest/'),
@@ -11,6 +14,7 @@ def build():
             ('graph.py', 'artifex_aptest/'),
             ('github.py', 'artifex_aptest/'),
             ('README.rst', 'artifex_aptest/'),
+            (gitinfo.encode('utf8'), 'artifex_aptest/gitinfo.py'),
             ]
 
 
