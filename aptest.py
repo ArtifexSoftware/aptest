@@ -695,6 +695,7 @@ def get_args(argv):
     state = State()
     
     state.build_type = None
+    state.build_pip_no_clean = False
     state.check_pushed = False
     state.check_unchanged = False
     state.cibw_ignore_test_failures = False
@@ -705,7 +706,7 @@ def get_args(argv):
     state.clean_git = list()
     state.clean_setup = list()
     state.clean_setup_all = list()
-    state.clean_wheelhouse = True
+    state.clean_wheelhouse = False
     state.commands = list()
     state.devel = False
     state.draft_location = None
@@ -735,6 +736,7 @@ def get_args(argv):
     state.packages = dict()   # map from name to location.
     state.packages_test = list()  # Sorted list of names.
     state.packages_for_release = dict()
+    state.pytest_junit_xml = False
     state.pytest_options = ''
     state.pytest_paths = list()
     state.pytest_timeout = None
@@ -878,6 +880,9 @@ def get_args(argv):
                 for p in state.packages_build:
                     Assert(p in state.packages, f'Package location not specified: {p}.')
 
+            elif arg == '--build-pip-no-clean':
+                state.build_pip_no_clean = args.get_bool()
+            
             elif arg == '--build-type':
                 build_type = next(args)
                 Assert(build_type in ('release', 'debug', 'memento'), f'Unrecognised {build_type=} should be one of: release debug memento')
@@ -1645,6 +1650,7 @@ def do_build_single(state, package):
         return ret_wheel
     if package == 'aptest':
         return ret_wheel
+    pip_wheel_no_clean = ' --no-clean' if state.build_pip_no_clean else ''
 
     new_files = pipcl.NewFiles(f'{state.wheelhouse}/{package}*.whl')
 
@@ -1668,7 +1674,7 @@ def do_build_single(state, package):
         for p in glob.glob(f'{state.wheelhouse}/{package}-*.whl'):
             pipcl.log(f'Removing: {p}')
             pipcl.fs_remove(p)
-        pipcl.run(f'pip wheel --no-cache-dir -w {state.wheelhouse} {name}')
+        pipcl.run(f'pip wheel{pip_wheel_no_clean} --no-cache-dir -w {state.wheelhouse} {name}')
         ret_wheel = new_files.get_one()
         pipcl.run(f'pip uninstall -y {name}')
         pipcl.run(f'pip install -v {name}')
@@ -1760,7 +1766,7 @@ def do_build_single(state, package):
                     state.env_extra['PYMUPDF_LAYOUT_SETUP_BUILD_TYPE'] = state.build_type
             
             pipcl.run(
-                    f'pip wheel -v --extra-index-url {pip_index_url} -w {state.wheelhouse} {directory_abs}',
+                    f'pip wheel{pip_wheel_no_clean} -v --extra-index-url {pip_index_url} -w {state.wheelhouse} {directory_abs}',
                     env_extra=state.env_extra,
                     prefix=f'build {package}: ',
                     )
@@ -2080,7 +2086,8 @@ def do_cibw(state):
                     CIBW_TEST_COMMAND += f' --timeout {state.pytest_timeout}'
                 if state.pytest_timeout_method:
                     CIBW_TEST_COMMAND += f' --timeout-method {state.pytest_timeout_method}'
-                CIBW_TEST_COMMAND += f' --junit-xml={os.path.abspath(state.wheelhouse)}/aptest-pytest-junit.xml'
+                if state.pytest_junit_xml:
+                    CIBW_TEST_COMMAND += f' --junit-xml={os.path.abspath(state.wheelhouse)}/aptest-pytest-junit.xml'
                 if state.pytest_options:
                     CIBW_TEST_COMMAND += f' {state.pytest_options}'
                 if state.pytest_paths:
@@ -2658,7 +2665,8 @@ def do_test_single(state, package, failed_packages):
             if package == 'aptest':
                 pipcl.run(f'pip install swig')
 
-            path_junit_xml = f'{os.path.abspath(state.wheelhouse)}/{package}-pytest-junit.xml'
+            if state.pytest_junit_xml:
+                path_junit_xml = f'{os.path.abspath(state.wheelhouse)}/{package}-pytest-junit.xml'
 
             command = f'pytest'
             if state.pytest_timeout:
@@ -2666,7 +2674,8 @@ def do_test_single(state, package, failed_packages):
             if state.pytest_timeout_method:
                 command += f' --timeout-method {state.pytest_timeout_method}'
             #command += f' --report-log=aptest-pytest.jsonl'
-            command += f' --junit-xml={path_junit_xml}'
+            if state.pytest_junit_xml:
+                command += f' --junit-xml={path_junit_xml}'
             #command += f' --durations=10'
             if state.pytest_options:
                 command += f' {state.pytest_options}'
@@ -2697,7 +2706,7 @@ def do_test_single(state, package, failed_packages):
             if state.pytest_wrap:
                 command = f'python -m {command}'
                 if state.pytest_wrap == 'gdb':
-                    command = f'gdb --args {command}'
+                    command = f'gdb -ex "set print inferior-events off" --args {command}'
                 elif state.pytest_wrap == 'valgrind':
                     state.env_extra['PYMUPDF_RUNNING_ON_VALGRIND'] = '1'
                     state.env_extra['PYTHONMALLOC'] = 'malloc'
@@ -2731,12 +2740,13 @@ def do_test_single(state, package, failed_packages):
                     env_extra=state.env_extra,
                     check=0,
                     )
-            try:
-                junit_xml_pretty = xml.dom.minidom.parse(path_junit_xml).toprettyxml()
-                pipcl.fs_write(f'{path_junit_xml}.xml', junit_xml_pretty)
-            except Exception as ee:
-                e = ee
-                pipcl.log(f'Failed to prettyfy {path_junit_xml=}: {e}')
+            if state.pytest_junit_xml:
+                try:
+                    junit_xml_pretty = xml.dom.minidom.parse(path_junit_xml).toprettyxml()
+                    pipcl.fs_write(f'{path_junit_xml}.xml', junit_xml_pretty)
+                except Exception as ee:
+                    e = ee
+                    pipcl.log(f'Failed to prettyfy {path_junit_xml=}: {e}')
         if e:
             pipcl.log(f'Tests failed for {package=}.')
             failed_packages.append(package)
@@ -2766,6 +2776,8 @@ def do_test(state):
         for p in state.test_extra_packages:
             command += f' {shlex.quote(p)}'
         pipcl.run(command)
+    
+    pipcl.log(f'pip list')
 
     for package in state.packages_test:
         with pipcl.LogPrefix(f'{package}: '):
@@ -2776,6 +2788,23 @@ def do_test(state):
         for package in failed_packages:
             pipcl.log(f'    {package}')
         raise Exception(f'Packages failed tests: {failed_packages}')
+
+
+def get_self_gitinfo():
+    sha, comment, diff, branch = pipcl.git_info(g_root)
+    if sha:
+        return sha, comment, diff, branch
+    try:
+        from . import gitinfo
+    except ImportError:
+        return None, None, None, None
+    else:
+        return (
+                gitinfo.sha,
+                gitinfo.comment,
+                gitinfo.diff,
+                gitinfo.branch,
+                )
 
 
 def main(argv):
@@ -2810,6 +2839,9 @@ def main(argv):
     else:
         # Just output elapsed time by default.
         pipcl.g_log_format = f'[+%d]: {os.path.basename(sys.prefix)}: '
+    
+    sha, comment, diff, _branch = get_self_gitinfo()
+    pipcl.log(f'Aptest gitinfo: {sha=}: {comment}')
     
     if state.show_help:
         p = os.path.abspath(f'{__file__}/../README.rst')
@@ -2908,7 +2940,27 @@ def main(argv):
             'build' in state.commands
             or 'cibw' in state.commands
             ):
-        pipcl.fs_remove(state.wheelhouse)
+        if 0:
+            pipcl.fs_remove(state.wheelhouse)
+        elif 0:
+            packages_to_preserve = set()
+            for package in state.packages:
+                if package not in state.packages_build:
+                    pipcl.log(f'    Adding to packages_to_preserve: {package}')
+                    packages_to_preserve.add(package)
+            for p in glob.glob(f'{state.wheelhouse}/*.whl'):
+                for package in packages_to_preserve:
+                    if os.path.basename(p).startswith(f'{package}-'):
+                        pipcl.log(f'Not removing {p=} because of {package=}')
+                        break
+                else:
+                    pipcl.log(f'Removing from {state.wheelhouse=}: {p}')
+                    pipcl.fs_remove(p)
+        elif 0:
+            for package in state.packages_build:
+                for p in glob.glob(f'{state.wheelhouse}/{package}-*.whl'):
+                    pipcl.log(f'Removing from {state.wheelhouse=}: {p}')
+                    pipcl.fs_remove(p)
         
     os.makedirs(state.wheelhouse, exist_ok=1)
         
