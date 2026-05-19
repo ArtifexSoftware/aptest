@@ -475,8 +475,9 @@ See the `-v`_ option.
 Pytest junit .xml output
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-When running `pytest <https://docs.pytest.org>`_ with the `test`_ and `cibw`_ commands,
-Aptest always specifies ``--junit-xml=aptest-wheelhouse/<package-name>-pytest-junit.xml``,
+If `--pytest-junit-xml`_ is specified,
+then when running `pytest <https://docs.pytest.org>`_ with the `test`_ and `cibw`_ commands,
+Aptest specifies ``--junit-xml=aptest-wheelhouse/<package-name>-pytest-junit.xml``,
 which generates an .xml file containing the test results.
 
 The .xml file is also copied back to local machine along with .whl files if `-r`_ is used.
@@ -735,11 +736,11 @@ build
     Also see:
 
     * `-b`_
+    * `--build-pip-no-clean`_
     * `--build-type`_
     * `--clean-git`_
     * `--clean-setup`_
     * `--clean-setup-all`_
-
 
 cibw
 ....
@@ -1032,20 +1033,6 @@ Options
         (or their aliases.)
 
     ``package-location`` should be one of:
-    
-        ``pip:``
-            Install from https://pypi.org using pip.
-
-        ``pip:<suffix>``
-            Install ``<package-name><suffix>`` from https://pypi.org using pip.
-            For example ``pip:==1.26.3`` will install version 1.26.3 of
-            the package.
-        
-        ``pip:*.whl``
-            Install from local wheel using pip.
-        
-        ``pip:*.tar.gz``
-            Install from local sdist using pip.
         
         ``"git:[-b|--branch <branch>] [--depth <depth>] [-s|--sha <40-char-sha>] [-t|--tag <tag>] [<remote>]"``
             Clone/update from git remote into local checkout
@@ -1054,12 +1041,27 @@ Options
             * If the local checkout already exists, any local changes are deleted.
             * ``<remote>`` can also be a local checkout,
               from which Aptest will clone/fetch in the usual way.
+            * A suffix can be appended to the local checkout name if `--git-local-detailed`_ is specified.
             
             Defaults:
             
             * ``<branch>``: hard-coded for each package (typically "master" or "main").
             * ``<remote>``: hard-coded for each package (typically a Github repository).
             * ``<depth>``: 1.
+    
+        ``pip:``
+            Install from https://pypi.org using pip.
+        
+        ``pip:*.tar.gz``
+            Install from local sdist using pip.
+        
+        ``pip:*.whl``
+            Install from local wheel using pip.
+
+        ``pip:<suffix>``
+            Install ``<package-name><suffix>`` from https://pypi.org using pip.
+            For example ``pip:==1.26.3`` will install version 1.26.3 of
+            the package.
 
         ``<directory>``
             A local directory, typically a git checkout, from which we build/install from source.
@@ -1103,6 +1105,7 @@ Options
     Also see:
     
     * `--git-depth`_.
+    * `--git-local-detailed`_.
 
 
 .. _--log-prefix:
@@ -1337,6 +1340,15 @@ Options
     * ``--atexit beep``
 
 
+.. _--build-pip-no-clean:
+
+--build-pip-no-clean (bool)
+...........................
+    With command `build`_, run ``pip wheel`` with ``--no-clean``.
+    
+    According to ``man pip wheel``, this can also be done by setting environment variable ``PIP_NO_CLEAN``.
+
+
 .. _--build-type:
 
 --build-type debug | memento | release
@@ -1447,13 +1459,16 @@ Options
 
 --clean-wheelhouse (bool)
 .........................
-    If `build`_ or `cibw`_ are specified, delete directory
-    ``aptest-wheelhouse/`` if it exists.
-
-    This avoids potential incorrect behaviour when building/installing
-    packages.
+    If not specified (the default),
+    we delete ``aptest-wheelhouse/`` only if:
     
-    * Default is True.
+    * Commands `build`_ or `cibw`_ are specified.
+    * And we are building all specified packages (e.g. `-b`_ has not been specified).
+    
+    Otherwise:
+    
+    * If true, we delete ``aptest-wheelhouse/``.
+    * If false, we do not delete ``aptest-wheelhouse/``.
 
 
 .. _--devel:
@@ -1499,6 +1514,23 @@ Options
     
     * `-i`_.
 
+
+.. _--git-local-detailed:
+
+--git-local-detailed (bool)
+...........................
+    Default is false.
+    
+    If true, we include any branch/tag/remote specification in local git clone
+    path with ``git:...``.
+    
+    For example with ``--git-local-detailed -m=git:-b 1.27.x``,
+    the local directory will be ``aptest-git-mupdf--b_1.27.x``.
+    
+    Also see:
+    
+    * `-i`_.
+    
 
 .. _--gnn-doit:
 
@@ -1837,6 +1869,13 @@ Options
     
     * ``--pytest '-k test_123'``
     * ``--pytest '-v -k "test_123 or test_246"'``
+
+
+.. _--pytest-junit-xml:
+
+--pytest-junit-xml: (bool)
+..........................
+    Run ``pytest`` with ``--junit-xml`` and write info into ``aptest-wheelhouse``.
 
 
 .. _--pytest-path:
@@ -2420,6 +2459,16 @@ completion
 
 Changelog
 ---------
+
+**2026-06-01**
+
+* Added `--build-pip-no-clean`_, to preserve ``pip wheel`` build directory.
+* Fixed detection of free-thread python.
+* Show Aptest git info on startup.
+* Change whether we clean wheelhouse; see `--clean-wheelhouse`_.
+* Don't run pytest with ``--junit-xml`` by default; see `--pytest-junit-xml`_.
+* Added `--git-local-detailed`_.
+
 
 **2026-05-14**
 
