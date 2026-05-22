@@ -712,6 +712,7 @@ def get_args(argv):
     state.draft_location = None
     state.env_extra = dict()
     state.git_depth = 1
+    state.git_local_detailed = False
     state.git_remote_modifications = list()
     state.github_upload = None
     state.gnn_doit = False
@@ -936,6 +937,9 @@ def get_args(argv):
             
             elif arg == '--git-depth':
                 state.git_depth = next(args).as_int()
+            
+            elif arg == '--git-local-detailed':
+                state.git_local_detailed = args.get_bool()
             
             elif arg == '--git-remote-modify':
                 a = next(args).as_str()
@@ -3162,6 +3166,14 @@ def _get_local(package, state, test=False):
     if location.startswith('git:'):
         info = name_info(state, package)
         local = f'aptest-git-{package}'
+        if state.git_local_detailed:
+            if tail := location[len('git:'):]:
+                # Append branch/tag etc to the local checkout name.
+                pipcl.log(f'{tail=}')
+                # Put different branches/tags into different directories.
+                tail = re.sub('[\\/ "\':]', '_', tail)
+                local += f'-{tail}'
+        #pipcl.log(f'{local=}')
         with pipcl.LogPrefix(f'{local}: '):
             env_extra = state.env_extra
             pipcl.log(f'{package=}')
