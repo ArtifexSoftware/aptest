@@ -778,6 +778,7 @@ def get_args(argv):
     state.test_gnn_out = None
     state.test_gnn_push = 0
     state.ticker = 0
+    state.use_release_args = False
     state.valgrind = False
     state.venv = 2
     state.venv_name = None
@@ -787,8 +788,7 @@ def get_args(argv):
         state.verbose = True
     
     state.wheelhouse = 'aptest-wheelhouse'
-    state.wheelhouse_union = None
-    state.wheelhouse_union_release = 'aptest-wheelhouse-release'
+    state.wheelhouse_release = None
     
     global g_devel
     g_devel = state.devel
@@ -993,9 +993,6 @@ def get_args(argv):
                 location = next(args)
                 add_package(state, package, location)
             
-            elif arg == '--release_packages':
-                state.release_packages = next(args).as_str()
-            
             elif arg == '--tee-auto':
                 tee_auto = args.get_bool()
                 # Ignore if we are being run by an outer aptest or by bash completion.
@@ -1119,9 +1116,6 @@ def get_args(argv):
                 args.args_eq.replace(arg.pos, args.pos, new_args)
                 continue
             
-            elif arg == '--release-packages':
-                state.release_packages = next(args).as_str()
-
             elif arg == '--remote-do':
                 state.remote_do = args.get_bool()
 
@@ -1219,12 +1213,8 @@ def get_args(argv):
                 state.github_upload = args.get_bool()
             
             elif arg == '--use-release-args':
-                Assert(state.wheelhouse_union_release, f'Must specify `--wheelhouse-union-release <dir>` for releases.')
-                state.wheelhouse_union = state.wheelhouse_union_release
-                
                 Assert(state.packages_for_release, f'Must specify upper-case packages for release.')
-                for package, location in state.packages_for_release.items():
-                    add_package(state, package, location)
+                state.use_release_args = True
 
             elif arg == '-v':
                 _venv = next(args)
@@ -1241,11 +1231,8 @@ def get_args(argv):
             elif arg == '--wheelhouse':
                 state.wheelhouse = next(args).as_str()
 
-            elif arg == '--wheelhouse-union':
-                state.wheelhouse_union = next(args).as_str()
-
-            elif arg == '--wheelhouse-union-release':
-                state.wheelhouse_union_release = next(args).as_str()
+            elif arg == '--wheelhouse-release':
+                state.wheelhouse_release = next(args).as_str()
 
             elif arg == '--draft-location':
                 state.draft_location = next(args).as_str()
@@ -1449,13 +1436,12 @@ def do_remote_github(state, args):
                 #extra_wheels=upload_extra_wheels,
                 upload=upload,
                 token_pypi=_get_key_pypi(state) if upload else None,
-                local_dir_union=state.wheelhouse_union,
+                local_dir_union=state.wheelhouse,
                 )
-        if state.wheelhouse_union:
-            pipcl.run(
-                    f'piprepo build {state.wheelhouse_union}',
-                    prefix='piprepo build: ',
-                    )
+        pipcl.run(
+                f'piprepo build {state.wheelhouse}',
+                prefix='piprepo build: ',
+                )
 
 def do_remote(state, argv):
     remote = state.remote
@@ -2952,6 +2938,16 @@ def main(argv):
         pipcl.log(f'aptest: {comment=}')
         pipcl.log(f'aptest: diff:\n{textwrap.indent(diff, "    ")}')
     
+    if state.use_release_args:
+        # We never clean the release wheelhouse.
+        state.clean_wheelhouse = False
+        Assert(state.packages_for_release, f'No release package locations specified - use upper-case specifications such as `-P git:`.')
+        Assert(state.wheelhouse_release, f'No release wheelhouse specified, use `--wheelhouse-release <directory-name>`.')
+        Assert(state.wheelhouse_release != state.wheelhouse, f'{state.wheelhouse_release=} is not different from {state.wheelhouse=}.')
+        state.wheelhouse = state.wheelhouse_release
+        for package, location in state.packages_for_release.items():
+            add_package(state, package, location)
+    
     clean_wheelhouse = state.clean_wheelhouse
     if clean_wheelhouse == 'auto':
         if (
@@ -3079,8 +3075,7 @@ def main(argv):
                 
                 elif command == 'draft':
                     Assert(state.draft_location, f'<draft_location> unset')
-                    Assert(state.wheelhouse_union_release, f'<wheelhouse_union_release> unset')
-                    command = f'rsync -ai {state.wheelhouse_union_release}/ {state.draft_location}/'
+                    command = f'rsync -ai {state.wheelhouse}/ {state.draft_location}/'
                     pipcl.run(command)
 
                 elif command == 'gnn-download':
@@ -3126,15 +3121,9 @@ def main(argv):
                     do_test(state)
                 
                 elif command == 'upload':
-                    if not state.wheelhouse_union:
-                        Assert(
-                                state.wheelhouse_union_release,
-                                f'Need `--wheelhouse-union-release <wheelhouse_union_dir>`',
-                                )
-                        state.wheelhouse_union = state.wheelhouse_union_release
                     github._upload( # pylint: disable=protected-access
                             token_pypi=_get_key_pypi(state),
-                            local_dir_union=state.wheelhouse_union,
+                            local_dir_union=state.wheelhouse_release,
                             pyodide_wheels=None,
                             upload='pypi',
                             )
