@@ -2760,7 +2760,10 @@ def do_test_single(state, package, failed_packages):
                     pipcl.log(f'Failed to prettyfy {path_junit_xml=}: {e}')
         if e:
             pipcl.log(f'Tests failed for {package=}.')
-            failed_packages.append(package)
+            if state.cibw_ignore_test_failures:
+                pipcl.log(f'Ignoring test failure for {package=} because {state.cibw_ignore_test_failures=}.')
+            else:
+                failed_packages.append(package)
         else:
             pipcl.log(f'Tests succeeded for {package=}.')
 
