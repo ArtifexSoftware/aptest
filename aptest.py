@@ -1411,6 +1411,8 @@ def do_remote_github(state, args):
             # Run ourselves on Github using test.yml, passing argv.
             info = name_info(state, 'aptest')
             args_string = shlex.join(args.args_eq.argv[1:])
+            # Force a fixed wheelhouse so we can download artifacts easily.
+            args_string += ' --wheelhouse aptest-wheelhouse'
             # We define the .yml's `matrix: os: ...` by passing in a dict encoded with json, as
             # expected by test.yml's workflow_dispatch:inputs:matrix
             Assert(state.remote_github_runners, f'No Github runners specified.')
