@@ -778,7 +778,6 @@ def get_args(argv):
     state.test_gnn_out = None
     state.test_gnn_push = 0
     state.ticker = 0
-    state.use_release_args = False
     state.valgrind = False
     state.venv = 2
     state.venv_name = None
@@ -1075,6 +1074,11 @@ def get_args(argv):
                 new_args += ' --check-unchanged'
                 new_args += ' --use-release-args'
                 
+                # If `--MUPDF=...` has been specified, then we need to include
+                # mupdf in the list of packages to build. (Usually it is not
+                # specified so that pymupdf's default mupdf is used.)
+                b_mupdf = 'mupdf,' if 'mupdf' in state.packages_for_release else ''
+                
                 if 0:
                     pass
                 
@@ -1082,23 +1086,23 @@ def get_args(argv):
                     # Build core wheels and sdist.
                     # [pymupdf4llm is pure python so doesn't need to be
                     # mentioned in other --release-* options.]
-                    new_args += ' --sdists -b pymupdf,pymupdfpro,pymupdf_layout,pymupdf4llm,pdf4llm'
+                    new_args += f' --sdists -b {b_mupdf}pymupdf,pymupdfpro,pymupdf_layout,pymupdf4llm,pdf4llm'
                 
                 elif arg == '--release-2':
                     # Build macos-intel and linux-arm wheels.
-                    new_args += ' -b pymupdf,pymupdfpro,pymupdf_layout,pymupdf4llm,pdf4llm --remote-github-runners macos-intel,linux-arm'
+                    new_args += f' -b {b_mupdf}pymupdf,pymupdfpro,pymupdf_layout,pymupdf4llm,pdf4llm --remote-github-runners macos-intel,linux-arm'
                 
                 elif arg == '--release-3':
                     # Build for win-x32.
-                    new_args += ' -b pymupdf --remote-github-runners windows -e CIBW_ARCHS_WINDOWS=x86 --cibw-skip-add-defaults=0'
+                    new_args += f' -b {b_mupdf}pymupdf --remote-github-runners windows -e CIBW_ARCHS_WINDOWS=x86 --cibw-skip-add-defaults=0'
                 
                 elif arg == '--release-4':
                     # Build for linux-musllinux.
-                    new_args += ' -b pymupdf --remote-github-runners linux -e "CIBW_BUILD=cp310-musllinux_x86_64" --cibw-skip-add-defaults=0'
+                    new_args += f' -b {b_mupdf}pymupdf --remote-github-runners linux -e "CIBW_BUILD=cp310-musllinux_x86_64" --cibw-skip-add-defaults=0'
                 
                 elif arg == '--release-5':
                     # Build for Pyodide.
-                    new_args += ' -b pymupdf --cibw-pyodide --remote-github-runners linux'
+                    new_args += f' -b {b_mupdf}pymupdf --cibw-pyodide --remote-github-runners linux'
                 
                 elif arg == '--release-6':
                     # Build for cp314t.
@@ -1107,7 +1111,7 @@ def get_args(argv):
                     # py_limited_api and Py_GIL_DISABLED are not supported
                     # together as of 2026-02-20, e.g. see PEP 803 and PEP 809.
                     #
-                    new_args += ' -b pymupdf --remote-github-runners linux --cibw-skip-add-defaults=0 -e CIBW_BUILD="cp314t*" -e CIBW_SKIP="*musllinux*" -e PYMUPDF_SETUP_PY_LIMITED_API=0'
+                    new_args += f' -b {b_mupdf}pymupdf --remote-github-runners linux --cibw-skip-add-defaults=0 -e CIBW_BUILD="cp314t*" -e CIBW_SKIP="*musllinux*" -e PYMUPDF_SETUP_PY_LIMITED_API=0'
                 
                 else:
                     Assert(0, f'Unrecognised {arg=}.')
@@ -1213,8 +1217,14 @@ def get_args(argv):
                 state.github_upload = args.get_bool()
             
             elif arg == '--use-release-args':
-                Assert(state.packages_for_release, f'Must specify upper-case packages for release.')
-                state.use_release_args = True
+                Assert(state.packages_for_release, f'No release package locations specified - use upper-case specifications such as `-P git:`.')
+                Assert(state.wheelhouse_release, f'No release wheelhouse specified, use `--wheelhouse-release <directory-name>`.')
+                Assert(state.wheelhouse_release != state.wheelhouse, f'{state.wheelhouse_release=} is not different from {state.wheelhouse=}.')
+                state.wheelhouse = state.wheelhouse_release
+                # We never clean the release wheelhouse.
+                state.clean_wheelhouse = False
+                for package, location in state.packages_for_release.items():
+                    add_package(state, package, location)
 
             elif arg == '-v':
                 _venv = next(args)
@@ -2937,17 +2947,7 @@ def main(argv):
         pipcl.log(f'aptest: {sha=}')
         pipcl.log(f'aptest: {comment=}')
         pipcl.log(f'aptest: diff:\n{textwrap.indent(diff, "    ")}')
-    
-    if state.use_release_args:
-        # We never clean the release wheelhouse.
-        state.clean_wheelhouse = False
-        Assert(state.packages_for_release, f'No release package locations specified - use upper-case specifications such as `-P git:`.')
-        Assert(state.wheelhouse_release, f'No release wheelhouse specified, use `--wheelhouse-release <directory-name>`.')
-        Assert(state.wheelhouse_release != state.wheelhouse, f'{state.wheelhouse_release=} is not different from {state.wheelhouse=}.')
-        state.wheelhouse = state.wheelhouse_release
-        for package, location in state.packages_for_release.items():
-            add_package(state, package, location)
-    
+        
     clean_wheelhouse = state.clean_wheelhouse
     if clean_wheelhouse == 'auto':
         if (
