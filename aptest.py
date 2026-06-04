@@ -888,11 +888,14 @@ def get_args(argv):
                 Assert(build_type in ('release', 'debug', 'memento'), f'Unrecognised {build_type=} should be one of: release debug memento')
                 state.build_type = build_type.as_text()
             
+            elif arg == '--check-pushed':
+                state.check_pushed = args.get_bool()
+
             elif arg == '--check-unchanged':
                 state.check_unchanged = args.get_bool()
 
-            elif arg == '--check-pushed':
-                state.check_pushed = args.get_bool()
+            elif arg == '--cibw-ignore-test-failures':
+                state.cibw_ignore_test_failures = args.get_bool()
 
             elif arg == '--cibw-name':
                 state.cibw_name = next(args)
@@ -910,12 +913,6 @@ def get_args(argv):
                 packages = package_aliases(next(args))
                 state.clean_git += packages
             
-            elif arg == '--clean-wheelhouse':
-                state.clean_wheelhouse = args.get_bool()
-            
-            elif arg == '--clean-wheelhouse-auto':
-                state.clean_wheelhouse = 'auto'
-            
             elif arg == '--clean-setup':
                 packages = package_aliases(next(args))
                 state.clean_setup += packages
@@ -924,9 +921,18 @@ def get_args(argv):
                 packages = package_aliases(next(args))
                 state.clean_setup_all += packages
             
+            elif arg == '--clean-wheelhouse':
+                state.clean_wheelhouse = args.get_bool()
+            
+            elif arg == '--clean-wheelhouse-auto':
+                state.clean_wheelhouse = 'auto'
+            
             elif arg == '--devel':
                 state.devel = args.get_bool()
                 g_devel = state.devel
+
+            elif arg == '--draft-location':
+                state.draft_location = next(args).as_str()
 
             elif arg == '-e':
                 _nv = next(args).as_text()
@@ -992,53 +998,11 @@ def get_args(argv):
                 location = next(args)
                 add_package(state, package, location)
             
-            elif arg == '--tee-auto':
-                tee_auto = args.get_bool()
-                # Ignore if we are being run by an outer aptest or by bash completion.
-                if APTEST_NESTED or COMP_LINE:
-                    pass
-                elif tee_auto:
-                    state.tee_auto = tee_auto
-                    global g_log_tee
-                    if state.tee_auto:
-                        g_log_tee = f'aptest-out-{g_date_time}'
-                        pipcl.log_tee(g_log_tee, 'aptest-out')
-                else:
-                    g_log_tee = None
-                    pipcl.log_tee(None)
-
-            elif arg == '--tee-path':
-                pos = args.pos
-                path = next(args).as_text()
-                #args.args_eq.set(pos, '')
-                # Ignore if we are being rerun by an outer aptest or by bash completion.
-                if path and not APTEST_NESTED and not COMP_LINE:
-                    state.tee_path = path
-                    pipcl.log_tee(state.tee_path)
-
             elif arg == '-o':
                 state.os_names += next(args).as_text().lower().split(',')
                 names = ('linux', 'windows', 'darwin', 'openbsd')
                 for os_name in state.os_names:
                     Assert(os_name in names, f'{os_name=} should be one of {names!r}.')
-
-            elif arg == '-r':
-                state.remote_arg = args.pos
-                _remote = next(args)
-                # Provide useful command-line completion if _remote starts with @.
-                if _remote.startswith('@'):
-                    Assert(_remote == '@github', f'{_remote=} should be `@github`.')
-                state.remote = _remote.as_text()
-
-            elif arg == '--run':
-                package = next(args)
-                command = next(args)
-                state.run_commands.append((package.as_text(), command.as_text()))
-
-            elif arg == '-t':
-                _names = next(args).as_text()
-                _names = _names.split(',') if _names else list()
-                apply_deltas(state.packages_test, _names, aliasfn=package_alias)
 
             elif arg == '--pytest':
                 state.pytest_options = next(args).as_text()
@@ -1063,6 +1027,14 @@ def get_args(argv):
                 pos = args.pos
                 state.python = next(args).as_text()
                 args.args_eq.set(pos, '')   # Avoid recursion when we rerun ourselves.
+            
+            elif arg == '-r':
+                state.remote_arg = args.pos
+                _remote = next(args)
+                # Provide useful command-line completion if _remote starts with @.
+                if _remote.startswith('@'):
+                    Assert(_remote == '@github', f'{_remote=} should be `@github`.')
+                state.remote = _remote.as_text()
 
             elif arg.startswith('--release-'):
                 # Must be last arg.
@@ -1081,6 +1053,10 @@ def get_args(argv):
                 
                 if 0:
                     pass
+                
+                elif arg == '--release-test':
+                    # Undocumented test option, for quick test of github.
+                    new_args += f' --sdists -b {b_mupdf}pymupdf4llm --cibw-ignore-test-failures'
                 
                 elif arg == '--release-1':
                     # Build core wheels and sdist.
@@ -1156,6 +1132,11 @@ def get_args(argv):
             elif arg == '--remote-rsync-wsl':
                 state.remote_rsync_wsl = args.get_bool()
 
+            elif arg == '--run':
+                package = next(args)
+                command = next(args)
+                state.run_commands.append((package.as_text(), command.as_text()))
+
             elif arg == '--sdists':
                 state.sdists = args.get_bool()
 
@@ -1171,6 +1152,35 @@ def get_args(argv):
 
             elif arg == '--system-site-packages':
                 state.system_site_packages = args.get_bool()
+
+            elif arg == '-t':
+                _names = next(args).as_text()
+                _names = _names.split(',') if _names else list()
+                apply_deltas(state.packages_test, _names, aliasfn=package_alias)
+
+            elif arg == '--tee-auto':
+                tee_auto = args.get_bool()
+                # Ignore if we are being run by an outer aptest or by bash completion.
+                if APTEST_NESTED or COMP_LINE:
+                    pass
+                elif tee_auto:
+                    state.tee_auto = tee_auto
+                    global g_log_tee
+                    if state.tee_auto:
+                        g_log_tee = f'aptest-out-{g_date_time}'
+                        pipcl.log_tee(g_log_tee, 'aptest-out')
+                else:
+                    g_log_tee = None
+                    pipcl.log_tee(None)
+
+            elif arg == '--tee-path':
+                pos = args.pos
+                path = next(args).as_text()
+                #args.args_eq.set(pos, '')
+                # Ignore if we are being rerun by an outer aptest or by bash completion.
+                if path and not APTEST_NESTED and not COMP_LINE:
+                    state.tee_path = path
+                    pipcl.log_tee(state.tee_path)
 
             elif arg == '--test-extra-packages':
                 state.test_extra_packages += next(args).as_text().split(',')
@@ -1205,9 +1215,6 @@ def get_args(argv):
             elif arg == '--test-gnn-push':
                 state.test_gnn_push = args.get_bool()
             
-            elif arg == '--cibw-ignore-test-failures':
-                state.cibw_ignore_test_failures = args.get_bool()
-
             elif arg == '--ticker':
                 _ticker = next(args).as_float()
                 if not APTEST_NESTED and GITHUB_ACTIONS != 'true':
@@ -1243,9 +1250,6 @@ def get_args(argv):
 
             elif arg == '--wheelhouse-release':
                 state.wheelhouse_release = next(args).as_str()
-
-            elif arg == '--draft-location':
-                state.draft_location = next(args).as_str()
 
             elif arg in (
                     'build',
