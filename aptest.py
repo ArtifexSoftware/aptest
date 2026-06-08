@@ -3130,9 +3130,23 @@ def main(argv):
                     do_test(state)
                 
                 elif command == 'upload':
-                    github._upload( # pylint: disable=protected-access
+                    paths = list()
+                    for path in glob.glob(f'{state.wheelhouse}/*.whl') + glob.glob(f'{state.wheelhouse}/*.tar.gz'):
+                        leaf = os.path.basename(path)
+                        name = leaf.split('-', 1)[0]
+                        if 'pyodide' in leaf:
+                            pipcl.log(f'Ignoring pyodide wheel: {path}')
+                        elif name in state.packages:
+                            paths.append(path)
+                        else:
+                            pipcl.log(f'Ignoring wheel/sdist: {path}')
+                    github.upload_pypi(
                             token_pypi=_get_key_pypi(state),
-                            local_dir_union=state.wheelhouse_release,
+                            paths=paths,
+                            )
+                    if 0: github._upload( # pylint: disable=protected-access
+                            token_pypi=_get_key_pypi(state),
+                            local_dir_union=state.wheelhouse,
                             pyodide_wheels=None,
                             upload='pypi',
                             )
