@@ -2460,6 +2460,14 @@ completion
 Changelog
 ---------
 
+**2026-06-10**
+
+* Fix Windows builds with `cibw`_ by disabling wheel repair with
+  ``CIBW_REPAIR_WHEEL_COMMAND_WINDOWS=''``.
+  
+  (This is because ``cibuildwheel`` has started to use ``delvewheel``,
+  which apparently cannot find our ``mupdfcpp64.dll``.)
+
 **2026-06-01**
 
 * Added `--build-pip-no-clean`_, to preserve ``pip wheel`` build directory.
