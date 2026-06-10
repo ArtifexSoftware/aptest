@@ -1910,6 +1910,11 @@ def do_cibw(state):
     #
     state.env_extra['CIBW_REPAIR_WHEEL_COMMAND_LINUX'] = ''
     state.env_extra['CIBW_REPAIR_WHEEL_COMMAND_MACOS'] = ''
+    
+    # Tell cibuildwheel not to use `auditwheel` on Windows. As of 2026-06-10
+    # cibuildwheel uses delvewheel which complains that it cannot find
+    # mupdfcpp64.dll.
+    state.env_extra['CIBW_REPAIR_WHEEL_COMMAND_WINDOWS'] = ''
 
     # Specify python versions.
     CIBW_BUILD = state.env_extra.get('CIBW_BUILD')
