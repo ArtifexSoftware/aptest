@@ -2857,6 +2857,8 @@ def main(argv):
     
     sha, comment, diff, _branch = get_self_gitinfo()
     pipcl.log(f'Aptest gitinfo: {sha=}: {comment}')
+    pipcl.log(f'Command line: {shlex.join(args.argv)}')
+
     
     if state.show_help:
         p = os.path.abspath(f'{__file__}/../README.rst')
