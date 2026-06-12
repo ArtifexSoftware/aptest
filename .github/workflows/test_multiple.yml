@@ -51,10 +51,15 @@ jobs:
       - name: test_multiple
         env:
           APTEST_args: ${{inputs.args}}
+          APTEST_matrix_args: ${{ matrix.args }}
           ARTIFEX_SOFTWARE_SSH_KEY: ${{secrets.ARTIFEX_SOFTWARE_SSH_KEY}}
           PYMUPDFPRO_SETUP_SOT_KEY: ${{secrets.PYMUPDFPRO_SETUP_SOT_KEY}}
-        run:
+        run: |
           python aptest.py ${{matrix.args}} build test -a APTEST_args
+          
+          # Set APTEST_matrix_args2 to APTEST_matrix_args with modifications to
+          # allows use as artifact name.
+          python -c 'import os; APTEST_matrix_args2=os.environ["APTEST_matrix_args"].replace(":", "_").replace(" ", "_"); print(f"APTEST_matrix_args2="+APTEST_matrix_args2);' >> $GITHUB_ENV
       
       # Upload generated wheels, to be accessible from github Actions page.
       #
@@ -80,3 +85,12 @@ jobs:
       #        aptest-wheelhouse/*.whl
       #        aptest-wheelhouse/*.tar.gz
       #    name: artifact-${{ matrix.os }}-${{ matrix.args }}
+      #
+      # Se we use APTEST_matrix_args2 as calculated earlier.
+      #
+      - uses: actions/upload-artifact@v4
+        with:
+          path: |
+              aptest-wheelhouse/*.whl
+              #aptest-wheelhouse/*.tar.gz
+          name: artifact-${{ matrix.os }}-${{ env.APTEST_matrix_args2 }}
