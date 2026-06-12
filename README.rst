@@ -2460,6 +2460,12 @@ completion
 Changelog
 ---------
 
+**2026-06-12**
+
+* Write command line to log output on startup.
+* In ``.github/workflows/test_multiple.yml``, fix creation of artifacts containing wheels.
+
+
 **2026-06-10**
 
 * Fix Windows builds with `cibw`_ by disabling wheel repair with
@@ -2467,6 +2473,7 @@ Changelog
   
   (This is because ``cibuildwheel`` has started to use ``delvewheel``,
   which apparently cannot find our ``mupdfcpp64.dll``.)
+
 
 **2026-06-01**
 
