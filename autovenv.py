@@ -39,10 +39,10 @@ def run(command, verbose, t0, check=1):
 def gil():
     Py_GIL_DISABLED = sysconfig.get_config_var('Py_GIL_DISABLED')
     #print(f'{Py_GIL_DISABLED=}')
-    if sysconfig.get_config_var('Py_GIL_DISABLED')==1:
-        gil_enabled = sys._is_gil_enabled()
+    if Py_GIL_DISABLED==1:
+        gil_enabled = sys._is_gil_enabled() # pylint:disable=protected-access
         #print(f'{gil_enabled=}')
-        if not gil_enabled:  # pylint:disable=protected-access
+        if not gil_enabled:
             return False
     return True
 
