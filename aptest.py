@@ -2859,7 +2859,6 @@ def main(argv):
     pipcl.log(f'Aptest gitinfo: {sha=}: {comment}')
     pipcl.log(f'Command line: {shlex.join(args.argv)}')
 
-    
     if state.show_help:
         p = os.path.abspath(f'{__file__}/../README.rst')
         with open(p) as f:
@@ -2961,7 +2960,7 @@ def main(argv):
                     'build' in state.commands
                     or 'cibw' in state.commands
                     )
-            ):
+                ):
             # We're building all packages, so clean wheelhouse.
             clean_wheelhouse = True
         else:
