@@ -2460,6 +2460,11 @@ completion
 Changelog
 ---------
 
+**2026-06-14**
+
+* Further fix of ``.github/workflows/test_multiple.yml`` artifact names.
+
+
 **2026-06-12**
 
 * Write command line to log output on startup.
