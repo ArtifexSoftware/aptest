@@ -55,11 +55,11 @@ jobs:
           ARTIFEX_SOFTWARE_SSH_KEY: ${{secrets.ARTIFEX_SOFTWARE_SSH_KEY}}
           PYMUPDFPRO_SETUP_SOT_KEY: ${{secrets.PYMUPDFPRO_SETUP_SOT_KEY}}
         run: |
-          python aptest.py ${{matrix.args}} build test -a APTEST_args
-          
           # Set APTEST_matrix_args2 to APTEST_matrix_args with modifications to
           # allows use as artifact name.
           python3 -c 'import os, re; APTEST_matrix_args=os.environ["APTEST_matrix_args"]; APTEST_matrix_args2 = re.sub("[: \"]", "_", APTEST_matrix_args); print(f"APTEST_matrix_args2="+APTEST_matrix_args2)' >> $GITHUB_ENV
+          # Run tests.
+          python aptest.py ${{matrix.args}} build test -a APTEST_args
       
       # Upload generated wheels, to be accessible from github Actions page.
       #
