@@ -3159,12 +3159,6 @@ def main(argv):
                             token_pypi=_get_key_pypi(state),
                             paths=paths,
                             )
-                    if 0: github._upload( # pylint: disable=protected-access
-                            token_pypi=_get_key_pypi(state),
-                            local_dir_union=state.wheelhouse,
-                            pyodide_wheels=None,
-                            upload='pypi',
-                            )
                 
                 elif command == 'windows-show-vs-instances':
                     pipcl.log(f'{command}:')
