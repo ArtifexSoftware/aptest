@@ -50,6 +50,21 @@ Aptest can be run in various ways:
     pipx run artifex_aptest@git+ssh://git@github.com/ArtifexSoftware/aptest.git ...
 
 
+Python virtual environments
+---------------------------
+If one is already in a venv:
+
+* Aptest will use the venv directly,
+  for example the `build`_ command will install packages into this venv.
+
+Otherwise:
+
+* Aptest will create, enter and use its own venv,
+  called ``venv-aptest-<pthonversion>-<wordsize>``.
+* For convenience,
+  a symbolic link ``venv-aptest`` will be created that points to this venv.
+
+
 Supported packages
 ------------------
 
@@ -149,7 +164,7 @@ Build/test with cibuildwheel
   prerequisite packages can
   override packages specified to Aptest.
   We try to avoid this by setting PYMUPDF_SETUP_VERSION
-  but generally one should use `build`_ and `test_` when testing non-standard versions.
+  but generally one should use `build`_ and `test`_ when testing non-standard versions.
 
 See the `cibw`_ command.
 
@@ -157,12 +172,17 @@ See the `cibw`_ command.
 Examples
 --------
 
-Build, install and test ``pymupdf``, ``pymupdfpro`` and ``pymupdf_layout`` using
-local checkouts:
+[Also see `Python virtual environments`_ for information about where wheels are
+generated/installed.]
+
+Using local checkouts, build packages ``pymupdf``, ``pymupdfpro`` and ``pymupdf_layout``
+(putting wheels into directory ``aptest-wheelhouse/``),
+install (into current venv or ``venv-aptest-<pthonversion>-<wordsize>``)
+and test:
 
     ``aptest/aptest.py -p PyMuPDF --pro PyMuPDFPro -m mupdf --layout sce build test``
 
-Build, install and test ``pymupdf``, ``pymupdfpro`` and ``pymupdf_layout`` using
+Similarly build, install and test ``pymupdf``, ``pymupdfpro`` and ``pymupdf_layout`` using
 central git repositories:
 
     ``aptest/aptest.py -p git: --pro git: --layout git: build test``
@@ -184,11 +204,11 @@ getting packages from different locations:
 
 Test current ``pymupdf`` release with latest test suite in central git:
 
-    ``aptest/aptest.py -r macmini -p pip: -p git: build test``
+    ``aptest/aptest.py -p pip: -p git: build test``
 
 Test current ``pymupdf`` release with test suite in local checkout:
 
-    ``aptest/aptest.py -r macmini -p pip: -p PyMuPDF build test``
+    ``aptest/aptest.py -p pip: -p PyMuPDF build test``
 
 Runs specific Github workflow ``PyMuPDFPlus/.github/workflows/test_multiple.yml``, on windows only:
 
@@ -259,7 +279,7 @@ Instructions for releasing wheels for:
 
     ``aptest/aptest.py -r @github -p PyMuPDF --pro PyMuPDFPro --layout sce --4llm pymupdf4llm --pdf4llm pymupdf4llm cibw``
 
-* Specify package source for releases in `~/.aptest`_.
+* In `~/.aptest`_, specify package sources for releases.
 
   This is done with upper-case versions of the usual package-specifier options,
   so that different `--release-*`_ options can select different subsets
@@ -277,9 +297,9 @@ Instructions for releasing wheels for:
   
       ``-P git: --PRO git: --LAYOUT git: --4LLM git: --PDF4LLM git:``
   
-* Specify a release directory in `~/.aptest`_:
+* In `~/.aptest`_, specify an empty release wheelhouse directory, for example:
   
-    ``--wheelhouse-union-release release-1.27.2``
+    ``--wheelhouse-release release-1.27.2``
 
   This will eventually hold all release wheels and sdists prior to them being
   uploaded to https://pypi.org.
@@ -300,7 +320,7 @@ Instructions for releasing wheels for:
 
   These commands can be manually run in parallel using individual terminals.
     
-  On success this will populate the release directory with all wheels and sdists
+  On success this will populate the release wheelhouse with all wheels and sdists
   
   Also see:
   
@@ -310,14 +330,14 @@ Instructions for releasing wheels for:
 
   Install from local wheels:
   
-  * Use the location specified by `--wheelhouse-union-release`_ in `~/.aptest`_,
+  * Use the location specified by `--wheelhouse-release`_ in `~/.aptest`_,
     with ``pip install``'s ``--extra-index-url``, for example:
 
       ``pip install --extra-index-url release-1.27.2 pdf4llm pymupdfpro``
 
   Or upload to, and install from, a web server:
   
-  * ``aptest/aptest.py draft --draft-location julian@ghostscript.com:public_html/wheels-1.27.2/``.
+  * ``aptest/aptest.py draft --draft-location julian@ghostscript.com:public_html/wheels-1.27.2/`` --wheelhouse release-1.27.2.
   
   * ``pip install --extra-index-url https://ghostscript.com/~julian/wheels-1.27.2/simple pdf4llm pymupdfpro``
   
@@ -336,16 +356,23 @@ Instructions for releasing wheels for:
 
 * Release pyodide wheel.
 
-  Copy/rsync the pyodide wheel in the release directory to
-  ``julian@ghostscript.com:public_html/pyodide/``, for example:
+  **2026-06-15**: pypi.org now accepts pyodide wheels.
   
-    ``rsync -ai release-1.27.2/pymupdf-1.27.2-cp313-abi3-pyodide_2025_0_wasm32.whl julian@ghostscript.com:public_html/pyodide/``
+  * See: https://github.com/pymupdf/PyMuPDF/issues/5025
+  * Need to update aptest.py to include pyodide wheels in upload.
 
-  This will be available in: https://ghostscript.com/~julian/pyodide/.
+  Old:
   
-  Tell ``@jamie`` about the Pyodide wheel.
-  
-  [2026-01-30: hopefully we'll have a more official location soon.]
+      Copy/rsync the pyodide wheel in the release directory to
+      ``julian@ghostscript.com:public_html/pyodide/``, for example:
+
+        ``rsync -ai release-1.27.2/pymupdf-1.27.2-cp313-abi3-pyodide_2025_0_wasm32.whl julian@ghostscript.com:public_html/pyodide/``
+
+      This will be available in: https://ghostscript.com/~julian/pyodide/.
+
+      Tell ``@jamie`` about the Pyodide wheel.
+
+      [2026-01-30: hopefully we'll have a more official location soon.]
 
 * Update central repositories:
 
@@ -800,12 +827,20 @@ docs
 
 draft
 .....
-    Rsync ``<wheelhouse_union_dir>`` to location specified by `--draft-location`_.
+    Rsync the wheelhouse directory to the location specified by `--draft-location`_.
+    
+    * The wheelhouse will contain a ``simple/`` directory created by ``piprepo``,
+      so one can pip install with:
+      
+      ``pip install --extra-index-url ``<url>/simple``.
+      
+      where ``<url>`` is the URL of the draft location.
+      
+    * We will also sync a piprepo subdirectory ``simple/`` that will
 
     Also see:
 
-    * `--wheelhouse-union`_.
-    * `--wheelhouse-union-release`_.
+    * `--wheelhouse-release`_.
 
 
 gnn-download
@@ -917,7 +952,7 @@ test-gnn
 
 upload
 ......
-    Upload all wheels and sdists in directory specified by `--wheelhouse-union`_, to https://pypi.org.
+    Upload all wheels and sdists in directory specified by `--wheelhouse-release`_, to https://pypi.org.
 
 
 windows-show-vs-instances
@@ -1198,7 +1233,7 @@ Options
       * `--remote-github-workflow-id`_
       * `--remote-github-yml`_
       * `--remote-github-yml-inputs`_
-      * `--wheelhouse-union`_
+      * `--wheelhouse-release`_
     
     Otherwise ``<remote>`` should specify a remote machine on which to run
     Aptest:
@@ -1460,10 +1495,16 @@ Options
 --clean-wheelhouse (bool)
 .........................
     If not specified (the default),
-    we delete ``aptest-wheelhouse/`` only if:
+    then we first delete ``aptest-wheelhouse/`` if we are doing a build of all specified packages.
+    
+    I.e. we delete ``aptest-wheelhouse/`` if:
     
     * Commands `build`_ or `cibw`_ are specified.
-    * And we are building all specified packages (e.g. `-b`_ has not been specified).
+    * And we are not skipping the build of one or more packages (with `-b`_).
+
+    This is a useful default because it allows one to test while skipping slow
+    rebuilds using `-b`_, but still start with a clean wheelhouse in the usual
+    case where everything is being built.
     
     Otherwise:
     
@@ -1485,8 +1526,7 @@ Options
 
 --draft-location <remote>
 .........................
-    Location to which the `draft`_ command rsync's from the local directory
-    specified by `--wheelhouse-union-release`_.
+    Location to which the `draft`_ command rsync's from the local wheelhouse.
     
     If ``<remote>`` can be accessed via https,
     it can be used as a pypi-style package repository with:
@@ -1495,7 +1535,7 @@ Options
     
     For example after:
     
-        ``--draft-location julian@ghostscript.com:public_html/wheels-1.27.2``
+        ``draft --draft-location julian@ghostscript.com:public_html/wheels-1.27.2``
     
     One can install packages with:
     
@@ -2369,9 +2409,21 @@ Options
       (see `-i`_'s `upper-case-package names`_ section),
       typically specified in `~/.aptest`_.
 
-    * Also use `--wheelhouse-union-release`_'s value for final wheel directory.
+    * Require that `--wheelhouse-release`_ has been specified,
+      and use its value for the wheelhouse.
+      
+      * The new value must be different from the default wheelhouse,
+        so that we can protect against non-release builds deleting a partially complete
+        release procedure.
+      * We never remove the contents of this wheelhouse,
+        because multiple invocations of Aptest are required to build the release wheels. So
+        `--clean-wheelhouse`_ is ignored.
     
-    Also see: `-i`_.
+    Also see:
+    
+    * `-i`_.
+    * `--wheelhouse`_.
+    * `--wheelhouse-release`_.
 
 .. _--venv-name:
 
@@ -2389,41 +2441,23 @@ Options
 .............................
     Directory in which to place wheels, instead of
     default ``aptest-wheelhouse``.
+    
+    Also see:
+    
+    * `--clean-wheelhouse`_.
+    * `--wheelhouse-release`_.
 
 
-.. _--wheelhouse-union:
+.. _--wheelhouse-release:
 
---wheelhouse-union <wheelhouse_union_dir>
+--wheelhouse-release <wheelhouse_release>
 .........................................
-    Directory in which to place wheels downloaded from Github, instead of
-    default ``gh_workflow-YYYY-mm-dd-<workflow-id>-union``.
-    
-    We also run ``piprepo build`` in this directory so it can function as a
-    pypi-style package store.
+    Directory in which to place wheels when building releases.
     
     Also see:
     
-    * `-r`_.
-    * `--draft-location`_.
-    * `--wheelhouse-union-release`_.
-    * `upload`_.
-
-
-.. _--wheelhouse-union-release:
-
---wheelhouse-union-release <wheelhouse_union_dir>
-.................................................
-    Default value of `--wheelhouse-union`_ if not specified and a
-    `--release-*`_ option is given.
-    
-    This is typically used when building release wheels/sdists on Github for
-    uploading to https://pypi.org with `upload`_, or with `draft`_.
-    
-    Also see:
-    
-    * `-r`_.
+    * `--wheelhouse`_.
     * `--release-*`_.
-    * `--wheelhouse-union`_.
 
 
 .. _--4llm:
@@ -2459,6 +2493,17 @@ completion
 
 Changelog
 ---------
+
+* Simplified where we put wheels:
+
+  * Removed ``--wheelhouse-union``.
+  * Removed ``--wheelhouse-union-release``.
+  * Added `--wheelhouse-release`_.
+  * When building on Github, download wheels into our wheelhouse.
+
+* Various fixes to `--release-*`_.
+* Improved display of args - show ``~.aptest``, ``APTEST_options`` and command line separately.
+
 
 **2026-06-14**
 
@@ -2654,8 +2699,8 @@ Changelog
 * New option `--check-unchanged`_.
 * New option `--draft-location`_.
 * New option `--log-prefix`_.
-* New option `--wheelhouse-union`_.
-* New option `--wheelhouse-union-release`_.
+* New option ``--wheelhouse-union``.
+* New option ``--wheelhouse-union-release``.
 * New command `draft`_.
 * New command `upload`_.
 
