@@ -639,8 +639,17 @@ def _add_key(state, prefix, path, env, pos):
 
 def get_args(argv):
     '''
-    Parses command-line args in <argv> and returns a State instance. Any
-    changes to behaviour of this function should be added to README.md.
+    Parses command-line args in <argv> and returns a State instance (args, state, regions),
+    where:
+        args: A cli.Args instance.
+        state: A State instance.
+        regions:
+            A list of (name, args) allowing useful diagnostic showing where
+            args come from.
+            name: `~/.aptest`, `APTEST_options` or `command line`.
+            args: a list of args.
+    
+    Any changes to behaviour of this function should be added to README.md.
 
     If we are being called by bash for command-line completion, we return
     None.
@@ -805,6 +814,7 @@ def get_args(argv):
     args_list += [argv[0]]
     
     regions = list()
+    regions2 = list()   # For returning to our caller.
     
     # First read args from ~/.aptest if it exists.
     if os.environ.get('APTEST_DOT_APTEST') != '0' and not APTEST_NESTED:
@@ -817,6 +827,7 @@ def get_args(argv):
                     aptest_config2 += f'{line}\n'
             aptest_config = shlex.split(aptest_config2)
             regions.append( ('~/.aptest', len(args_list)))
+            regions2.append( ('~/.aptest', aptest_config))
             args_list += aptest_config
     
     # Read args from APTEST_options if set.
@@ -824,6 +835,7 @@ def get_args(argv):
     if APTEST_options:
         APTEST_options = shlex.split(APTEST_options)
         regions.append( ('APTEST_options', len(args_list)))
+        regions2.append( ('APTEST_options', APTEST_options))
         args_list += APTEST_options
     
     if COMP_LINE:
@@ -839,6 +851,7 @@ def get_args(argv):
     else:
         # Normal operation, get args from <argv>.
         regions.append( ('command line', len(args_list)))
+        regions2.append( ('command line', argv[1:]))
         args_list += argv[1:]
         if 0:
             pipcl.log(f'args_list ({len(args_list)}):')
@@ -1280,7 +1293,7 @@ def get_args(argv):
         args.final(regions)
     #pipcl.log(f'{args.args_eq.argv=}')
     
-    return args, state
+    return args, state, regions2
 
 
 def _get_key(state, url, on_error=None):
@@ -2832,7 +2845,7 @@ def main(argv):
     if github_workflow_unimportant():
         return
     
-    args, state = get_args(argv)
+    args, state, args_regions = get_args(argv)
     if args is None:
         # COMP_LINE.
         return 0
@@ -2862,7 +2875,9 @@ def main(argv):
     
     sha, comment, diff, _branch = get_self_gitinfo()
     pipcl.log(f'Aptest gitinfo: {sha=}: {comment}')
-    pipcl.log(f'Command line: {shlex.join(args.argv)}')
+    pipcl.log(f'Args:')
+    for region, region_args in args_regions:
+        pipcl.log(f'    {region}: {shlex.join(region_args)}')
 
     if state.show_help:
         p = os.path.abspath(f'{__file__}/../README.rst')
