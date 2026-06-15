@@ -154,7 +154,7 @@ def enter(*,
             if arg.startswith('"') and arg.endswith('"'):
                 argv_string += f' {arg}'
             else:
-                assert '"' not in arg, f'Cannot handle arg containing double quote on windows: {arg=}'   
+                assert '"' not in arg, f'Cannot handle arg containing double quote on windows: {arg=}'
                 argv_string += f' "{arg}"'
     else:
         venv_enter = f'. {venv_name}/bin/activate'
