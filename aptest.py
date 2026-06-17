@@ -1348,6 +1348,26 @@ def _get_key_pypi(state, on_error='raise'):
     return _get_key2(state, 'https://upload.pypi.org/', on_error).strip()
 
 
+def do_piprepo(state):
+    # Uses piprepo to create {state.wheelhouse}/simple so it functions as a pypi-style
+    # repository.
+    
+    # Cleanup wheelhouse - remove all wheels that we don't support (which can
+    # have been pulled in by pip), and run piprep.
+    for p in glob.glob(f'{state.wheelhouse}/*.whl'):
+        name = os.path.basename(p)
+        name, _ = name.split('-', 1)
+        if name not in g_package_info:
+            pipcl.log(f'Deleting: {p}')
+            pipcl.fs_remove(p)
+    # We want to completely recreate.
+    pipcl.fs_remove(f'{state.wheelhouse}/simple')
+    pipcl.run(
+            f'piprepo build {state.wheelhouse}',
+            prefix='piprepo build: ',
+            )
+    
+
 def github_api_url(info):
     git_remote = info['git_remote']
     m = re.match('^git@github.com:(.+).git$', git_remote)
@@ -2989,8 +3009,12 @@ def main(argv):
             pipcl.log(f'Not removing {state.wheelhouse=} because not building all packages.')
             clean_wheelhouse = False
     if clean_wheelhouse:
-        pipcl.log(f'Removing {state.wheelhouse=}.')
-        pipcl.fs_remove(state.wheelhouse)
+        path_aptest_preserve = f'{state.wheelhouse}/_aptest_wheelhouse_preserve'
+        if os.path.exists(path_aptest_preserve):
+            pipcl.log(f'Not removing {state.wheelhouse=} because file exists: {path_aptest_preserve!r}')
+        else:
+            pipcl.log(f'Removing {state.wheelhouse=}.')
+            pipcl.fs_remove(state.wheelhouse)
     os.makedirs(state.wheelhouse, exist_ok=1)
         
     # Set environment variable values in <state.env_extra> to give access to
@@ -3099,6 +3123,7 @@ def main(argv):
                 
                 elif command == 'draft':
                     Assert(state.draft_location, f'<draft_location> unset')
+                    do_piprepo(state)
                     command = f'rsync -ai {state.wheelhouse}/ {state.draft_location}/'
                     pipcl.run(command)
 
@@ -3170,6 +3195,8 @@ def main(argv):
     finally:
         for path in paths_to_delete:
             pipcl.fs_remove(path)
+    
+    do_piprepo(state)
 
 
 def _get_local(package, state, test=False):
