@@ -169,6 +169,27 @@ Build/test with cibuildwheel
 See the `cibw`_ command.
 
 
+Things to be careful of
+-----------------------
+
+Rebuild all packages each time Aptest is used
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Aptest tries to be cautious when building/rebuilding and,
+by default,
+it will remove the contents of the wheelhouse before building anything,
+so don't assume previous builds will be available.
+  
+* So for example when building pymupdf4llm,
+  if one intends to use the new build of pymupdf4llm with a similar new build of pymupdf
+  (instead of pymupdf from pypi.org),
+  then one should also build pymupdf, for example with:
+  
+  ``aptest/aptest.py -m=git: -p=git: --4llm pymupdf4llm build``
+  
+  Usually rebuilding pypmupdf like this will be faily quick.
+
+
 Examples
 --------
 
@@ -239,6 +260,43 @@ Run ``pymupdf_layout`` gnn tests with ``mupdf`` version 1.27.2, current ``pymupd
 
     ``aptest/aptest.py --test-gnn-det eval/eval_pymupdf_layout.py -m=git:'-t 1.27.2' -p=git: --layout=sce test-gnn``
 
+
+Making internal development releases
+------------------------------------
+
+It can be useful to build wheels for commonly-used systems from the latest code in central git,
+and make them generally available for testing.
+
+Building development wheels
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+First create a separate wheelhouse directory,
+with a special file that prevents Aptest from deleting it.
+This allows one to have multiple wheel versions in the same place:
+
+* ``mkdir -p wheels-test``
+* ``touch wheels-test/_aptest_wheelhouse_preserve``
+
+Build wheels on Github,
+forcing version ``1.28.0a1`` for packages starting with ``pymupdf`` by setting ``PIPCL_CHANGE_VERSIONS``.
+This will default to creating wheels for ``windows-x64``, ``linux-x64`` and ``macos-arm64``:
+
+* ``aptest/aptest.py --wheelhouse wheels-test -m=git: -p=git: --layout=git: --4llm=git: -r @github cibw -e 'PIPCL_CHANGE_VERSIONS=^pymupdf.* 1.28.0a1'``
+
+Upload wheels and pypi database to web server:
+
+* ``aptest/aptest.py --wheelhouse wheels-test draft --draft-location julian@ghostscript.com:public_html/wheels-test/``
+
+Using development wheels
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+View wheels on web server at:
+
+* ``https://ghostscript.com/~julian/wheels-test``
+
+Install wheels from the web server with one of:
+
+* ``pip install --pre --upgrade --extra-index-url https://ghostscript.com/~julian/wheels-test/simple pymupdf4llm``
+* ``pip install --extra-index-url https://ghostscript.com/~julian/wheels-test/simple pymupdf4llm==1.28.0a1``
 
 Release procedure
 -----------------
@@ -570,8 +628,8 @@ On Macos:
   * Also see: https://docs.python.org/3/using/mac.html.
 
 
-Workarounds
-^^^^^^^^^^^
+Workarounds and problems
+^^^^^^^^^^^^^^^^^^^^^^^^
 
 (2026-02-06) With `cibw`_ we do not test with python-3.14 on Windows
 ....................................................................
@@ -596,6 +654,14 @@ Workarounds
     Package piprepo requires package ``pkg_resources``,
     which is part of setuptools,
     but only setuptools<81.
+
+(2026-06-18) Use under Visual Studio on Windows
+...............................................
+
+Running Aptest within a Visual Studio session has been known to give confusing results,
+possibly due to using a different working directory.
+
+So it's recommended to run Aptest within a standard Windows terminal instead.
 
 
 Keys/tokens
@@ -2493,6 +2559,23 @@ completion
 
 Changelog
 ---------
+
+**2026-06-18**
+
+* Added section on creating/using development wheels, `Making internal development releases`_.
+* Don't delete wheelhouse if it contains a file called ``_aptest_wheelhouse_preserve``.
+* Improved use of ``piprepo`` to create pypi-style database in wheelhouse:
+
+  * Remove all wheels that are unknown to Aptest.
+  * Recreate pypi-style database before uploading with `draft`_.
+  * Recreate pypi-style database before exiting.
+* Minor improvements to output from autoenv on startup.
+* Modify .github/workflows/test_multiple.yml to match pymupdfpro now defaulting to marina.
+* Show current directory on startup.
+* With `upload`_, also upload pyodide wheels to pypi, which now accepts them.
+
+
+**2026-06-15**
 
 * Simplified where we put wheels:
 
