@@ -2892,12 +2892,12 @@ def main(argv):
     else:
         # Just output elapsed time by default.
         pipcl.g_log_format = f'[+%d]: {os.path.basename(sys.prefix)}: '
-    
+    pipcl.log(f'Current directory: {os.getcwd()}')
     sha, comment, diff, _branch = get_self_gitinfo()
-    pipcl.log(f'Aptest gitinfo: {sha=}: {comment}')
     pipcl.log(f'Args:')
     for region, region_args in args_regions:
         pipcl.log(f'    {region}: {shlex.join(region_args)}')
+    pipcl.log(f'Aptest gitinfo: {sha=}: {comment}')
 
     if state.show_help:
         p = os.path.abspath(f'{__file__}/../README.rst')
