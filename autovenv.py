@@ -31,9 +31,28 @@ def log(text, verbose, t0):
             print(text, file=f)
     
 
-def run(command, verbose, t0, check=1):
-    log(f'Running: {command}', verbose, t0)
-    return subprocess.run(command, shell=1, check=check)
+def run(command, verbose, t0, check=1, batch=True):
+    log(f'Running {batch=}: {command}', verbose, t0)
+    if batch:
+        def write_out(text):
+            for line in text.split('\n'):
+                log(line, verbose=True, t0=t0)
+        try:
+            cp = subprocess.run(command, shell=1, check=check, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        except subprocess.SubprocessError as e:
+            text = e.stdout
+            # Docs say that e.stdout is always bytes, but doesn't seem to be the case?
+            if isinstance(text, bytes):
+                text = text.decode('utf8', errors='replace')
+            write_out(text)
+            raise
+        else:
+            text = cp.stdout
+            write_out(text)
+            return cp
+    else:
+        cp = subprocess.run(command, shell=1, check=check)
+    return cp
 
 
 def gil():
@@ -114,7 +133,7 @@ def enter(*,
     assert create in (1, 2, 3), f'Unrecognised {create=}, should be 1, 2 or 3.'
 
     if sys.prefix != sys.base_prefix:
-        log(f'Already in a venv.', verbose, t0)
+        log(f'Already in a venv, {sys.prefix=}.', verbose, t0)
         return
     
     # We are not in a venv.
@@ -173,5 +192,5 @@ def enter(*,
     else:
         command = f'{venv_enter} && python {shlex.join(sys.argv)}'
     
-    cp = run(command, verbose, t0, check=0)
+    cp = run(command, verbose, t0, check=0, batch=0)
     sys.exit(cp.returncode)
