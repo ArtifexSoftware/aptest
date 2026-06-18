@@ -3174,9 +3174,10 @@ def main(argv):
                     for path in glob.glob(f'{state.wheelhouse}/*.whl') + glob.glob(f'{state.wheelhouse}/*.tar.gz'):
                         leaf = os.path.basename(path)
                         name = leaf.split('-', 1)[0]
-                        if 'pyodide' in leaf:
-                            pipcl.log(f'Ignoring pyodide wheel: {path}')
-                        elif name in state.packages:
+                        # 2026-06-17: pypi.org now supports pyodide.
+                        #if 'pyodide' in leaf:
+                        #    pipcl.log(f'Ignoring pyodide wheel: {path}')
+                        if name in state.packages:
                             paths.append(path)
                         else:
                             pipcl.log(f'Ignoring wheel/sdist: {path}')
