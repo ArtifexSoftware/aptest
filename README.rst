@@ -18,6 +18,14 @@ https://pypi.org) multiple Artifex Python packages together.
 Aptest is hosted at https://github.com/ArtifexSoftware/aptest.
 
 
+License
+-------
+
+GNU Affero General Public License v3.0 only.
+
+* See file `<COPYING>`__.
+
+
 How to run Aptest
 -----------------
 
@@ -1969,7 +1977,9 @@ Options
 
 --pytest <pytest-flags>
 .......................
-    Specify extra `pytest <https://docs.pytest.org>`_ flags used by `test`_ and `cibw`_ commands.
+    Specify extra `pytest <https://docs.pytest.org>`_ flags when Aptest runs ``pytest``.
+    
+    Used by the `test`_ and `cibw`_ commands.
     
     For example:
     
@@ -2559,6 +2569,12 @@ completion
 
 Changelog
 ---------
+
+**2026-06-19**
+
+* Added AGPL-3.0-only license - see `License`_.
+* Updated Github workflow to test mupdf-1.28.x branch.
+
 
 **2026-06-18**
 
