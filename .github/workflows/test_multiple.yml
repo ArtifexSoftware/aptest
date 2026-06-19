@@ -32,9 +32,8 @@ jobs:
                 ]
         
         args: [
-            '-m "git:-b 1.27.x" -p git: --pro git: --layout git: --4llm git:',
-            '-m git:            -p git: --pro git: --layout git: --4llm git:',
-            '-p pip: --pro git: --smartoffice git: -t -pymupdf',
+            '-m "git:-b 1.28.x" -p git: --pro git: --layout git: --4llm git: --pro git:',
+            '-m git: -p git: --pro git: --layout git: --4llm git: --pro git: --marina git:',
             ]
 
       # Avoid cancelling of all runs after a single failure.
