@@ -42,13 +42,13 @@ jobs:
           ARTIFEX_SOFTWARE_SSH_KEY: ${{secrets.ARTIFEX_SOFTWARE_SSH_KEY}}
           PYMUPDFPRO_SETUP_SOT_KEY: ${{secrets.PYMUPDFPRO_SETUP_SOT_KEY}}
         run:
-          'python aptest.py -P git: --PRO git: --LAYOUT git: --4LLM git: --PDF4LLM git: --release-1'
+          'python aptest.py -P git: --PRO git: --LAYOUT git: --4LLM git: --PDF4LLM git: --wheelhouse-release aptest-wheelhouse-release --release-1'
       
       # Upload generated wheels, to be accessible from github Actions page.
       #
       - uses: actions/upload-artifact@v4
         with:
           path: |
-              aptest-wheelhouse/*.whl
-              aptest-wheelhouse/*.tar.gz
+              aptest-wheelhouse-release/*.whl
+              aptest-wheelhouse-release/*.tar.gz
           name: artifact-${{ matrix.os }}
