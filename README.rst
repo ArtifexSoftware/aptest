@@ -2570,6 +2570,11 @@ completion
 Changelog
 ---------
 
+**2026-06-22**
+
+* Fixed ``.github/workflows/test_release.yml``.
+
+
 **2026-06-19**
 
 * Added AGPL-3.0-only license - see `License`_.
