@@ -551,10 +551,9 @@ def apply_deltas(items, deltas, check=1, aliasfn=lambda name: name):
         elif delta.startswith('-'):
             try:
                 items.remove(aliasfn(delta[1:]))
-            except Exception:
-                #pipcl.log(f'Failed to remove {delta[1:]=} from {items=}')
+            except Exception as e:
                 if check:
-                    raise
+                    raise Exception(f'Failed to remove {delta[1:]=} from {items=}') from e
         else:
             if delta.startswith('+'):
                 delta = delta[1:]
