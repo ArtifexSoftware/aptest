@@ -1650,16 +1650,9 @@ def _modify_build_env(state, package):
             ):
         # Pro's setup.py needs PYMUPDFPRO_SETUP_SOT_KEY or
         # PYMUPDFPRO_SETUP_SOT_KEY_PATH to be set in order to clone
-        # smartoffice.
+        # smartoffice-marina.
         #
-        # This will need to be changed if/when we change pro to use
-        # smartoffice-marina by default.
-        #
-        if 'smartoffice-marina' in state.packages:
-            key_path, key_env = _get_key(state, 'git@github.com:', on_error='raise')
-        else:
-            key_path, key_env = _get_key(state, 'git@gitlab.artifex.com:', on_error='raise')
-        
+        key_path, key_env = _get_key(state, 'git@github.com:', on_error='raise')
         if key_path:
             state.env_extra['PYMUPDFPRO_SETUP_SOT_KEY_PATH'] = os.path.abspath(key_path)
         elif key_env:
