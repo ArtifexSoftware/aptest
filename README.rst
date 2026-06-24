@@ -2574,6 +2574,7 @@ Changelog
 
 * In ``.github/workflows/test_release.yml``,
   temporarily use mupdf-1.28.x until there is a mupdf 1.28.0 tag.
+* Fixed key handling for pymupdfpro and marina.
 
 
 **2026-06-22**
