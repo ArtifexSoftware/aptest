@@ -2570,6 +2570,12 @@ completion
 Changelog
 ---------
 
+**2026-06-24**
+
+* In ``.github/workflows/test_release.yml``,
+  temporarily use mupdf-1.28.x until there is a mupdf 1.28.0 tag.
+
+
 **2026-06-22**
 
 * Fixed ``.github/workflows/test_release.yml``.
