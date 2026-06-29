@@ -901,10 +901,6 @@ def _create_download_union(leaf_to_path, extra_wheels, local_dir_union):
         if not leaf.endswith(('.whl', '.tar.gz')):
             pipcl.log(f'Ignoring {leaf=}.')
             continue
-        if 'emscripten' in leaf:
-            pipcl.log(f'Pyodide wheel: {leaf=} {path=}')
-            pyodide_wheels.append((leaf, path))
-            continue
         #path = paths[0]
         path_leaf = os.path.basename(path)
         path_existing = f'{local_dir_union}/{path_leaf}'
