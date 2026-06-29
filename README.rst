@@ -403,7 +403,7 @@ Instructions for releasing wheels for:
 
   Or upload to, and install from, a web server:
   
-  * ``aptest/aptest.py draft --draft-location julian@ghostscript.com:public_html/wheels-1.27.2/`` --wheelhouse release-1.27.2.
+  * ``aptest/aptest.py draft --draft-location julian@ghostscript.com:public_html/wheels-1.27.2/ --wheelhouse release-1.27.2``
   
   * ``pip install --extra-index-url https://ghostscript.com/~julian/wheels-1.27.2/simple pdf4llm pymupdfpro``
   
@@ -517,6 +517,8 @@ Instructions for releasing wheels for:
         PyMuPDF-<version> has just been released.
       
         See: https://github.com/pymupdf/PyMuPDF/discussions/<announcement-id>
+        
+        Also released: pymupdf4llm, pymupdf_layout, pdf4llm, pymupdfpro.
 
 * Possible post-release changes:
 
@@ -716,22 +718,22 @@ Also see:
 
 
 Using DocLayNet dataset
-.......................
+^^^^^^^^^^^^^^^^^^^^^^^
 
-The `gnn-download`_ command downloads/extracts the DocLayNet dataset as described in
+Aptest has experimental support for using the DocLayNet dataset as described in
 https://github.com/ArtifexSoftware/sce/wiki/How-to-train-GNN.
 
-* Downloading and extracting is tracked using marker files, to avoid running
-  unnecessarily more than once.
+* The `gnn-download`_ command downloads/extracts the DocLayNet dataset as required.
+* The `test-gnn`_ command runs ``pymupdf_layout`` tests on the DocLayNet dataset.
 
-* The `test-gnn`_ command runs ``pymupdf_layout`` tests on the DocLayNet dataset,
-  depending on the `--test-gnn-det`_ value.
+Also see:
 
-* The ``pymupdf_layout`` package must have been built/installed.
+* `gnn-show`_.
+* `gnn-train`_.
 
 
 Argument completion with Bash
-.............................
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Aptest has support for customised bash argument completion using ``<tab>``.
 
@@ -919,8 +921,9 @@ draft
 
 gnn-download
 ............
-    Download and extract dataset for the ``pymupdf_layout`` GNN model. Does not
-    do unnecessary downloads or extracts.
+    Download and extract dataset for the ``pymupdf_layout`` GNN model.
+    
+    Uses marker files to avoid unnecessary downloads or extracts.
 
 
 gnn-show
@@ -934,7 +937,7 @@ gnn-show
                 'environ' in results \
                 and results['environ']['USER']=='jules' \
                 and results['python']['platform.system()']=='Windows' \
-                and  results['state'].get('limit')==5 \
+                and results['state'].get('limit')==5 \
                 "
 
     Also see:
@@ -1088,9 +1091,12 @@ Options
 
 .. _-e:
 
--e <name>=<value>
-.................
+-e <name>[+]=<value>
+....................
     Set specified environment variable.
+    
+    If ``+=`` is used then ``<value>`` is appended to any existing value, for
+    example ``-e PATH+=:foo/bar``.
 
 
 .. _--git-remote-modify:
@@ -2569,6 +2575,11 @@ completion
 
 Changelog
 ---------
+
+* Added support for ``+=`` when setting an environment variable with `-e`_.
+* Fix `upload`_ to use `--wheelhouse-release`_ directory.
+* The `upload`_ command now also uploads Pyodide wheels to pypi.org.
+
 
 **2026-06-24**
 
