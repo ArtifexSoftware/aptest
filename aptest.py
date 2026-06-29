@@ -950,7 +950,15 @@ def get_args(argv):
                 _nv = next(args).as_text()
                 Assert('=' in _nv, f'-e <name>=<value> does not contain "=": {_nv!r}')
                 _name, _value = _nv.split('=', 1)
-                state.env_extra[_name] = _value
+                if _name.endswith('+'):
+                    _name = _name[:-1]
+                    _value0 = state.env_extra.get(_name)
+                    if _value0 is None:
+                        _value0 = os.environ.get(_name, '')
+                    state.env_extra[_name] = _value0 + _value
+                    pipcl.log(f'Have set state.env_extra[{_name!r}]={state.env_extra[_name]!r}')
+                else:
+                    state.env_extra[_name] = _value
             
             elif arg == '--git-depth':
                 state.git_depth = next(args).as_int()
@@ -1243,6 +1251,7 @@ def get_args(argv):
                 # We never clean the release wheelhouse.
                 state.clean_wheelhouse = False
                 for package, location in state.packages_for_release.items():
+                    assert package != 'mupdf', f'The mupdf location must not be set in release builds - use pymupdf default: {package=} {location=}'
                     add_package(state, package, location)
 
             elif arg == '-v':
@@ -2094,11 +2103,12 @@ def do_cibw(state):
             pipcl.log(f'Not doing build/test on macos/intel/python-3.14 because onnxruntime not available: {package=}')
         
         elif package in ('pdf2docx', 'pdf4llm', 'pymupdf4llm', 'pipcl'):
-            # Build/test directly.
+            # Build/test directly because pure python.
             pipcl.log(f'Not using cibuildwheel for {package=} because cibuildwheel does not support pure python wheels.')
             new_files = pipcl.NewFiles(f'{state.wheelhouse}/*.whl')
             do_build_single(state, package)
             failed_packages = list()
+            pipcl.run(f'pip list')
             do_test_single(state, package, failed_packages)
             
             # Delete any new prerequisite wheels that are not for <package>, so
@@ -2123,6 +2133,7 @@ def do_cibw(state):
                 CIBW_TEST_COMMAND = f'pip install --upgrade pytest'
                 if state.pytest_timeout:
                     CIBW_TEST_COMMAND += f' && pip install --upgrade pytest-timeout'
+                CIBW_TEST_COMMAND += f' && pip list'
                 CIBW_TEST_COMMAND += f' && pytest'
                 if state.pytest_timeout:
                     CIBW_TEST_COMMAND += f' --timeout {state.pytest_timeout}'
@@ -3146,7 +3157,7 @@ def main(argv):
                                 directory = _get_local(package, state)
                                 pipcl.log(f'Local directory for {package=} is: {directory!r}')
 
-                elif command.startswith('test-gnn'):
+                elif command == 'test-gnn':
                     do_test_gnn(state)
 
                 elif command == 'run':
@@ -3162,14 +3173,17 @@ def main(argv):
                     do_test(state)
                 
                 elif command == 'upload':
+                    Assert(state.wheelhouse_release, f'No release wheelhouse specified, use `--wheelhouse-release <directory-name>`.')
+                    Assert(state.wheelhouse_release != state.wheelhouse, f'{state.wheelhouse_release=} is not different from {state.wheelhouse=}.')
+                    pipcl.log(f'Using {state.wheelhouse_release=}')
                     paths = list()
-                    for path in glob.glob(f'{state.wheelhouse}/*.whl') + glob.glob(f'{state.wheelhouse}/*.tar.gz'):
+                    for path in glob.glob(f'{state.wheelhouse_release}/*.whl') + glob.glob(f'{state.wheelhouse_release}/*.tar.gz'):
                         leaf = os.path.basename(path)
                         name = leaf.split('-', 1)[0]
                         # 2026-06-17: pypi.org now supports pyodide.
                         #if 'pyodide' in leaf:
                         #    pipcl.log(f'Ignoring pyodide wheel: {path}')
-                        if name in state.packages:
+                        if name in state.packages_for_release:
                             paths.append(path)
                         else:
                             pipcl.log(f'Ignoring wheel/sdist: {path}')
