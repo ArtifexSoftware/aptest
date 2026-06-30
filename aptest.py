@@ -2451,10 +2451,13 @@ def do_gnn_show(state):
     else:
         pattern_matches = glob.glob(pattern)
     for path in pattern_matches:
+        if path.endswith('-raw.json'):
+            continue
         if state.gnn_show_select:
             with open(path) as f:
                 results = json.load(f)
             # Convert to a Doct so that selectfn() can use dotted notation.
+            Assert(isinstance(results, dict), f'Data in file is not a dict: {path}')
             results = doct.Doct(results)
             s = selectfn(results)
         else:
