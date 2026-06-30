@@ -929,6 +929,11 @@ gnn-download
 gnn-show
 ........
     Generate graph showing results from previous runs of `test-gnn`_.
+    
+    By default we generate graphs and text files called:
+    
+    * ``gnn-text-YYYY-mm-dd-HH-MM-SS.txt``
+    * ``gnn-graph-YYYY-mm-dd-HH-MM-SS.html``
 
     For example::
 
@@ -943,8 +948,9 @@ gnn-show
     Also see:
 
     * `--gnn-show-graph`_
-    * `--gnn-show-text`_
+    * `--gnn-show-path`_
     * `--gnn-show-select`_
+    * `--gnn-show-text`_
 
 
 gnn-train
@@ -989,7 +995,7 @@ test-gnn
     * Test GNN model
     * Writes results to ``test-gnn-results/test-gnn-YYYY-mm-dd-HH-MM-SS.json``.
     * Requires `--test-gnn-det`_.
-    * Requires a checkout of the `layout` repository, e.g. with `--layout git:`.
+    * Requires a checkout of the ``pymupdf_layout`` repository, e.g. with `--layout git:`.
 
     Results are a dict with this structure:
 
@@ -1021,6 +1027,7 @@ test-gnn
     Also see:
 
     * `gnn-download`_
+    * `gnn-show`_
     * `--gnn-show-*`_
     * `--test-gnn-cache`_
     * `--test-gnn-det`_
@@ -1690,16 +1697,16 @@ Options
 
 --gnn-show-path <path>
 ......................
-    Add comma-separated paths of json output file for `gnn-show`_ command. Can
-    be called multiple times.
+    Add comma-separated paths of ``test-gnn-*.json`` files for the `gnn-show`_ command.
+    
+    Can be called multiple times.
 
 
 .. _--gnn-show-select:
 
 --gnn-show-select <expression>
 ..............................
-    Specify expression to use to select which ``test-gnn-*.json`` files to
-    include in output created by command `gnn-show`_.
+    Specify expression to use to select ``test-gnn-*.json`` files for the `gnn-show`_ command.
 
     ``<expression>`` should be a Python expression that looks at Python dict ``results``.
 
@@ -1708,7 +1715,7 @@ Options
 
     Example::
     
-        --gnn-show-select "'environ' in results and results.environ.USER=='jules' and results.python['platform.system()']=='Windows' and  results.state.get('limit')==5
+        --gnn-show-select "'environ' in results and results.environ.USER=='jules' and results.python['platform.system()']=='Windows' and  results.state.get('limit')==5"
 
 
 .. _--gnn-show-text:
