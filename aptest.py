@@ -2647,7 +2647,8 @@ def do_test_gnn(state):
         out_json = f'test-gnn-results/test-gnn-{g_date_time}.json'
         out_json_raw = f'test-gnn-results/test-gnn-{g_date_time}-raw.json'
         pipcl.fs_ensure_dir('test-gnn-results')
-        
+        Assert(state.test_gnn_det, f'test-gnn requires `--test-gnn-det <gnn_det>`.')
+        Assert(layout_location, f'test-gnn requires a checkout of pymupdf_layout, e.g. with `--layout git:`.')
         command = textwrap.dedent(f'''
                 cd {layout_location}
                 && python {state.test_gnn_det}
@@ -2658,7 +2659,7 @@ def do_test_gnn(state):
                  ''')
         ret['t_start'] = time.time()
         
-        pipcl.run(command)
+        pipcl.run(command, env_extra=dict(PYTHONPATH='.'))
         
         ret['t_duration'] = time.time() - ret['t_start']
         with open(out_json_raw) as f:
