@@ -989,6 +989,7 @@ test-gnn
     * Test GNN model
     * Writes results to ``test-gnn-results/test-gnn-YYYY-mm-dd-HH-MM-SS.json``.
     * Requires `--test-gnn-det`_.
+    * Requires a checkout of the `layout` repository, e.g. with `--layout git:`.
 
     Results are a dict with this structure:
 
@@ -1019,6 +1020,8 @@ test-gnn
 
     Also see:
 
+    * `gnn-download`_
+    * `--gnn-show-*`_
     * `--test-gnn-cache`_
     * `--test-gnn-det`_
     * `--test-gnn-extra`_
@@ -1652,6 +1655,20 @@ Options
     * `-i`_.
     
 
+.. _--gnn-doclaynet-dir:
+
+--gnn-doclaynet-dir <doclaynet_dir>
+...................................
+    Set the DocLayNet directory.
+    
+    * If `gnn-download`_ is specified, it will populate this directory as required.
+    
+    * Otherwise ``<doclaynet_dir>`` should be an existing DocLayNet directory,
+      with subdirectories ``COCO``, ``JSON``, ``PDF``, ``PNG``.
+      
+    * Default is ``datasets/DocLayNet``.
+
+
 .. _--gnn-doit:
 
 --gnn-doit (bool)
@@ -1659,11 +1676,14 @@ Options
     If 0 (the default) we never download/extract DocLayNet.
 
 
+.. _--gnn-show-*:
+
+
 .. _--gnn-show-graph:
 
 --gnn-show-graph <path>
 .......................
-    Override default name of gnn-graph out file in `gnn-show`_ command.
+    Override default name of gnn-graph output file in `gnn-show`_ command.
 
 
 .. _--gnn-show-path:
@@ -2579,6 +2599,8 @@ Changelog
 * Added support for ``+=`` when setting an environment variable with `-e`_.
 * Fix `upload`_ to use `--wheelhouse-release`_ directory.
 * The `upload`_ command now also uploads Pyodide wheels to pypi.org.
+* Fix import error if `test-gnn`_ runs ``pymupdf_layout:eval/eval_pymupdf_layout.py``.
+* Added `--gnn-doclaynet-dir`_, sets the DocLayNet directory.
 
 
 **2026-06-24**
