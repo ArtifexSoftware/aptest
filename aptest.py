@@ -723,6 +723,7 @@ def get_args(argv):
     state.git_local_detailed = False
     state.git_remote_modifications = list()
     state.github_upload = None
+    state.gnn_doclaynet_dir = 'datasets/DocLayNet'
     state.gnn_doit = False
     state.gnn_show_graph = None
     state.gnn_show_text = None
@@ -971,6 +972,9 @@ def get_args(argv):
                 b = next(args).as_str()
                 state.git_remote_modifications.append( (a, b))
             
+            elif arg == '--gnn-doclaynet-dir':
+                state.gnn_doclaynet_dir = next(args).as_text()
+                
             elif arg == '--gnn-doit':
                 state.gnn_doit = args.get_bool()
             
@@ -2278,7 +2282,7 @@ def do_gnn_download(state):
     # a specific torch.
     #
     # I don't understand this. The only way to make things work
-    # is to install the latest versions on pypi.prg, and build
+    # is to install the latest versions on pypi.org, and build
     # torch-scatter without isolation so that it can build with
     # the installed torch.
     pipcl.run('pip install -v torch')
@@ -2366,8 +2370,8 @@ def do_gnn_download(state):
 
         if 1:
             # Unzip.
-            ensure_unzip(url_doclaynet_core_zip, 'datasets/DocLayNet')
-            ensure_unzip(url_doclaynet_extra_zip, 'datasets/DocLayNet')
+            ensure_unzip(url_doclaynet_core_zip, state.gnn_doclaynet_dir)
+            ensure_unzip(url_doclaynet_extra_zip, state.gnn_doclaynet_dir)
 
         if 1:
             # Generate PKL.
@@ -2378,8 +2382,8 @@ def do_gnn_download(state):
             else:
                 pipcl.run(f'{sys.executable}'
                         f' {layout_location}/train/tools/make_pkl_data_from_COCO_json.py'
-                        f' --json datasets/DocLayNet/COCO/train.json'
-                        f' --img_dir datasets/DocLayNet/PNG'
+                        f' --json {state.gnn_doclaynet_dir}/COCO/train.json'
+                        f' --img_dir {state.gnn_doclaynet_dir}/PNG'
                         f' --save_dir workspace/pkl_data/train'
                         )
                 with open(marker_pkl, 'w'):
@@ -2391,8 +2395,8 @@ def do_gnn_download(state):
             else:
                 pipcl.run(f'{sys.executable}'
                         f' {layout_location}/train/tools/make_pkl_data_from_COCO_json.py'
-                        f' --json datasets/DocLayNet/COCO/val.json'
-                        f' --img_dir datasets/DocLayNet/PNG'
+                        f' --json {state.gnn_doclaynet_dir}/COCO/val.json'
+                        f' --img_dir {state.gnn_doclaynet_dir}/PNG'
                         f' --save_dir workspace/pkl_data/val'
                         )
                 with open(marker_pkl_validation, 'w'):
@@ -2533,7 +2537,7 @@ def do_test_gnn(state):
     layout_location = _get_local('pymupdf_layout', state)
 
     pipcl.run(f'pip install tqdm')
-    pdf_dir = 'datasets/DocLayNet/PDF'
+    pdf_dir = f'{state.gnn_doclaynet_dir}/PDF'
     
     ret = dict()
 
