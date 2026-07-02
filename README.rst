@@ -1039,7 +1039,11 @@ test-gnn
 
 upload
 ......
-    Upload all wheels and sdists in directory specified by `--wheelhouse-release`_, to https://pypi.org.
+    Upload wheels and sdists in directory specified by `--wheelhouse-release`_, to https://pypi.org.
+    
+    * If `--wheelhouse-release`_ is not specified,
+      we use the default wheelhouse
+      (which may have been overridden with `--wheelhouse`_).
 
 
 windows-show-vs-instances
@@ -2602,6 +2606,15 @@ completion
 
 Changelog
 ---------
+
+**2026-07-02**
+
+* Allow upload from non-release wheelhouse.
+* Allow use of lower-case ``--mupdf`` in release builds.
+* Fixed potential exception when sorting keys on Github.
+
+
+**2026-06-30**
 
 * Added support for ``+=`` when setting an environment variable with `-e`_.
 * Fix `upload`_ to use `--wheelhouse-release`_ directory.
