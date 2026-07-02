@@ -737,8 +737,8 @@ def get_args(argv):
         # Add known keys from aptest's Github repository secrets. This is
         # required - otherwise scheduled workflow runs are unable to clone
         # Github/Gitlab repositories.
-        _add_key(state, 'git@github.com:', '', 'ARTIFEX_SOFTWARE_SSH_KEY', 0)
-        _add_key(state, 'git@gitlab.artifex.com:', '', 'PYMUPDFPRO_SETUP_SOT_KEY', 0)
+        _add_key(state, 'git@github.com:', '', 'ARTIFEX_SOFTWARE_SSH_KEY', (0, 0))
+        _add_key(state, 'git@gitlab.artifex.com:', '', 'PYMUPDFPRO_SETUP_SOT_KEY', (0, 0))
     
     state.os_names = list()
     state.packages2 = dict()   # map from name to location.
