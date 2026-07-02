@@ -3181,17 +3181,22 @@ def main(argv):
                     do_test(state)
                 
                 elif command == 'upload':
-                    Assert(state.wheelhouse_release, f'No release wheelhouse specified, use `--wheelhouse-release <directory-name>`.')
-                    Assert(state.wheelhouse_release != state.wheelhouse, f'{state.wheelhouse_release=} is not different from {state.wheelhouse=}.')
-                    pipcl.log(f'Using {state.wheelhouse_release=}')
+                    if state.wheelhouse_release:
+                        Assert(state.wheelhouse_release != state.wheelhouse, f'{state.wheelhouse_release=} is set but is not different from {state.wheelhouse=}.')
+                        wheelhouse = state.wheelhouse_release
+                        packages = state.packages_for_release
+                    else:
+                        wheelhouse = state.wheelhouse
+                        packages = state.packages
+                    pipcl.log(f'Using {wheelhouse=}')
                     paths = list()
-                    for path in glob.glob(f'{state.wheelhouse_release}/*.whl') + glob.glob(f'{state.wheelhouse_release}/*.tar.gz'):
+                    for path in glob.glob(f'{wheelhouse}/*.whl') + glob.glob(f'{wheelhouse}/*.tar.gz'):
                         leaf = os.path.basename(path)
                         name = leaf.split('-', 1)[0]
                         # 2026-06-17: pypi.org now supports pyodide.
                         #if 'pyodide' in leaf:
                         #    pipcl.log(f'Ignoring pyodide wheel: {path}')
-                        if name in state.packages_for_release:
+                        if name in packages:
                             paths.append(path)
                         else:
                             pipcl.log(f'Ignoring wheel/sdist: {path}')
