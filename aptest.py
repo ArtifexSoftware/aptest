@@ -1070,10 +1070,11 @@ def get_args(argv):
                 new_args += ' --check-unchanged'
                 new_args += ' --use-release-args'
                 
-                # If `--MUPDF=...` has been specified, then we need to include
-                # mupdf in the list of packages to build. (Usually it is not
-                # specified so that pymupdf's default mupdf is used.)
-                b_mupdf = 'mupdf,' if 'mupdf' in state.packages_for_release else ''
+                # We do not allow --MUPDF to be specified (this is checked if
+                # --use-release-args is specified). But for testing purposes we
+                # allow --mupdf, in which case we need to include mupdf in the
+                # list of packages to build.
+                b_mupdf = 'mupdf,' if 'mupdf' in state.packages else ''
                 
                 if 0:
                     pass
