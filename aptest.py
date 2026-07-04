@@ -45,7 +45,7 @@ COMP_POINT = os.environ.get('COMP_POINT')
 # Note that we don't have a way to use anything other than pypi's pipcl.
 create = 2
 verbose = 1
-packages = ['pipcl']
+packages = ['pipcl', 'xmltodict']
 if sys.argv[1:] == ['completion'] or COMP_LINE:
     # We don't want autovenv to output debug info because it'll badly mess
     # up completion. And we use `create = 1` for speed.
@@ -61,7 +61,11 @@ autovenv.enter(
         verbose=verbose,
         )
 
+# We use `pylint:disable=wrong-import-position` because these imports need to
+# be after autovenv.enter().
+#
 import pipcl    # pylint:disable=wrong-import-position
+import xmltodict    # pylint:disable=wrong-import-position
 
 # Import local files directly or from our package if we are installed.
 try:
@@ -2812,12 +2816,22 @@ def do_test_single(state, package, failed_packages):
                     check=0,
                     )
             if state.pytest_junit_xml:
+                # Convert junit .xml file into .json.
+                try:
+                    with open(path_junit_xml, 'rb') as f:
+                        pytest_junit = xmltodict.parse(f)
+                    with open(f'{path_junit_xml}.json', 'w') as f:
+                        json.dump(pytest_junit, f, indent='    ')
+                except Exception as ee:
+                    pipcl.log(f'Failed to convert to json {path_junit_xml=}: {ee}')
+                # Convert junit .xml file into indented .xml.
                 try:
                     junit_xml_pretty = xml.dom.minidom.parse(path_junit_xml).toprettyxml()
                     pipcl.fs_write(f'{path_junit_xml}.xml', junit_xml_pretty)
                 except Exception as ee:
-                    e = ee
-                    pipcl.log(f'Failed to prettyfy {path_junit_xml=}: {e}')
+                    pipcl.log(f'Failed to prettyfy {path_junit_xml=}: {ee}')
+            else:
+                pytest_junit = None
         if e:
             pipcl.log(f'Tests failed for {package=}.')
             if state.cibw_ignore_test_failures:
@@ -2826,6 +2840,8 @@ def do_test_single(state, package, failed_packages):
                 failed_packages.append(package)
         else:
             pipcl.log(f'Tests succeeded for {package=}.')
+    
+    return pytest_junit
 
 
 def do_test(state):
@@ -2853,15 +2869,30 @@ def do_test(state):
     
     pipcl.log(f'pip list')
 
+    results = dict()
     for package in state.packages_test:
         with pipcl.LogPrefix(f'{package}: '):
-            do_test_single(state, package, failed_packages)
+            results[package] = dict()
+            location, _ = state.packages[package]
+            results[package]['location'] = location
+            directory = _get_local(package, state)
+            if directory:
+                sha, comment, diff, branch = pipcl.git_info(directory)
+                results[package]['git'] = dict(sha=sha, comment=comment, diff=diff, branch=branch)
+            
+            junit = do_test_single(state, package, failed_packages)
+            results[package]['junit'] = junit
     
     if failed_packages:
         pipcl.log(f'Tests failed for these packages:')
         for package in failed_packages:
             pipcl.log(f'    {package}')
         raise Exception(f'Packages failed tests: {failed_packages}')
+    
+    path_results = f'{state.wheelhouse}/results.json'
+    with open(path_results, 'w') as f:
+        json.dump(results, f, indent='    ')
+    pipcl.log(f'Have written test results to: {path_results}')
 
 
 def get_self_gitinfo():
@@ -3179,13 +3210,23 @@ def main(argv):
                     do_test_gnn(state)
 
                 elif command == 'run':
+                    run_results = dict()
                     for package, command in state.run_commands:
-                        directory = _get_local(package, state, test=True)
-                        Assert(
-                                directory,
-                                f'Cannot run command within {package=} because no local directory.',
-                                )
-                        pipcl.run(f'cd {directory} && {command}')
+                        if package:
+                            directory = _get_local(package, state, test=True)
+                            Assert(
+                                    directory,
+                                    f'Cannot run command within {package=} because no local directory.',
+                                    )
+                        else:
+                            directory = '.'
+                        t = time.time()
+                        out = pipcl.run(f'cd {directory} && {command}', capture=1, out='log')
+                        t = time.time() - t
+                        run_results[package] = dict(t=t, out=out)
+                    
+                    with open(f'{state.wheelhouse}/aptest-run-results.json', 'w') as f:
+                        json.dump(run_results, f, indent=4)
 
                 elif command == 'test':
                     do_test(state)
