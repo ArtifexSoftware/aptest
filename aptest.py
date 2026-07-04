@@ -770,6 +770,7 @@ def get_args(argv):
     state.remote_prefix_default = dict()
     state.remote_rsync_path = None
     state.remote_rsync_wsl = False
+    state.remote_sync = list()
     state.run_commands = list()
     state.sdists = False
     state.show_help = False
@@ -1123,6 +1124,9 @@ def get_args(argv):
             
             elif arg == '--remote-do':
                 state.remote_do = args.get_bool()
+            
+            elif arg == '--remote-sync':
+                state.remote_sync.append(args.next().as_text())
 
             elif arg == '--remote-github-runners':
                 _deltas = next(args).as_text()
@@ -1563,6 +1567,10 @@ def do_remote(state, argv):
         for _prefix, path, _env, _pos in state.keys:
             if path and os.path.exists(path):
                 sync2(path)
+        
+        # Sync misc files/directories specified by --remote-sync.
+        for path in state.remote_sync:
+            sync2(path)
 
         # Run remote command.
         #
@@ -1607,6 +1615,7 @@ def do_remote(state, argv):
             filters.append(f'--include={package}-*.whl')
             filters.append(f'--include={package}-*.tar.gz')
             filters.append(f'--include={package}-*.xml')
+        filters.append(f'--include=aptest-run-results.json')
         filters.append('--exclude=*')
         sync_reverse(
                 remote,
