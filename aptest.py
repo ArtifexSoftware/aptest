@@ -792,7 +792,6 @@ def get_args(argv):
     state.test_gnn_out = None
     state.test_gnn_push = 0
     state.ticker = 0
-    state.valgrind = False
     state.venv = 2
     state.venv_name = None
     
@@ -1050,7 +1049,10 @@ def get_args(argv):
 
             elif arg == '--pytest-wrap':
                 state.pytest_wrap = next(args)
-                Assert(state.pytest_wrap in ('gdb', 'valgrind', 'helgrind'), f'{state.pytest_wrap=} should be one of: gdb valgrind helgrind')
+                Assert(
+                        state.pytest_wrap in ('gdb', 'valgrind', 'helgrind', 'pyinstrument'),
+                        f'{state.pytest_wrap=} should be one of: gdb valgrind helgrind pyinstrument',
+                        )
 
             elif arg == '--python':
                 pos = args.pos
@@ -1613,12 +1615,13 @@ def do_remote(state, argv):
                 )
 
     if 1:
-        # Copy remote wheels back to local machine.
+        # Copy contents of remote wheelhouse back to local machine.
         filters = list()
         for package in state.packages_build:
             filters.append(f'--include={package}-*.whl')
             filters.append(f'--include={package}-*.tar.gz')
             filters.append(f'--include={package}-*.xml')
+        filters.append(f'--include=*.pyisession')
         filters.append(f'--include=aptest-run-results.json')
         filters.append('--exclude=*')
         sync_reverse(
@@ -2778,7 +2781,16 @@ def do_test_single(state, package, failed_packages):
             if state.pytest_wrap in ('valgrind', 'helgrind'):
                 if not state.pytest_options:
                     command += ' -sv'
-            if state.pytest_wrap:
+            if state.pytest_wrap == 'pyinstrument':
+                pipcl.run('pip install --upgrade pyinstrument')
+                command = (
+                            f'pyinstrument'
+                            f' -o {os.path.abspath(state.wheelhouse)}/pyintrument_{package}.txt'
+                            f' -o {os.path.abspath(state.wheelhouse)}/pyintrument_{package}.html'
+                            f' -o {os.path.abspath(state.wheelhouse)}/pyintrument_{package}.pyisession'
+                            f' -m {command}'
+                            )
+            elif state.pytest_wrap:
                 command = f'python -m {command}'
                 if state.pytest_wrap == 'gdb':
                     command = f'gdb -ex "set print inferior-events off" --args {command}'
