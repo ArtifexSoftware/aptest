@@ -32,8 +32,8 @@ jobs:
                 ]
         
         args: [
-            '-m "git:-b 1.28.x" -p git: --pro git: --layout git: --4llm git: --pro git:',
-            '-m git: -p git: --pro git: --layout git: --4llm git: --pro git: --marina git:',
+            '-m "git:-b 1.28.x" -p git: --pro git: --layout git: --4llm git:',
+            '-m git: -p git: --pro git: --layout git: --4llm git: --marina git:',
             ]
 
       # Avoid cancelling of all runs after a single failure.
