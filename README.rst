@@ -197,6 +197,13 @@ so don't assume previous builds will be available.
   
   Usually rebuilding pypmupdf like this will be faily quick.
 
+Forcing a rebuild of MuPDF on Windows
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+On Windows libraries are initially built in `platform/win32/x64/`` by Visual Studio,
+before being copied into ``build/``.
+
+So to manually force a rebuild, delete ``platform/win32/x64`` as well as ``build/``.
+
 
 Examples
 --------
@@ -340,6 +347,8 @@ Instructions for releasing wheels for:
     they are labelled as fixed in ``changes.txt``.
   * For all issues mentioned as fixed in ``changes.txt``, ensure that
     the corresponding Github issue is labelled as ``Fixed in next release``.
+
+* Ensure that pymupdf4llm's CHANGES.md is up to date.
 
 * Test local checkouts of all packages on Github machines:
 
@@ -576,6 +585,8 @@ Aptest specifies ``--junit-xml=aptest-wheelhouse/<package-name>-pytest-junit.xml
 which generates an .xml file containing the test results.
 
 The .xml file is also copied back to local machine along with .whl files if `-r`_ is used.
+
+We also create a pretty-printed xml file ``<package-name>-pytest-junit.xml.xml``.
 
 Also see https://docs.pytest.org/en/stable/how-to/output.html#creating-junitxml-format-files.
 
@@ -983,7 +994,10 @@ test
     Also see:
 
     * `--pytest`_
+    * `--pytest-junit-xml`_
     * `--pytest-path`_
+    * `--pytest-timeout`_
+    * `--pytest-timeout-method`_
     * `--pytest-wrap`_
     * `-t`_
     * `--test-extra-packages`_
@@ -2028,7 +2042,8 @@ Options
 
 --pytest-junit-xml: (bool)
 ..........................
-    Run ``pytest`` with ``--junit-xml`` and write info into ``aptest-wheelhouse``.
+    If true, `test`_ will run ``pytest`` with extra arg ``--junit-xml``
+    and write info (converted from xml to json) into ``aptest-wheelhouse/<package>-pytest-junit.xml``.
 
 
 .. _--pytest-path:
@@ -2063,10 +2078,21 @@ Options
 
 .. _--pytest-wrap:
 
---pytest-wrap gdb | valgrind | helgrind
-.......................................
+--pytest-wrap gdb | valgrind | helgrind | pyinstrument
+......................................................
     Makes `test`_ command run `pytest <https://docs.pytest.org>`_ under specified tool.
 
+    If ``pyinstrument``, we run pytest under
+    `pyinstrument <https://pyinstrument.readthedocs.io/en/latest/guide.html>`_.
+    
+    * We generate these files:
+    
+      * ``<wheelhouse_dir>/pyintrument_<package>.txt``
+      * ``<wheelhouse_dir>/pyintrument_<package>.html``
+      * ``<wheelhouse_dir>/pyintrument_<package>.pyisession``
+    
+    * The ``.pyisession`` file can be used to generate other reports.
+    * With `-r`_, remote ``.pyisession`` files will be synced back to local wheelhouse.
 
 .. _--python:
 
@@ -2258,12 +2284,23 @@ Options
     If true we tweak various things to cope with remote using wsl rsync.
 
 
+.. _--remote-sync:
+
+--remote-sync <path>
+....................
+Copy ``<path>`` (a file or directory) to remote.
+
+* Can be specified multiple times.
+
+
 .. _--run:
 
 --run <package> <command>
 .........................
     Make `run`_ command run the specified command within checkout of
     ``<package>``.
+
+    If ``<package>`` is empty string, ``<command>`` is run in the current directory.
 
 
 .. _--sdists:
@@ -2466,14 +2503,24 @@ Options
     Sets the Python script to be run,
     relative to the root of the ``pymupdf_layout`` checkout.
     
-    Valid values for ``<gnn_det>`` are:
+    For example:
     
-    * ``eval/eval_docling.py``
-    * ``eval/eval_gnn.py``
-    * ``eval/eval_oracle_gnn.py``
-    * ``eval/eval_pymupdf4llm.py``
-    * ``eval/eval_pymupdf_layout.py``
+    * ``--test-gnn-det eval/eval_pymupdf4llm.py``
+    
+    One can specify extra args by including them in ``<gnn_det>``, for example:
+    
+    ``--test-gnn-det 'eval/eval_pymupdf4llm.py --foo 3.14 --bar 2.71'``
 
+    Aptest will append a fixed set of args, for example::
+    
+        cd pymupdf_layout && python eval/eval_pymupdf4llm.py
+            --foo 3.14
+            --bar 2.71
+            --pdf_dir <pdf_dir>
+            --result_csv_path <test-gnn-results/test-gnn-{YYYY-mm-dd-HH-MM-SS}.csv
+            --result_json_path <test-gnn-results/test-gnn-{YYYY-mm-dd-HH-MM-SS}.json
+            --limit <test_gnn_limit>
+    
 
 .. _--test-gnn-extra:
 
@@ -2606,6 +2653,22 @@ completion
 
 Changelog
 ---------
+
+* `--remote-sync`_: new, copies files/directories to remote.
+* `test`_: also generate ``<wheelhouse>/results.json``,
+* `run`_: generate ``aptest-run-results.json`` file
+  containing information from ``pytest --junit-xml``
+  and information about packages etc.
+* `--run`_: allow specification of package-independent commands.
+* `--pytest-wrap`_: also support use of the ``pyinstrument`` profiler.
+* Update default ``pymupdf_layout`` remote to new ``git@github.com:ArtifexSoftware/sce.git``.
+* Add Github test of ``pymupdf`` on windows-arm64.
+* `--test-gnn-det`_:
+
+  * Allow any script path to be specified
+    instead of having a hard-coded list of allowed scripts.
+  * Document how to add miscellaneous args.
+
 
 **2026-07-02**
 
