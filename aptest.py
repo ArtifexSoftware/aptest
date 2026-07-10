@@ -329,8 +329,8 @@ g_package_info = {
             },
         'pymupdf_layout':
             {
-                'git_remote': 'git@github.com:ArtifexSoftware/sce.git',
-                'git_branch': 'master',
+                'git_remote': 'git@github.com:ArtifexSoftware/pymupdf_layout.git',
+                'git_branch': 'main',
                 'aliases':  ['layout'],
                 'submodules': False,
                 'order': 2,
