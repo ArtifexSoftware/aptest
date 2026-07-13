@@ -1224,17 +1224,7 @@ def get_args(argv):
                 state.test_gnn_cache = args.get_bool()
             
             elif arg == '--test-gnn-det':
-                test_gnn_det = next(args)
-                Assert(
-                        test_gnn_det in (
-                            'eval/eval_gnn.py',
-                            'eval/eval_oracle_gnn.py',
-                            'eval/eval_pymupdf4llm.py',
-                            'eval/eval_pymupdf_layout.py',
-                            ),
-                        f'Unrecognised {test_gnn_det=}',
-                        )
-                state.test_gnn_det = test_gnn_det.as_str()
+                state.test_gnn_det = next(args).as_str()
                 
             elif arg == '--test-gnn-extra':
                 nv = next(args).as_text()
@@ -2559,6 +2549,8 @@ def do_test_gnn(state):
     pipcl.run(f'pip install tqdm')
     pdf_dir = f'{state.gnn_doclaynet_dir}/PDF'
     
+    # We generate a Json file containing information about host system etc, as
+    # well as the actual test results.
     ret = dict()
 
     ret['python'] = dict()
@@ -2673,6 +2665,18 @@ def do_test_gnn(state):
         pipcl.fs_ensure_dir('test-gnn-results')
         Assert(state.test_gnn_det, f'test-gnn requires `--test-gnn-det <gnn_det>`.')
         Assert(layout_location, f'test-gnn requires a checkout of pymupdf_layout, e.g. with `--layout git:`.')
+        
+        if not state.test_gnn_det.endswith('.py'):
+            pipcl.log(f'Warning: expected --test-gnn-det path to end with `.py`: {state.test_gnn_det}')
+        
+        if not os.path.exists(f'{layout_location}/{state.test_gnn_det}'):
+            pipcl.log(f'Warning: --test-gnn-det path does not exist inside {layout_location=}: {state.test_gnn_det}')
+        
+        # Note that we deliberately do not use `shlex.quote()` with `state.test_gnn_det`, so that
+        # the use could include args in state.test_gnn_det. For example:
+        #
+        #   --test-gnn-det 'eval/eval_special.py --foo 3.14 --bar 2.71'
+        #
         command = textwrap.dedent(f'''
                 cd {layout_location}
                 && python {state.test_gnn_det}
