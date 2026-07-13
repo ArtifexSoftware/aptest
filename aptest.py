@@ -61,7 +61,7 @@ autovenv.enter(
         verbose=verbose,
         )
 
-# We use `pylint:disable=wrong-import-position` because these imports need to
+# We use `pylint disable=wrong-import-position` because these imports need to
 # be after autovenv.enter().
 #
 import pipcl    # pylint:disable=wrong-import-position
