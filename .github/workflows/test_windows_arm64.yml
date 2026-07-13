@@ -1,0 +1,55 @@
+on:
+  schedule:
+    - cron: '47 1 * * *'
+  workflow_dispatch:
+    inputs:
+      args:
+        type: string
+        default: ''
+        description: 'Extra arguments to pass to Aptest.'
+
+jobs:
+
+  test:
+    name: test_windows_arm64
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [
+            windows-11-arm,
+            ]
+        
+        args: [
+            '-m git: -p git:',
+            ]
+
+      # Avoid cancelling of all runs after a single failure.
+      fail-fast: false
+
+    steps:
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+
+      - name: test_multiple
+        env:
+          APTEST_args: ${{inputs.args}}
+          APTEST_matrix_args: ${{ matrix.args }}
+          ARTIFEX_SOFTWARE_SSH_KEY: ${{secrets.ARTIFEX_SOFTWARE_SSH_KEY}}
+          PYMUPDFPRO_SETUP_SOT_KEY: ${{secrets.PYMUPDFPRO_SETUP_SOT_KEY}}
+        
+        run: |
+          # Set APTEST_matrix_args2 to APTEST_matrix_args with modifications to
+          # allows use as artifact name.
+          python3 -c 'import os, re; APTEST_matrix_args=os.environ["APTEST_matrix_args"]; APTEST_matrix_args2 = re.sub("[: \"]", "_", APTEST_matrix_args); print(f"APTEST_matrix_args2="+APTEST_matrix_args2)' >> $GITHUB_ENV
+          
+          # We need PYMUPDF_SETUP_MUPDF_VS_UPGRADE=1 because 142 tools don't work on arm.
+          python aptest.py ${{matrix.args}} -m git: -p git: build test -e PYMUPDF_SETUP_MUPDF_VS_UPGRADE=1 -a APTEST_args
+      
+      - uses: actions/upload-artifact@v4
+        with:
+          path: |
+              aptest-wheelhouse/*.whl
+              #aptest-wheelhouse/*.tar.gz
+          name: artifact-${{ matrix.os }}-${{ env.APTEST_matrix_args2 }}
