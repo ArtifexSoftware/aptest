@@ -94,6 +94,7 @@ python_versions_minor = range(10, 14+1)
 
 g_devel = False
 g_atexit = None
+g_atexit_speak = False
 g_log_tee = None    # Used to output final `Aptest: log output is in: aptest-out-2026-03-18-15-40-15`.
 
 # We use APTEST_NESTED to indicate that we are being re-run inside a venv or on
@@ -806,6 +807,7 @@ def get_args(argv):
     g_devel = state.devel
 
     global g_atexit
+    global g_atexit_speak
     
     # Prevent future additions to items in <state>. We can still modify
     # existing values.
@@ -889,6 +891,9 @@ def get_args(argv):
             elif arg == '--atexit':
                 g_atexit = next(args).as_text()
                 args.argv[args.pos-1] = ''  # Omit if we recurse.
+
+            elif arg == '--atexit-speak':
+                g_atexit_speak = True
 
             elif arg == '-b':
                 _names = next(args).as_text()
@@ -2910,6 +2915,20 @@ def do_test(state):
         json.dump(results, f, indent='    ')
     pipcl.log(f'Have written test results to: {path_results}')
 
+def speak(fail):
+    try:
+        import pyttsx3
+        engine = pyttsx3.init()
+
+        if fail:
+            engine.say('aptest failed')
+        else:
+            engine.say('aptest complete')
+        engine.runAndWait()
+        engine.stop()
+    except Exception:
+        print('\a')
+
 
 def get_self_gitinfo():
     sha, comment, diff, branch = pipcl.git_info(g_root)
@@ -3549,6 +3568,9 @@ def main0():
                     if e:
                         pipcl.log(f'Warning, {g_atexit=} failed: {e=}')
         
+        if g_atexit_speak:
+            speak(e)
+
         if g_log_tee:
             pipcl.log(f'Aptest: log output is in: {g_log_tee}')
         if e:
