@@ -2654,6 +2654,8 @@ completion
 Changelog
 ---------
 
+**2026-07-14**
+
 * `--remote-sync`_: new, copies files/directories to remote.
 * `test`_: also generate ``<wheelhouse>/results.json``,
 * `run`_: generate ``aptest-run-results.json`` file
