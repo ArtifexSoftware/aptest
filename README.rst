@@ -2663,7 +2663,7 @@ Changelog
   and information about packages etc.
 * `--run`_: allow specification of package-independent commands.
 * `--pytest-wrap`_: also support use of the ``pyinstrument`` profiler.
-* Update default ``pymupdf_layout`` remote to new ``git@github.com:ArtifexSoftware/sce.git``.
+* Update default ``pymupdf_layout`` remote to new ``git@github.com:ArtifexSoftware/pymupdf_layout.git``.
 * Add Github test of ``pymupdf`` on windows-arm64.
 * `--test-gnn-det`_:
 
