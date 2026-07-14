@@ -96,7 +96,8 @@ def enter(*,
     '''
     Creates and re-runs inside a venv if we are not already in a venv.
 
-    If we are already in a venv, we do nothing.
+    If we are already in a venv, we run `pip install --upgrade` for each item
+    in <packages> and return.
     
     Otherwise we do the following:
     
@@ -128,12 +129,19 @@ def enter(*,
     '''
     t0 = time.time()
     
+    if isinstance(packages, str):
+        packages = (packages,)
+    packages = packages or list()
+    
     if create is None:
         create = 2
     assert create in (1, 2, 3), f'Unrecognised {create=}, should be 1, 2 or 3.'
 
     if sys.prefix != sys.base_prefix:
         log(f'Already in a venv, {sys.prefix=}.', verbose, t0)
+        for package in packages:
+            if package:
+                run(f'pip install --upgrade {shlex.quote(package)}', verbose, t0)
         return
     
     # We are not in a venv.
@@ -180,8 +188,6 @@ def enter(*,
         argv_string = shlex.join(sys.argv)
     
     # Install packages.
-    if isinstance(packages, str):
-        packages = (packages,)
     for package in (packages or list()):
         if package:
             run(f'{venv_enter} && pip install --upgrade {shlex.quote(package)}', verbose, t0)
