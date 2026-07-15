@@ -1483,6 +1483,14 @@ Options
     * ``--atexit beep``
 
 
+.. _--atexit-speak:
+
+--atexit-speak
+..............
+Use ``pyttsx3`` to speak ``aptest failed`` or ``aptest complete`` on exit.
+
+
+
 .. _--build-pip-no-clean:
 
 --build-pip-no-clean (bool)
@@ -2653,6 +2661,13 @@ completion
 
 Changelog
 ---------
+
+**2026-07-15**
+
+* Added `--atexit-speak`_ option.
+* Added Github pre-push test.
+* Fix minor test failures on Windows.
+
 
 **2026-07-14**
 
