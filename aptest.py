@@ -2917,7 +2917,7 @@ def do_test(state):
 
 def speak(fail):
     try:
-        import pyttsx3
+        import pyttsx3  # pylint:disable=import-error
         engine = pyttsx3.init()
 
         if fail:
