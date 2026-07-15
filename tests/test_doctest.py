@@ -1,7 +1,12 @@
 import os
+import platform
 import sys
 
 def test_doctest():
+    if platform.system() == 'Windows':
+        # Some tests like bash completion cannot succeed on windows.
+        print('test_doctest(): not running on Windows.')
+        return
     root = os.path.abspath(f'{__file__}/../..')
     sys.path.insert(0, root)
     import pipcl

@@ -18,10 +18,10 @@ def test_dirname():
     print(f'{root_relative=}')
     print(f'{os.getcwd()=}')
     leaf = os.path.basename(root)   # Typically 'aptest'.
-    pipcl.run(f'cd {root}/.. && {leaf}/aptest.py -V=0 --aptest {leaf}')
-    pipcl.run(f'cd {root}/.. && {leaf}/aptest.py -V=0 --aptest {leaf}/')
-    pipcl.run(f'cd {root} && ./aptest.py -V=0 --aptest ../{leaf}')
-    pipcl.run(f'cd {root} && ./aptest.py -V=0 --aptest ../{leaf}/')
+    pipcl.run(f'cd {root}/.. && {sys.executable} {leaf}/aptest.py -V=0 --aptest {leaf}')
+    pipcl.run(f'cd {root}/.. && {sys.executable} {leaf}/aptest.py -V=0 --aptest {leaf}/')
+    pipcl.run(f'cd {root} && {sys.executable} ./aptest.py -V=0 --aptest ../{leaf}')
+    pipcl.run(f'cd {root} && {sys.executable} ./aptest.py -V=0 --aptest ../{leaf}/')
 
 
 def test_log_timestamps():
