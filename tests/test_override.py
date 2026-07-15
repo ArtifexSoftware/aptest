@@ -100,7 +100,7 @@ def test_same_version():
     pymupdf_checkout = 'aptest-test-git-pymupdf_sameversion'
     pipcl.git_get(
             pymupdf_checkout,
-            remote = 'git@github.com:PyMuPDF/PyMuPDF.git',
+            remote = 'https://github.com/PyMuPDF/PyMuPDF.git',
             tag = '1.26.3',
             )
     text = pipcl.fs_read(f'{pymupdf_checkout}/src/__init__.py')
