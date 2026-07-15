@@ -1485,10 +1485,18 @@ Options
 
 .. _--atexit-speak:
 
---atexit-speak
-..............
-Use ``pyttsx3`` to speak ``aptest failed`` or ``aptest complete`` on exit.
+--atexit-speak (bool)
+.....................
 
+If true:
+
+* We install python package ``pyttsx3``.
+* On exit we use ``pyttsx3`` to speak *"aptest failed"* or *"aptest complete"*.
+* If this fails we write ``\a`` to generate an audible beep.
+
+On devuan this requires a system package install: ``sudo apt install espeak-ng``
+
+(``sudo apt install espeak`` gives runtime error ``SetVoiceByName failed with unknown return code -1 for voice: gmw/en``.)
 
 
 .. _--build-pip-no-clean:
@@ -1686,7 +1694,23 @@ Use ``pyttsx3`` to speak ``aptest failed`` or ``aptest complete`` on exit.
     Also see:
     
     * `-i`_.
+
+
+.. _--git-modify:
+
+--git-modify <package> <command>
+................................
+    Run ``<command>`` in git checkout of ``<package>`` after clone/update.
     
+    * ``<package>`` must be specified elsewhere with ``git:...``.
+    * ``<package>`` can be a package alias, for example ``4llm``.
+    * Can be specified multiple times.
+    * For example ``--layout 'git:--depth 10' git-modify layout 'git revert --no-commit beaef581558ba'``.
+    
+      Note the use of ``--depth`` to change default checkout depth of 1,
+      so that the ``git revert`` command can work.
+
+    Also see `-i`_.
 
 .. _--gnn-doclaynet-dir:
 
@@ -2661,6 +2685,12 @@ completion
 
 Changelog
 ---------
+
+**2026-07-16**
+
+* Minor improvements to `--atexit-speak`_.
+* Added `--git-modify`_. Allows modifications of local checkouts of packages specified with ``git:``.
+
 
 **2026-07-15**
 
