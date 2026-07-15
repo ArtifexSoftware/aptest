@@ -45,7 +45,7 @@ COMP_POINT = os.environ.get('COMP_POINT')
 # Note that we don't have a way to use anything other than pypi's pipcl.
 create = 2
 verbose = 1
-packages = ['pipcl', 'xmltodict']
+packages = ['pipcl', 'xmltodict', 'piprepo', 'setuptools<81']
 if sys.argv[1:] == ['completion'] or COMP_LINE:
     # We don't want autovenv to output debug info because it'll badly mess
     # up completion. And we use `create = 1` for speed.
@@ -893,7 +893,9 @@ def get_args(argv):
                 args.argv[args.pos-1] = ''  # Omit if we recurse.
 
             elif arg == '--atexit-speak':
-                g_atexit_speak = True
+                g_atexit_speak = args.get_bool()
+                if g_atexit_speak:
+                    pipcl.run(f'pip install --upgrade pyttsx3')
 
             elif arg == '-b':
                 _names = next(args).as_text()
@@ -2926,7 +2928,8 @@ def speak(fail):
             engine.say('aptest complete')
         engine.runAndWait()
         engine.stop()
-    except Exception:
+    except Exception as e:
+        pipcl.log(f'Failed to speak with pyttsx3: {e}')
         print('\a')
 
 
