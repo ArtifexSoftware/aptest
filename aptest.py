@@ -3562,11 +3562,16 @@ def main0():
                     )
             e = 1
         finally:
+            # This is always run, even if we get an exception not derived from
+            # Exception, for example KeyboardInterrupt from ctrl-c.
             if g_atexit:
                 with pipcl.LogPrefix('atexit: '):
                     e = pipcl.run(g_atexit, check=0)
                     if e:
                         pipcl.log(f'Warning, {g_atexit=} failed: {e=}')
+        
+        # This is not run if we get an exception not derived from Exception,
+        # for example KeyboardInterrupt from ctrl-c.
         
         if g_atexit_speak:
             speak(e)
