@@ -96,6 +96,9 @@ def _get_pymupdf_version():
     return pymupdf_version
 
 def test_same_version():
+    if APTEST_TEST_QUICK == '1':
+        print(f'test_same_version(): {APTEST_TEST_QUICK=}, doing nothing.')
+        return
     # Make modified pymupdf-1.26.3 with extra marker value in source.
     pymupdf_checkout = 'aptest-test-git-pymupdf_sameversion'
     pipcl.git_get(
