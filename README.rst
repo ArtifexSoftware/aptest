@@ -2690,6 +2690,8 @@ Changelog
 
 * Minor improvements to `--atexit-speak`_.
 * Added `--git-modify`_. Allows modifications of local checkouts of packages specified with ``git:``.
+* Fixed quoting bug on some Windows systems when creating venv,
+  for example when pip installing ``setuptools<81``.
 
 
 **2026-07-15**
