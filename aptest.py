@@ -726,6 +726,7 @@ def get_args(argv):
     state.env_extra = dict()
     state.git_depth = 1
     state.git_local_detailed = False
+    state.git_modify = list()
     state.git_remote_modifications = list()
     state.github_upload = None
     state.gnn_doclaynet_dir = 'datasets/DocLayNet'
@@ -977,6 +978,11 @@ def get_args(argv):
             
             elif arg == '--git-local-detailed':
                 state.git_local_detailed = args.get_bool()
+            
+            elif arg == '--git-modify':
+                package = package_alias(next(args).as_str())
+                command = next(args).as_str()
+                state.git_modify.append( (package, command))
             
             elif arg == '--git-remote-modify':
                 a = next(args).as_str()
@@ -3379,6 +3385,9 @@ def _get_local(package, state, test=False):
                     # Enable this after pipcl-2 is released.
                     # clone_extra='--config core.autocrlf=input',
                     )
+            for package2, command in state.git_modify:
+                if package2 == package:
+                    pipcl.run(f'cd {directory} && {command}')
     else:
         directory = location
         if state.check_unchanged:
