@@ -232,6 +232,7 @@ and uploading to https://pypi.org (also see `Release procedure`_)::
     aptest/aptest.py --release-4
     aptest/aptest.py --release-5
     aptest/aptest.py --release-6
+    aptest/aptest.py --release-7
 
 Build/test ``pymupdf``, ``pymupdfpro`` and ``pymupdf-layout`` using cibuildwheel,
 getting packages from different locations:
@@ -2182,6 +2183,13 @@ On devuan this requires a system package install: ``sudo apt install espeak-ng``
     Also see `Release procedure`_.
 
 
+--release-7
+...........
+    Build release ``pymupdf`` wheel for ``windows-armx64``.
+    
+    Also see `Release procedure`_.
+
+
 .. _--remote-do:
 
 --remote-do (bool)
@@ -2685,6 +2693,9 @@ completion
 
 Changelog
 ---------
+
+* Added `release-7`_, builds pymupdf wheel for windows-arm64.
+
 
 **2026-07-16**
 

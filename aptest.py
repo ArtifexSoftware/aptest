@@ -459,7 +459,7 @@ def gh_runner_alias(name):
             ('macos-15-intel',   ['macos-intel']),
             ('ubuntu-24.04-arm', ['linux-arm']),
             ('ubuntu-latest',    ['linux', 'linux-intel']),
-            ('windows-11-arm',   ['windows-arm']),
+            ('windows-11-arm',   ['windows-arm', 'windows-arm64']),
             ('windows-2022',     ['windows', 'windows-intel']),
             ]
     for fullname, aliases in runner_aliases:
@@ -1133,6 +1133,10 @@ def get_args(argv):
                     # together as of 2026-02-20, e.g. see PEP 803 and PEP 809.
                     #
                     new_args += f' -b {b_mupdf}pymupdf --remote-github-runners linux --cibw-skip-add-defaults=0 -e CIBW_BUILD="cp314t*" -e CIBW_SKIP="*musllinux*" -e PYMUPDF_SETUP_PY_LIMITED_API=0'
+                
+                elif arg == '--release-7':
+                    # Build pymupdf for windows-arm64.
+                    new_args += f' -b {b_mupdf}pymupdf -e PYMUPDF_SETUP_MUPDF_VS_UPGRADE=1 --remote-github-runners windows-arm64'
                 
                 else:
                     Assert(0, f'Unrecognised {arg=}.')
