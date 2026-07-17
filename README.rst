@@ -199,7 +199,7 @@ so don't assume previous builds will be available.
 
 Forcing a rebuild of MuPDF on Windows
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-On Windows libraries are initially built in `platform/win32/x64/`` by Visual Studio,
+On Windows libraries are initially built in ``platform/win32/x64/`` by Visual Studio,
 before being copied into ``build/``.
 
 So to manually force a rebuild, delete ``platform/win32/x64`` as well as ``build/``.
@@ -232,6 +232,7 @@ and uploading to https://pypi.org (also see `Release procedure`_)::
     aptest/aptest.py --release-4
     aptest/aptest.py --release-5
     aptest/aptest.py --release-6
+    aptest/aptest.py --release-7
 
 Build/test ``pymupdf``, ``pymupdfpro`` and ``pymupdf-layout`` using cibuildwheel,
 getting packages from different locations:
@@ -392,6 +393,8 @@ Instructions for releasing wheels for:
     ``aptest/aptest.py --release-5``
   
     ``aptest/aptest.py --release-6``
+
+    ``aptest/aptest.py --release-7``
 
   These commands can be manually run in parallel using individual terminals.
     
@@ -2182,6 +2185,13 @@ On devuan this requires a system package install: ``sudo apt install espeak-ng``
     Also see `Release procedure`_.
 
 
+--release-7
+...........
+    Build release ``pymupdf`` wheel for ``windows-armx64``.
+    
+    Also see `Release procedure`_.
+
+
 .. _--remote-do:
 
 --remote-do (bool)
@@ -2215,10 +2225,11 @@ On devuan this requires a system package install: ``sudo apt install espeak-ng``
     We allow aliases for Github runners names:
     
     * ``linux``, ``linux-intel``.
-    * ``macos-intel``.
+    * ``linux-arm``.
     * ``macos``, ``macos-arm``.
-    * ``windows-arm``.
+    * ``macos-intel``.
     * ``windows``, ``windows-intel``.
+    * ``windows-arm``, ``windows-arm64``.
 
     For example:
 
@@ -2610,6 +2621,7 @@ Copy ``<path>`` (a file or directory) to remote.
       * We never remove the contents of this wheelhouse,
         because multiple invocations of Aptest are required to build the release wheels. So
         `--clean-wheelhouse`_ is ignored.
+      * We fail if ``--MUPDF`` is specified - release builds must use ``pymupdf``'s built-in default mupdf.
     
     Also see:
     
@@ -2685,6 +2697,16 @@ completion
 
 Changelog
 ---------
+
+**2026-07-20**
+
+* Added `--release-7`_, builds pymupdf wheel for windows-arm64.
+* Deliberately fail if ``mupdf`` specified without ``pymupdf``, because this
+  will not use ``mupdf``.
+* Reduce startup delay when installing packages.
+* Reinstated setting of ``PYMUPDF_SETUP_VERSION``,
+  so that packages build with the specified ``pymupdf``.
+
 
 **2026-07-16**
 
