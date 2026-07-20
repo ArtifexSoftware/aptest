@@ -1852,7 +1852,7 @@ def do_build_single(state, package):
                     prefix=f'install {package}: ',
                     )
 
-    if 0 and package == 'pymupdf':  # pylint: disable=condition-evals-to-constant
+    if package == 'pymupdf':  # pylint: disable=condition-evals-to-constant
         # Set PYMUPDF_SETUP_VERSION so subsequent builds are configured
         # for the PyMuPDF we have just built.
         PYMUPDF_SETUP_VERSION = importlib.metadata.version('pymupdf')
