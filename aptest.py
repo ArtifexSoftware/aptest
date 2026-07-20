@@ -1185,9 +1185,9 @@ def get_args(argv):
                 state.remote_rsync_wsl = args.get_bool()
 
             elif arg == '--run':
-                package = next(args)
+                package = package_alias(next(args))
                 command = next(args)
-                state.run_commands.append((package.as_text(), command.as_text()))
+                state.run_commands.append((package, command.as_text()))
 
             elif arg == '--sdists':
                 state.sdists = args.get_bool()
