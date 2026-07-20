@@ -3167,6 +3167,9 @@ def main(argv):
         pipcl.log(f' {MACOSX_DEPLOYMENT_TARGET=}.')
         state.env_extra['MACOSX_DEPLOYMENT_TARGET'] = MACOSX_DEPLOYMENT_TARGET
     
+    if 'mupdf' in state.packages and 'pymupdf' not in state.packages:
+        Assert(0, f'If `mupdf` is specified then `pymupdf` should also be specified.')
+    
     try:    # pylint: disable=too-many-nested-blocks.
         # Handle commands.
         #
