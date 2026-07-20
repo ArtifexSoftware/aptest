@@ -73,13 +73,26 @@ Otherwise:
   a symbolic link ``venv-aptest`` will be created that points to this venv.
 
 
+Run remotely
+------------
+
+Aptest can transparently re-run itself in remote locations:
+
+* Remote machine (with ssh/rsync).
+* Github runner (push to unique(ish) branches and run a workflow).
+
+See the `-r`_ option.
+
+
 Supported packages
 ------------------
 
 * ``langchain_pymupdf_layout``
 * ``mupdf``
+* ``parse_bench``
 * ``pdf2docx``
 * ``pdf_feature_inspector``
+* ``pipcl``
 * ``pymupdf``
 * ``pymupdf4llm``
 * ``pymupdf_layout``
@@ -211,6 +224,9 @@ Examples
 [Also see `Python virtual environments`_ for information about where wheels are
 generated/installed.]
 
+Basic build and test
+^^^^^^^^^^^^^^^^^^^^
+
 Using local checkouts, build packages ``pymupdf``, ``pymupdfpro`` and ``pymupdf_layout``
 (putting wheels into directory ``aptest-wheelhouse/``),
 install (into current venv or ``venv-aptest-<pthonversion>-<wordsize>``)
@@ -223,6 +239,9 @@ central git repositories:
 
     ``aptest/aptest.py -p git: --pro git: --layout git: build test``
 
+Build release wheels
+^^^^^^^^^^^^^^^^^^^^
+
 Make release, building/testing on Github, downloading to local machine,
 and uploading to https://pypi.org (also see `Release procedure`_)::
 
@@ -234,10 +253,16 @@ and uploading to https://pypi.org (also see `Release procedure`_)::
     aptest/aptest.py --release-6
     aptest/aptest.py --release-7
 
+Build and test using cibuildwheel
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
 Build/test ``pymupdf``, ``pymupdfpro`` and ``pymupdf-layout`` using cibuildwheel,
 getting packages from different locations:
 
     ``aptest/aptest.py -r @github -p pip: --pro PyMuPDFPlus --layout git: cibw``
+
+Test current release
+^^^^^^^^^^^^^^^^^^^^
 
 Test current ``pymupdf`` release with latest test suite in central git:
 
@@ -247,6 +272,8 @@ Test current ``pymupdf`` release with test suite in local checkout:
 
     ``aptest/aptest.py -p pip: -p PyMuPDF build test``
 
+Running on Github
+^^^^^^^^^^^^^^^^^^
 Runs specific Github workflow ``PyMuPDFPlus/.github/workflows/test_multiple.yml``, on windows only:
 
     ``aptest/aptest.py -r @github --remote-github-yml test_multiple.yml --pro PyMuPDFPlus --remote-github-yml-inputs --remote-github-runners windows``
@@ -260,6 +287,13 @@ Download wheels from a previous Aptest Github workflow run:
 
     ``aptest/aptest.py -r @github --aptest aptest --remote-github-workflow-id 21760695687``
 
+Running parse_bench
+^^^^^^^^^^^^^^^^^^^
+
+    ``aptest/aptest.py -m mupdf -p PyMuPDF --4llm pymupdf4llm --layout pymupdf_layout --pb ParseBench-Version-Lab build run --run pb 'parse-bench run pymupdf4llm_markdown_150dpi --group table --max_concurrent 1'``
+
+Other
+^^^^^
 Test Aptest itself:
 
     ``aptest/aptest.py --aptest aptest test``
@@ -556,17 +590,6 @@ Details
 -------
 
 
-Run remotely
-^^^^^^^^^^^^
-
-Aptest can transparently re-run itself in remote locations:
-
-* Remote machine (with ssh/rsync).
-* Github runner (push to unique(ish) branches and run a workflow).
-
-See the `-r`_ option.
-
-
 Use of Python venv virtual environments
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -761,6 +784,20 @@ Alternatively activate in all new bash sessions with one of::
     aptest/aptest.py completion >> ~/.bash_completion
 
 * Also see special command  `completion`_.
+
+
+Make Aptest itself use local pipcl
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+By default Aptest itself will use pipcl from pypi.org,
+regardless of any ``--pipcl`` option.
+
+Environment variable ``APTEST_PIPCL`` can be used to force Aptest to use a
+local pipcl checkout directory, for example:
+
+* ``APTEST_PIPCL=./pipcl aptest/aptest.py ...``
+
+Note that this is very unlikely to be required.
 
 
 Command-line arguments
@@ -1166,6 +1203,7 @@ Options
             aptest
             langchain_pymupdf_layout
             mupdf
+            parse_bench
             pdf2docx
             pdf_feature_inspector
             pymupdf
@@ -1235,10 +1273,11 @@ Options
     
     **Aliases**
     
-    Various convenience options and shortened aliases are provided:
+    Various aliases are provided:
     
     * `--langchain-pymupdf-layout`_ and alias `--langchain`_.
     * `--mupdf`_ and alias `-m`_.
+    * `--parse_bench`_ and alias `--pb`_.
     * `--pdf2docx`_.
     * `--pdf_feature_inspector`_ and alias `--pfi`_.
     * `--pymupdf4llm`_ and alias `--4llm`_.
@@ -1289,6 +1328,31 @@ Options
       on Github with `-r @github`_.
 
 
+.. _--parse_bench:
+
+--parse_bench <parse_bench-location>
+....................................
+
+    Specify location of package ``parse_bench``.
+
+    Also see:
+    
+    * `-i`_.
+    * `--pb`_.
+
+.. _--pb:
+
+--pb <parse_bench-location>
+...........................
+    Specify location of package ``parse_bench``.
+    
+    Alias for ``-i parse_bench <parse_bench-location>``.
+    
+    Also see:
+    
+    * `-i`_.
+    * `--parse_bench`_.
+
 .. _-p:
 
 -p <pymupdf-location>
@@ -1319,8 +1383,7 @@ Options
       hard-coded per-packagae central repositories, typically on https://github.com.
 
     * If there are uncommitted changes they are temporarily committed
-      and we use the git stash to save/restore things.
-      As of 2026-03-30 this fixes a problem where newly-added files were removed.
+      and we use ``git stash`` to save/restore the original state.
 
     * We re-run the ``aptest.py`` command on Github machines, changing
       ``-i``, ``-m`` etc args to use ``git:...`` to refer to the above
@@ -1360,7 +1423,7 @@ Options
     * Otherwise ``<remote>`` should be an rsync-style specification such
       as ``macmini`` or ``username@macmini:testdir``.
 
-      Specify a ssh jump host using ``::``, for example::
+      A ssh jump host can be specified using ``::``, for example::
 
           -r <gateway>::<remote-host>
 
@@ -2342,6 +2405,8 @@ Copy ``<path>`` (a file or directory) to remote.
 .........................
     Make `run`_ command run the specified command within checkout of
     ``<package>``.
+    
+    ``<package>`` can also be a package alias, for example ``-run p '...'``.
 
     If ``<package>`` is empty string, ``<command>`` is run in the current directory.
 
@@ -2697,6 +2762,12 @@ completion
 
 Changelog
 ---------
+
+**2026-07-24**
+
+* `--run`_: also accept package aliases.
+* Added support for package ``parse_bench`` - see `--parse_bench`_ and `Running parse_bench`_.
+
 
 **2026-07-20**
 
