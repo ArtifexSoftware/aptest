@@ -3272,9 +3272,10 @@ def main(argv):
                         else:
                             directory = '.'
                         t = time.time()
-                        out = pipcl.run(f'cd {directory} && {command}', capture=1, out='log')
-                        t = time.time() - t
-                        run_results[package] = dict(t=t, out=out)
+                        with pipcl.LogPrefix(f'{package}: '):
+                            out = pipcl.run(f'cd {directory} && {command}', capture=1, out='log', env_extra=state.env_extra)
+                            t = time.time() - t
+                            run_results[package] = dict(t=t, out=out)
                     
                     with open(f'{state.wheelhouse}/aptest-run-results.json', 'w') as f:
                         json.dump(run_results, f, indent=4)
@@ -3574,11 +3575,13 @@ def main0():
                         backtrace_limit = 0
                         break
                     ee2 = ee2.__cause__
-            backtrace.show(
+            text = backtrace.show(
                     reverse_chain=1,
                     limit=backtrace_limit,
                     brief=1,
+                    file=str,
                     )
+            pipcl.log(text)
             e = 1
         finally:
             # This is always run, even if we get an exception not derived from
