@@ -149,9 +149,12 @@ def enter(*,
 
     if sys.prefix != sys.base_prefix:
         log(f'Already in a venv, {sys.prefix=}.', verbose, t0)
-        for package in packages:
-            if package:
-                run(f'pip install --upgrade {shlex_quote(package)}', verbose, t0)
+        if packages:
+            command = f'pip install --quiet --upgrade'
+            for package in packages:
+                if package:
+                    command += f' {shlex_quote(package)}'
+            run(command, verbose, t0)
         return
     
     # We are not in a venv.
@@ -182,11 +185,6 @@ def enter(*,
         venv_enter = f'{venv_name}\\Scripts\\activate'
     else:
         venv_enter = f'. {venv_name}/bin/activate'
-    
-    # Install packages.
-    for package in (packages or list()):
-        if package:
-            run(f'{venv_enter} && pip install --upgrade {shlex_quote(package)}', verbose, t0)
     
     # Rerun ourselves in the venv.
     command = f'{venv_enter} && python {shlex_join(sys.argv)}'
