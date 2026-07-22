@@ -92,11 +92,6 @@ g_date_time = time.strftime('%F-%H-%M-%S')
 # With cibw we build and test Python 3.x for x in this range.
 python_versions_minor = range(10, 14+1)
 
-g_devel = False
-g_atexit = None
-g_atexit_speak = False
-g_log_tee = None    # Used to output final `Aptest: log output is in: aptest-out-2026-03-18-15-40-15`.
-
 # We use APTEST_NESTED to indicate that we are being re-run inside a venv or on
 # a remote machine, by an outer aptest invocation.
 #
@@ -641,53 +636,7 @@ def _add_key(state, prefix, path, env, pos):
     state.keys.sort(reverse=True)
     
 
-def get_args(argv):
-    '''
-    Parses command-line args in <argv> and returns a State instance (args, state, regions),
-    where:
-        args: A cli.Args instance.
-        state: A State instance.
-        regions:
-            A list of (name, args) allowing useful diagnostic showing where
-            args come from.
-            name: `~/.aptest`, `APTEST_options` or `command line`.
-            args: a list of args.
-    
-    Any changes to behaviour of this function should be added to README.md.
-
-    If we are being called by bash for command-line completion, we return
-    None.
-    '''
-    if COMP_LINE:
-        # Bash completion; we must not write to stdout.
-        del pipcl._log_f[:] # pylint: disable=protected-access
-        APTEST_COMPLETION_DEBUG = os.environ.get('APTEST_COMPLETION_DEBUG')
-        #print(f'{APTEST_COMPLETION_DEBUG=}', file=sys.stderr, flush=1)
-        if APTEST_COMPLETION_DEBUG:
-            f = open(APTEST_COMPLETION_DEBUG, 'a')   # pylint: disable=consider-using-with
-            pipcl._log_f.append(f)  # pylint: disable=protected-access
-        pipcl.log(f'{COMP_LINE=}')
-        pipcl.log(f'os.environ COMP_*:')
-        for n in sorted(os.environ.keys()):
-            if n.startswith('COMP_'):
-                v = os.environ[n]
-                pipcl.log(f'    {n}: {v!r}')
-    
-    if argv[1:] == ['completion']:
-        # Write bash completion script to stdout and exit.
-        print(textwrap.dedent(f'''
-                _aptest_py() {{
-                    COMPREPLY=($( \\
-                            COMP_LINE="$COMP_LINE" \\
-                            COMP_POINT="$COMP_POINT" \\
-                            COMP_TYPE="$COMP_TYPE" \\
-                            {os.path.abspath(argv[0])} \\
-                            ))
-                }}
-                complete -F _aptest_py aptest.py
-                '''))
-        sys.exit()
-    
+def make_state():
     class State:
         '''
         Represents parsed args, with protection against adding a new member
@@ -707,6 +656,8 @@ def get_args(argv):
     
     state = State()
     
+    state.atexit = None
+    state.atexit_speak = None
     state.build_type = None
     state.build_pip_no_clean = False
     state.check_pushed = False
@@ -737,6 +688,7 @@ def get_args(argv):
     state.gnn_show_select = None
     state.gnn_show_select_root = None
     state.graal = False
+    state.log_tee = None
     
     state.keys = list()
     if GITHUB_ACTIONS == 'true':
@@ -804,15 +756,59 @@ def get_args(argv):
     state.wheelhouse = 'aptest-wheelhouse'
     state.wheelhouse_release = None
     
-    global g_devel
-    g_devel = state.devel
-
-    global g_atexit
-    global g_atexit_speak
-    
     # Prevent future additions to items in <state>. We can still modify
     # existing values.
     state.freeze()
+    
+    return state
+
+
+def get_args(state, argv):
+    '''
+    Parses command-line args in <argv> and returns a State instance (args, state, regions),
+    where:
+        args: A cli.Args instance.
+        state: A State instance.
+        regions:
+            A list of (name, args) allowing useful diagnostic showing where
+            args come from.
+            name: `~/.aptest`, `APTEST_options` or `command line`.
+            args: a list of args.
+    
+    Any changes to behaviour of this function should be added to README.md.
+
+    If we are being called by bash for command-line completion, we return
+    None.
+    '''
+    if COMP_LINE:
+        # Bash completion; we must not write to stdout.
+        del pipcl._log_f[:] # pylint: disable=protected-access
+        APTEST_COMPLETION_DEBUG = os.environ.get('APTEST_COMPLETION_DEBUG')
+        #print(f'{APTEST_COMPLETION_DEBUG=}', file=sys.stderr, flush=1)
+        if APTEST_COMPLETION_DEBUG:
+            f = open(APTEST_COMPLETION_DEBUG, 'a')   # pylint: disable=consider-using-with
+            pipcl._log_f.append(f)  # pylint: disable=protected-access
+        pipcl.log(f'{COMP_LINE=}')
+        pipcl.log(f'os.environ COMP_*:')
+        for n in sorted(os.environ.keys()):
+            if n.startswith('COMP_'):
+                v = os.environ[n]
+                pipcl.log(f'    {n}: {v!r}')
+    
+    if argv[1:] == ['completion']:
+        # Write bash completion script to stdout and exit.
+        print(textwrap.dedent(f'''
+                _aptest_py() {{
+                    COMPREPLY=($( \\
+                            COMP_LINE="$COMP_LINE" \\
+                            COMP_POINT="$COMP_POINT" \\
+                            COMP_TYPE="$COMP_TYPE" \\
+                            {os.path.abspath(argv[0])} \\
+                            ))
+                }}
+                complete -F _aptest_py aptest.py
+                '''))
+        sys.exit()
     
     # Parse args and update the above state. We do this before moving into a
     # venv, partly so we can return errors immediately.
@@ -890,12 +886,12 @@ def get_args(argv):
                 args.args_eq.replace(pos0, pos2, new_args)
             
             elif arg == '--atexit':
-                g_atexit = next(args).as_text()
+                state.atexit = next(args).as_text()
                 args.argv[args.pos-1] = ''  # Omit if we recurse.
 
             elif arg == '--atexit-speak':
-                g_atexit_speak = args.get_bool()
-                if g_atexit_speak:
+                state.atexit_speak = args.get_bool()
+                if state.atexit_speak:
                     pipcl.run(f'pip install --upgrade pyttsx3')
 
             elif arg == '-b':
@@ -954,7 +950,6 @@ def get_args(argv):
             
             elif arg == '--devel':
                 state.devel = args.get_bool()
-                g_devel = state.devel
 
             elif arg == '--draft-location':
                 state.draft_location = next(args).as_str()
@@ -1217,12 +1212,11 @@ def get_args(argv):
                     pass
                 elif tee_auto:
                     state.tee_auto = tee_auto
-                    global g_log_tee
                     if state.tee_auto:
-                        g_log_tee = f'aptest-out-{g_date_time}'
-                        pipcl.log_tee(g_log_tee, 'aptest-out')
+                        state.log_tee = f'aptest-out-{g_date_time}'
+                        pipcl.log_tee(state.log_tee, 'aptest-out')
                 else:
-                    g_log_tee = None
+                    state.log_tee = None
                     pipcl.log_tee(None)
 
             elif arg == '--tee-path':
@@ -1323,7 +1317,7 @@ def get_args(argv):
         args.final(regions)
     #pipcl.log(f'{args.args_eq.argv=}')
     
-    return args, state, regions2
+    return args, regions2
 
 
 def _get_key(state, url, on_error=None):
@@ -1608,7 +1602,7 @@ def do_remote(state, argv):
         if state.tee_auto:
             def make_tee_out_remote():
                 from_ = f'aptest-out-{remote}'
-                to_ = g_log_tee
+                to_ = state.log_tee
                 #pipcl.log(f'Creating symlink {from_} => {to_}.')
                 pipcl.fs_symlink(from_, to_)
             atexit.register(make_tee_out_remote)
@@ -2960,12 +2954,12 @@ def get_self_gitinfo():
                 )
 
 
-def main(argv):
+def main(state, argv):
     
     if github_workflow_unimportant():
         return
     
-    args, state, args_regions = get_args(argv)
+    args, args_regions = get_args(state, argv)
     if args is None:
         # COMP_LINE.
         return 0
@@ -3543,15 +3537,16 @@ def main0():
         else:
             doctest.testmod(None)
     else:
+        state = make_state()
         try:
-            e = main(sys.argv)
+            e = main(state, sys.argv)
         except BrokenPipeError:
             # We end up here if our output is being piped into less, then less
             # is killed.
             e = 1
         except Exception as ee:
             backtrace_limit = None
-            if g_devel:
+            if state.devel:
                 pass
             else:
                 # See whether any chained exception is a type for which we
@@ -3586,20 +3581,20 @@ def main0():
         finally:
             # This is always run, even if we get an exception not derived from
             # Exception, for example KeyboardInterrupt from ctrl-c.
-            if g_atexit:
+            if state.atexit:
                 with pipcl.LogPrefix('atexit: '):
-                    e = pipcl.run(g_atexit, check=0)
+                    e = pipcl.run(state.atexit, check=0)
                     if e:
-                        pipcl.log(f'Warning, {g_atexit=} failed: {e=}')
+                        pipcl.log(f'Warning, {state.atexit=} failed: {e=}')
         
         # This is not run if we get an exception not derived from Exception,
         # for example KeyboardInterrupt from ctrl-c.
         
-        if g_atexit_speak:
+        if state.atexit_speak:
             speak(e)
 
-        if g_log_tee:
-            pipcl.log(f'Aptest: log output is in: {g_log_tee}')
+        if state.log_tee:
+            pipcl.log(f'Aptest: log output is in: {state.log_tee}')
         if e:
             pipcl.log(f'Aptest: exiting with error {e}.')
         else:
