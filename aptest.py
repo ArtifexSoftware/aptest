@@ -45,7 +45,9 @@ COMP_POINT = os.environ.get('COMP_POINT')
 # Note that we don't have a way to use anything other than pypi's pipcl.
 create = 2
 verbose = 1
-packages = ['pipcl', 'xmltodict', 'piprepo', 'setuptools<81']
+
+APTEST_PIPCL = os.environ.get('APTEST_PIPCL')
+packages = [APTEST_PIPCL or 'pipcl', 'xmltodict', 'piprepo', 'setuptools<81']
 if sys.argv[1:] == ['completion'] or COMP_LINE:
     # We don't want autovenv to output debug info because it'll badly mess
     # up completion. And we use `create = 1` for speed.
