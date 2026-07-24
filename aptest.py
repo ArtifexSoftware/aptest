@@ -272,8 +272,11 @@ def sync(remote, remote_dir, path, ssh_command, verbose, state):    # pylint: di
 
 
 # Hard-coded information about supported packages. This used when deferring
-# to Github with `-r @github`. The `aliases` items are used when looking at
-# command-line arguments etc.
+# to Github with `-r @github`.
+#
+# * Top-level dict keys are the names of package, as used in wheel filename,
+#   e.g. no '-' characters.
+# * The `aliases` items are used when looking at command-line arguments etc.
 #
 g_package_info = {
         'aptest':
@@ -395,6 +398,14 @@ g_package_info = {
                 'order': -1,
                 'aliases':  list(),
             },
+        
+        'parse_bench':
+            {
+                'git_remote': 'git@github.com:pymupdf/ParseBench-Version-Lab.git',
+                'git_branch': 'main',
+                'aliases':  ['pb'],
+                'order': 4,
+            }
         }
 
 for name, value in g_package_info.items():
