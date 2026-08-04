@@ -742,6 +742,7 @@ def make_state():
     state.remote_rsync_path = None
     state.remote_rsync_wsl = False
     state.remote_sync = list()
+    state.results = dict()
     state.run_commands = list()
     state.sdists = False
     state.show_help = False
@@ -1929,10 +1930,21 @@ def do_build(state):
         pipcl.run(f'pip install {wheel}')
 
 
+
+def read_pytest_junit(path):
+    try:
+        with open(path, 'rb') as f:
+            return xmltodict.parse(f)
+    except Exception as e:
+        pipcl.log(f'Failed to read pytest junit file {path=}: {ee}')
+    
+
 def do_cibw(state):
     '''
     Build wheels for each package with cibuildwheel, adding to wheelhouse,
     and using piprepo to update a local pypi-style tree.
+    
+    Writes pytest results into state.results['packages'][package]['junit'].
     '''
     pipcl.run(
             f'pip install --upgrade --force-reinstall {state.cibw_name}',
@@ -2175,7 +2187,8 @@ def do_cibw(state):
                 if state.pytest_timeout_method:
                     CIBW_TEST_COMMAND += f' --timeout-method {state.pytest_timeout_method}'
                 if state.pytest_junit_xml:
-                    CIBW_TEST_COMMAND += f' --junit-xml={os.path.abspath(state.wheelhouse)}/aptest-pytest-junit.xml'
+                    path_junit_xml = f'{os.path.abspath(state.wheelhouse)}/{package}-pytest-junit.xml'
+                    CIBW_TEST_COMMAND += f' --junit-xml={path_junit_xml}'
                 if state.pytest_options:
                     CIBW_TEST_COMMAND += f' {state.pytest_options}'
                 if state.pytest_paths:
@@ -2276,12 +2289,19 @@ def do_cibw(state):
             CIBW_ENVIRONMENT_PASS_LINUX = ' '.join(CIBW_ENVIRONMENT_PASS_LINUX)
             env_extra['CIBW_ENVIRONMENT_PASS_LINUX'] = CIBW_ENVIRONMENT_PASS_LINUX
 
-            pipcl.run(
-                    f'cd {directory} && cibuildwheel{cibw_pyodide_args}'
-                        f' --output-dir {os.path.abspath(state.wheelhouse)}',
-                    env_extra=env_extra,
-                    prefix=f'{package}: ',
-                    )
+            try:
+                pipcl.run(
+                        f'cd {directory} && cibuildwheel{cibw_pyodide_args}'
+                            f' --output-dir {os.path.abspath(state.wheelhouse)}',
+                        env_extra=env_extra,
+                        prefix=f'{package}: ',
+                        )
+            finally:
+                try:
+                    if state.pytest_junit_xml:
+                        state.results['packages'][package]['junit'] = read_pytest_junit(path_junit_xml)
+                except Exception:
+                    pass
         
         pipcl.log(f'Build/test succeeded for {package=}.')
         
@@ -2734,6 +2754,12 @@ def do_test_gnn(state):
 
 
 def do_test_single(state, package, failed_packages):
+    '''
+    Run tests. If state.pytest_junit_xml is true, we return a dict containing
+    results.
+    
+    Writes pytest results into state.results['packages'][package]['junit'].
+    '''
     location, _ = state.packages[package]
     if not location:
         return
@@ -2857,21 +2883,8 @@ def do_test_single(state, package, failed_packages):
                     )
             if state.pytest_junit_xml:
                 # Convert junit .xml file into .json.
-                try:
-                    with open(path_junit_xml, 'rb') as f:
-                        pytest_junit = xmltodict.parse(f)
-                    with open(f'{path_junit_xml}.json', 'w') as f:
-                        json.dump(pytest_junit, f, indent='    ')
-                except Exception as ee:
-                    pipcl.log(f'Failed to convert to json {path_junit_xml=}: {ee}')
-                # Convert junit .xml file into indented .xml.
-                try:
-                    junit_xml_pretty = xml.dom.minidom.parse(path_junit_xml).toprettyxml()
-                    pipcl.fs_write(f'{path_junit_xml}.xml', junit_xml_pretty)
-                except Exception as ee:
-                    pipcl.log(f'Failed to prettyfy {path_junit_xml=}: {ee}')
-            else:
-                pytest_junit = None
+                #pytest_junit = read_pytest_junit(path_junit_xml)
+                state.results['packages'][package]['junit'] = read_pytest_junit(path_junit_xml)
         if e:
             pipcl.log(f'Tests failed for {package=}.')
             if state.cibw_ignore_test_failures:
@@ -2880,11 +2893,12 @@ def do_test_single(state, package, failed_packages):
                 failed_packages.append(package)
         else:
             pipcl.log(f'Tests succeeded for {package=}.')
-    
-    return pytest_junit
 
 
 def do_test(state):
+    '''
+    Writes pytest results into state.results['packages'][package]['junit'].
+    '''
     if state.pytest_wrap in ('valgrind', 'helgrind'):
         if state.system_packages:
             pipcl.log('Installing valgrind.')
@@ -2909,30 +2923,16 @@ def do_test(state):
     
     pipcl.log(f'pip list')
 
-    results = dict()
     for package in state.packages_test:
         with pipcl.LogPrefix(f'{package}: '):
-            results[package] = dict()
-            location, _ = state.packages[package]
-            results[package]['location'] = location
-            directory = _get_local(package, state)
-            if directory:
-                sha, comment, diff, branch = pipcl.git_info(directory)
-                results[package]['git'] = dict(sha=sha, comment=comment, diff=diff, branch=branch)
-            
-            junit = do_test_single(state, package, failed_packages)
-            results[package]['junit'] = junit
+            do_test_single(state, package, failed_packages)
     
     if failed_packages:
         pipcl.log(f'Tests failed for these packages:')
         for package in failed_packages:
             pipcl.log(f'    {package}')
         raise Exception(f'Packages failed tests: {failed_packages}')
-    
-    path_results = f'{state.wheelhouse}/results.json'
-    with open(path_results, 'w') as f:
-        json.dump(results, f, indent='    ')
-    pipcl.log(f'Have written test results to: {path_results}')
+
 
 def speak(fail):
     try:
@@ -3177,6 +3177,17 @@ def main(state, argv):
     if 'mupdf' in state.packages and 'pymupdf' not in state.packages:
         Assert(0, f'If `mupdf` is specified then `pymupdf` should also be specified.')
     
+    # Populate state.results with package information.
+    state.results['packages'] = dict()
+    for package in state.packages:
+        state.results['packages'][package] = dict()
+        location, _ = state.packages[package]
+        state.results['packages'][package]['location'] = location
+        directory = _get_local(package, state)
+        if directory:
+            sha, comment, diff, branch = pipcl.git_info(directory)
+            state.results['packages'][package]['git'] = dict(sha=sha, comment=comment, diff=diff, branch=branch)
+    
     try:    # pylint: disable=too-many-nested-blocks.
         # Handle commands.
         #
@@ -3322,10 +3333,19 @@ def main(state, argv):
 
                 else:
                     assert 0, f'{command=}'
+    
     finally:
         for path in paths_to_delete:
             pipcl.fs_remove(path)
     
+        try:
+            path_results = f'{state.wheelhouse}/results.json'
+            with open(path_results, 'w') as f:
+                json.dump(state.results, f, indent='    ')
+            pipcl.log(f'Have written results to: {path_results}')
+        except Exception:
+            pass
+
     do_piprepo(state)
 
 
