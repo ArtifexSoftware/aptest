@@ -232,7 +232,7 @@ Using local checkouts, build packages ``pymupdf``, ``pymupdfpro`` and ``pymupdf_
 install (into current venv or ``venv-aptest-<pthonversion>-<wordsize>``)
 and test:
 
-    ``aptest/aptest.py -p PyMuPDF --pro PyMuPDFPro -m mupdf --layout sce build test``
+    ``aptest/aptest.py -p PyMuPDF --pro PyMuPDFPro -m mupdf --layout pymupdf_layout build test``
 
 Similarly build, install and test ``pymupdf``, ``pymupdfpro`` and ``pymupdf_layout`` using
 central git repositories:
@@ -306,9 +306,9 @@ Build/test ``pymupdfpro`` with alternative ``smartoffice-marina``:
 
     ``aptest/aptest.py --smartoffice-marina git: --pro git: build test``
 
-Run ``pymupdf_layout`` gnn tests with ``mupdf`` version 1.27.2, current ``pymupdf`` in git, and local checkout ``sce/`` of ``pymupdf_layout`` (this assumes that the DocLayNet dataset has been downloaded, see `Using DocLayNet dataset`_):
+Run ``pymupdf_layout`` gnn tests with ``mupdf`` version 1.27.2, current ``pymupdf`` in git, and local checkout ``pymupdf_layout/`` of ``pymupdf_layout`` (this assumes that the DocLayNet dataset has been downloaded, see `Using DocLayNet dataset`_):
 
-    ``aptest/aptest.py --test-gnn-det eval/eval_pymupdf_layout.py -m=git:'-t 1.27.2' -p=git: --layout=sce test-gnn``
+    ``aptest/aptest.py --test-gnn-det eval/eval_pymupdf_layout.py -m=git:'-t 1.27.2' -p=git: --layout=pymupdf_layout test-gnn``
 
 
 Making internal development releases
@@ -387,7 +387,7 @@ Instructions for releasing wheels for:
 
 * Test local checkouts of all packages on Github machines:
 
-    ``aptest/aptest.py -r @github -p PyMuPDF --pro PyMuPDFPro --layout sce --4llm pymupdf4llm --pdf4llm pymupdf4llm cibw``
+    ``aptest/aptest.py -r @github -p PyMuPDF --pro PyMuPDFPro --layout pymupdf_layout --4llm pymupdf4llm --pdf4llm pymupdf4llm cibw``
 
 * In `~/.aptest`_, specify package sources for releases.
 
@@ -397,7 +397,7 @@ Instructions for releasing wheels for:
   
   To use local checkouts:
 
-      ``-P PyMuPDF --PRO PyMuPDFPlus --LAYOUT sce --4LLM pymupdf4llm --PDF4LLM pymupdf4llm``
+      ``-P PyMuPDF --PRO PyMuPDFPlus --LAYOUT pymupdf_layout --4LLM pymupdf4llm --PDF4LLM pymupdf4llm``
   
   Or to use specific sha's for each package:
 
@@ -413,6 +413,14 @@ Instructions for releasing wheels for:
 
   This will eventually hold all release wheels and sdists prior to them being
   uploaded to https://pypi.org.
+
+* Remove any ``--git-local-detailed`` in `~/.aptest`_.
+  
+  Otherwise package checkout directories on Github machines can be very long, for example::
+  
+      aptest-git-pymupdf4llm--b_aptest-jules_git@github.com_pymupdf_pymupdf4llm.git
+    
+  This can break the test of PyMuPDF's ``docs/samples/code-printer.py``.
 
 * Build wheels for all packages:
 
@@ -430,7 +438,10 @@ Instructions for releasing wheels for:
 
     ``aptest/aptest.py --release-7``
 
-  These commands can be manually run in parallel using individual terminals.
+  * These commands use `--check-unchanged`_ internally,
+    so will fail if local checkouts contain uncommitted changes.
+
+  * These commands can be manually run in parallel using individual terminals.
     
   On success this will populate the release wheelhouse with all wheels and sdists
   
@@ -450,41 +461,18 @@ Instructions for releasing wheels for:
   Or upload to, and install from, a web server:
   
   * ``aptest/aptest.py draft --draft-location julian@ghostscript.com:public_html/wheels-1.27.2/ --wheelhouse release-1.27.2``
-  
+  * Enter a venv
   * ``pip install --extra-index-url https://ghostscript.com/~julian/wheels-1.27.2/simple pdf4llm pymupdfpro``
   
   Test the wheels:
   
-  * Enter a venv.
-  
   * ``pip install pytest``
-  
   * ``pytest PyMuPDF/tests`` etc.
 
 
 * Make the release by uploading all wheels and sdists to https://pypi.org/:
 
   ``aptest/aptest.py upload``
-
-* Release pyodide wheel.
-
-  **2026-06-15**: pypi.org now accepts pyodide wheels.
-  
-  * See: https://github.com/pymupdf/PyMuPDF/issues/5025
-  * Need to update aptest.py to include pyodide wheels in upload.
-
-  Old:
-  
-      Copy/rsync the pyodide wheel in the release directory to
-      ``julian@ghostscript.com:public_html/pyodide/``, for example:
-
-        ``rsync -ai release-1.27.2/pymupdf-1.27.2-cp313-abi3-pyodide_2025_0_wasm32.whl julian@ghostscript.com:public_html/pyodide/``
-
-      This will be available in: https://ghostscript.com/~julian/pyodide/.
-
-      Tell ``@jamie`` about the Pyodide wheel.
-
-      [2026-01-30: hopefully we'll have a more official location soon.]
 
 * Update central repositories:
 
@@ -493,7 +481,7 @@ Instructions for releasing wheels for:
     * ``PyMuPDF``
     * ``PyMuPDFPro``
     * ``pymupdf4llm``
-    * ``sce``
+    * ``pymupdf_layout``
   
   * If building with local checkouts, push each to github.
 
@@ -602,20 +590,191 @@ venv and re-runs itself inside it.
 See the `-v`_ option.
 
 
-Pytest junit .xml output
-^^^^^^^^^^^^^^^^^^^^^^^^
+Machine-readable results file
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+A file ``aptest-wheelhouse/results.json`` will be created,
+containing details about all packages (for example git sha).
 
-If `--pytest-junit-xml`_ is specified,
-then when running `pytest <https://docs.pytest.org>`_ with the `test`_ and `cibw`_ commands,
-Aptest specifies ``--junit-xml=aptest-wheelhouse/<package-name>-pytest-junit.xml``,
-which generates an .xml file containing the test results.
+* If `--pytest-junit-xml`_ is specified,
+  and the `cibw`_ or `test`_ commands are used,
+  this file will also contain information generated by `pytest <https://docs.pytest.org>`_'s `--junit-xml <https://docs.pytest.org/en/stable/how-to/output.html#creating-junitxml-format-files>`_ option.
 
-The .xml file is also copied back to local machine along with .whl files if `-r`_ is used.
+``results.json`` format is not (yet) fixed, but here is a current example::
 
-We also create a pretty-printed xml file ``<package-name>-pytest-junit.xml.xml``.
-
-Also see https://docs.pytest.org/en/stable/how-to/output.html#creating-junitxml-format-files.
-
+    {
+        "packages": {
+            "pymupdf": {
+                "location": "PyMuPDF",
+                "git": {
+                    "sha": "25d54bd5013a44c9b390c43a4952fe53e6080523",
+                    "comment": "changes.txt: updates for 1.28.2.",
+                    "diff": "",
+                    "branch": "main"
+                }
+            },
+            "pymupdf4llm": {
+                "location": "pymupdf4llm",
+                "git": {
+                    "sha": "5de0c983abba8902bfe15ab0053eaecdb0fd761b",
+                    "comment": "pdf4llm/setup.py setup.py: increment version to 1.28.2.",
+                    "diff": "diff --git a/CHANGES.md b/CHANGES.md\nindex 87583600..f7df4af2 100644\n--- a/CHANGES.md\n+++ b/CHANGES.md\n@@ -1,5 +1,15 @@\n # Change Log\n \n+## Changes in version 1.28.2\n+\n+## Changes in version 1.28.0\n+\n+* to_markdown(): don't propagate malicious links into the output.\n+* Rework Table Handling.\n+* Fix 150 and 151 Layout Issues\n+\n+## Changes in version 1.27.2.3\n+\n ## Changes in version 1.27.2.2\n \n ### Fixes:\n",
+                    "branch": "main"
+                },
+                "junit": {
+                    "testsuites": {
+                        "@name": "pytest tests",
+                        "testsuite": {
+                            "@name": "pytest",
+                            "@errors": "0",
+                            "@failures": "0",
+                            "@skipped": "0",
+                            "@tests": "27",
+                            "@time": "45.087",
+                            "@timestamp": "2026-08-05T11:37:07.153861+01:00",
+                            "@hostname": "jules-devuan",
+                            "testcase": [
+                                {
+                                    "@classname": "tests.pymupdf4llm.llama_index.test_layout",
+                                    "@name": "test_layout_switch",
+                                    "@time": "0.612"
+                                },
+                                {
+                                    "@classname": "tests.pymupdf4llm.llama_index.test_layout",
+                                    "@name": "test_layout_default",
+                                    "@time": "1.149"
+                                },
+                                {
+                                    "@classname": "tests.test_137",
+                                    "@name": "test_137",
+                                    "@time": "10.410"
+                                },
+                                {
+                                    "@classname": "tests.test_137",
+                                    "@name": "test_to_markdown_link_malicious",
+                                    "@time": "0.572"
+                                },
+                                {
+                                    "@classname": "tests.test_370",
+                                    "@name": "test_370",
+                                    "@time": "4.951"
+                                },
+                                {
+                                    "@classname": "tests.test_376",
+                                    "@name": "test_376",
+                                    "@time": "3.747"
+                                },
+                                {
+                                    "@classname": "tests.test_lint",
+                                    "@name": "test_pylint",
+                                    "@time": "0.001"
+                                },
+                                {
+                                    "@classname": "tests.test_markdown",
+                                    "@name": "test_markdown_unicode",
+                                    "@time": "0.001"
+                                },
+                                {
+                                    "@classname": "tests.test_ocr",
+                                    "@name": "test_ocr_1",
+                                    "@time": "6.041"
+                                },
+                                {
+                                    "@classname": "tests.test_ocr",
+                                    "@name": "test_ocr_2",
+                                    "@time": "0.384"
+                                },
+                                {
+                                    "@classname": "tests.test_ocr",
+                                    "@name": "test_ocr_3",
+                                    "@time": "7.235"
+                                },
+                                {
+                                    "@classname": "tests.test_pymupdf_5030",
+                                    "@name": "test_pymupdf_5030",
+                                    "@time": "0.325"
+                                },
+                                {
+                                    "@classname": "tests.test_sce-150",
+                                    "@name": "test_sce_150_1",
+                                    "@time": "0.459"
+                                },
+                                {
+                                    "@classname": "tests.test_sce-150",
+                                    "@name": "test_sce_150_2",
+                                    "@time": "4.373"
+                                },
+                                {
+                                    "@classname": "tests.test_sce-150",
+                                    "@name": "test_sce_150_3",
+                                    "@time": "0.349"
+                                },
+                                {
+                                    "@classname": "tests.test_sce_156",
+                                    "@name": "test_sce_156",
+                                    "@time": "1.305"
+                                },
+                                {
+                                    "@classname": "tests.test_table_html",
+                                    "@name": "test_to_html_is_live_only_public_api",
+                                    "@time": "0.001"
+                                },
+                                {
+                                    "@classname": "tests.test_table_html",
+                                    "@name": "test_page_html_tables_uses_core_union_find_tables",
+                                    "@time": "0.001"
+                                },
+                                {
+                                    "@classname": "tests.test_table_html",
+                                    "@name": "test_to_markdown_table_output_html_uses_layout_path",
+                                    "@time": "0.000"
+                                },
+                                {
+                                    "@classname": "tests.test_table_html",
+                                    "@name": "test_to_json_table_output_html_uses_layout_path",
+                                    "@time": "0.000"
+                                },
+                                {
+                                    "@classname": "tests.test_table_html",
+                                    "@name": "test_layout_html_env_does_not_enable_table_html",
+                                    "@time": "0.405"
+                                },
+                                {
+                                    "@classname": "tests.test_table_html",
+                                    "@name": "test_table_html_parallel_smoke",
+                                    "@time": "0.001"
+                                },
+                                {
+                                    "@classname": "tests.test_table_html",
+                                    "@name": "test_to_json_html_tables_match_to_markdown",
+                                    "@time": "0.000"
+                                },
+                                {
+                                    "@classname": "tests.test_table_html",
+                                    "@name": "test_to_json_html_mode_grid_fields_consistent",
+                                    "@time": "0.001"
+                                },
+                                {
+                                    "@classname": "tests.test_table_html",
+                                    "@name": "test_table_output_html_no_layout_falls_back_to_rag_path",
+                                    "@time": "0.001"
+                                },
+                                {
+                                    "@classname": "tests.test_table_html",
+                                    "@name": "test_body_text_preserved_around_tables",
+                                    "@time": "0.676"
+                                },
+                                {
+                                    "@classname": "tests.test_tabulate",
+                                    "@name": "test_tablulate_bug",
+                                    "@time": "0.836"
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        }
+    }
 
 Cleaning packages
 ^^^^^^^^^^^^^^^^^
@@ -2140,8 +2299,10 @@ On devuan this requires a system package install: ``sudo apt install espeak-ng``
 
 --pytest-junit-xml: (bool)
 ..........................
-    If true, `test`_ will run ``pytest`` with extra arg ``--junit-xml``
-    and write info (converted from xml to json) into ``aptest-wheelhouse/<package>-pytest-junit.xml``.
+    If true, the `cibw`_ and `test`_ commands will run ``pytest`` with extra arg ``--junit-xml``
+    and add the generated information
+    (converted from xml to json)
+    into the final ``aptest-wheelhouse/results.json`` file.
 
 
 .. _--pytest-path:
@@ -2762,6 +2923,22 @@ completion
 
 Changelog
 ---------
+
+**2026-08-06**
+
+* Improved generation of machine-readable information.
+
+  * Always create file ``aptest-wheelhouse/results.json``,
+    containing information about package checkouts.
+  * If `--pytest-junit-xml`_ is specified, the `cibw`_ and `test`_ commands
+    add pytest information.
+* In `Release procedure`_, removed specific instructions for Pyodide wheels.
+  They are now uploaded to pypi.org along with the other wheels.
+* Don't allow `--git-local-detailed`_ with `--release-*`_,
+  because the resulting long directory path can break ``PyMuPDF:docs/samples/code-printer.py``.
+* Fixed `--check-pushed`_ and `--check-unchanged`_ with ``-r @github``.
+  We now check before commit+push to remote branch.
+
 
 **2026-07-24**
 
