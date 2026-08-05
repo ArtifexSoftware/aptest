@@ -1419,6 +1419,25 @@ def github_api_url(info):
     return f'https://api.github.com/repos/{name}'
 
 
+def check_checkout_unchanged(state, directory):
+    _, _, diff, _ = pipcl.git_info(directory)
+    Assert(
+            not diff,
+            f'{state.check_unchanged=} but checkout has uncommitted changes: {directory!r}.',
+            )
+    pipcl.log(f'{state.check_unchanged=}, local checkout ok: {directory!r}')
+
+
+def check_checkout_pushed(state, directory):
+    out = pipcl.run(f'cd {directory} && git branch -r --contains', capture=1)
+    assert isinstance(out, str)
+    Assert(
+            out.strip(),
+            f'{state.check_pushed=} but local checkout has un-pushed commits: {directory!r}',
+            )
+    pipcl.log(f'{state.check_pushed=}, local checkout ok ({out=}): {directory!r}')
+    
+
 def do_remote_github(state, args):
     assert isinstance(args, cli.Args)
     pipcl.run('pip install requests')
@@ -1447,6 +1466,11 @@ def do_remote_github(state, args):
             if not package_location.startswith(('git:', 'pip:')):
                 # Push to a Github branch and update argv[] to refer to this
                 # Github branch.
+                if state.check_unchanged:
+                    check_checkout_unchanged(state, package_location)
+                if state.check_pushed:
+                    check_checkout_pushed(state, package_location)
+                
                 info = name_info(state, package_name)
                 pipcl.log(f'{package_name=}.')
                 pipcl.log(f'{info["git_remote"]=}.')
@@ -3431,20 +3455,9 @@ def _get_local(package, state, test=False):
     else:
         directory = location
         if state.check_unchanged:
-            _, _, diff, _ = pipcl.git_info(directory)
-            Assert(
-                    not diff,
-                    f'{state.check_unchanged=} but checkout has uncommitted changes: {directory!r}.',
-                    )
-            pipcl.log(f'{state.check_unchanged=}, local checkout ok: {directory!r}')
+            check_checkout_unchanged(state, directory)
         if state.check_pushed:
-            out = pipcl.run(f'cd {directory} && git branch -r --contains', capture=1)
-            assert isinstance(out, str)
-            Assert(
-                    out.strip(),
-                    f'{state.check_pushed=} but local checkout has un-pushed commits: {directory!r}',
-                    )
-            pipcl.log(f'{state.check_pushed=}, local checkout ok ({out=}): {directory!r}')
+            check_checkout_pushed(state, directory)
     if not test:
         if package in state.clean_git:
             pipcl.run(
