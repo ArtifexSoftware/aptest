@@ -1092,6 +1092,11 @@ def get_args(state, argv):
             elif arg.startswith('--release-'):
                 # Must be last arg.
                 #assert args.pos[0] == len(args.argv), f'{len(args.argv)=} {args.pos=}.'
+                Assert(
+                        not state.git_local_detailed,
+                        'Do not specify --git-local-detailed,'
+                        ' because the resulting long directory name has been seen to break PyMuPDF:docs/samples/code-printer.py.'
+                        )
                 new_args = ''
                 new_args += f' --log-prefix {shlex.quote(arg.as_str() + ": ")}'
                 pipcl.log(f'{new_args=}')
