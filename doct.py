@@ -46,7 +46,7 @@ class Doct:
     >>> d['foo']['bar']['qwerty']
     1
     
-    Assignment of nested dicts converts them into Dicts.
+    Assignment of nested dicts converts them into Docts.
     >>> d.bbb = dict(ccc=dict(ddd=1))
     >>> type(d.bbb) == Doct
     True
