@@ -18,7 +18,6 @@ import subprocess
 import sys
 import textwrap
 import time
-import xml.dom.minidom
 
 
 class AptestUserError(Exception):
@@ -1959,13 +1958,12 @@ def do_build(state):
         pipcl.run(f'pip install {wheel}')
 
 
-
 def read_pytest_junit(path):
     try:
         with open(path, 'rb') as f:
             return xmltodict.parse(f)
     except Exception as e:
-        pipcl.log(f'Failed to read pytest junit file {path=}: {ee}')
+        pipcl.log(f'Failed to read pytest junit file {path=}: {e}')
     
 
 def do_cibw(state):
