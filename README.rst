@@ -959,6 +959,14 @@ local pipcl checkout directory, for example:
 Note that this is very unlikely to be required.
 
 
+Building pymupdfpro libraries for .net
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Use Aptest to build pymupdfpro libraries. Example command:
+
+``python aptest\aptest.py --key git@github.com: ARTIFEX_SOFTWARE_SSH_KEY -m "git:-t 1.28.2" -p "git:-t 1.28.2" --pro "git:-t 1.28.2" --run pymupdfpro "python setup.py --rawbuild ..\csharp_devel" build run``
+
+
 Command-line arguments
 ----------------------
 
@@ -2923,6 +2931,15 @@ completion
 
 Changelog
 ---------
+
+**2026-08-25**
+
+* Added `Building pymupdfpro libraries for .net`_.
+* Allow `--mupdf`_ without `--pymupdf`_ if `run`_ is specified.
+* Fix windows failure if venv path contains `/`.
+* Improved autovenv.py.
+* Added daily Github free-threading test.
+
 
 **2026-08-06**
 
