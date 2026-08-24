@@ -4,190 +4,135 @@ Automatic creation/use of a venv.
 Example usage:
 
     import autovenv
-    autovenv.enter(create=3, packages=['foopackage', 'barpackage'])
-    import foomodule
-    import barmodule
+    autovenv.enter(packages=['pytest', 'numpy'])
+    import numpy
     ...
 '''
 
 import os
 import platform
-import shlex
-import shutil
 import subprocess
 import sys
 import sysconfig
-import time
+import tempfile
 
 
-def log(text, verbose, t0):
-    debug = False
-    if debug or verbose:
-        text = f'autovenv [+{time.time()-t0:.1f}]: {text}'
-    if verbose:
-        print(text, flush=1)
-    if debug:
-        with open('autoenv-env-log.txt', 'a') as f:
-            print(text, file=f)
-    
-
-def run(command, verbose, t0, check=1, batch=True):
-    log(f'Running {batch=}: {command}', verbose, t0)
-    if batch:
-        def write_out(text):
-            for line in text.split('\n'):
-                log(line, verbose=True, t0=t0)
-        try:    # pylint: disable=no-else-raise
-            cp = subprocess.run(command, shell=1, check=check, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        except subprocess.SubprocessError as e:
-            text = e.stdout # pylint: disable=no-member
-            # Docs say that e.stdout is always bytes, but doesn't seem to be the case?
-            if isinstance(text, bytes):
-                text = text.decode('utf8', errors='replace')
-            write_out(text)
-            raise
-        else:
-            text = cp.stdout
-            write_out(text)
-            return cp
-    else:
-        cp = subprocess.run(command, shell=1, check=check)
-    return cp
-
-
-def gil():
+def _freethreads():
+    '''
+    Returns true if python is free-threads.
+    '''
     Py_GIL_DISABLED = sysconfig.get_config_var('Py_GIL_DISABLED')
-    #print(f'{Py_GIL_DISABLED=}')
-    if Py_GIL_DISABLED==1:
-        gil_enabled = sys._is_gil_enabled() # pylint:disable=protected-access
-        #print(f'{gil_enabled=}')
-        if not gil_enabled:
-            return False
-    return True
+    if Py_GIL_DISABLED == 1:
+        # Free threads build.
+        if not sys._is_gil_enabled():   # pylint:disable=protected-access
+            return True
 
 
-def bits():
+def _bits():
     return int.bit_length(sys.maxsize+1)
 
 
-def shlex_quote(arg):
-    '''
-    On Windows we simply enclose <arg> within "..." or raise an exception if
-    <arg> contains double-quotes.
-    
-    Otherwise we simply use shlex.quote().
-    '''
-    if platform.system() == 'Windows':
-        if '"' in arg:
-            raise Exception(f'Cannot quote {arg=}.')
-        return f'"{arg}"'
-    else:
-        return shlex.quote(arg)
-        
-
-def shlex_join(argv):
-    '''
-    Like shlex.join(), but on Windows we use shlex_quote().
-    '''
-    if platform.system() == 'Windows':
-        argv = [shlex_quote(arg) for arg in argv]
-        return ' '.join(argv)
-    else:
-        return shlex.join(argv)
-    
-
 def enter(*,
-        venv_name=None,
-        venv_prefix='autovenv',
-        create=None,
         packages=None,
-        verbose=False,
+        venv_path=None,
+        verbose=True,
         ):
     '''
-    Creates and re-runs inside a venv if we are not already in a venv.
-
-    If we are already in a venv, we run `pip install --upgrade` for each item
-    in <packages> and return.
-    
-    Otherwise we do the following:
-    
-    * Create the venv if required.
-    * In the venv, run `pip install --upgrade` for each item in <packages>.
-    * Create a child process that runs `python <sys.args>` inside the venv.
-    * Call `sys.exit()` with termination code of child process.
-    * We do not return.
-    
+    Rerun current python program in a venv.
     Args:
-    
-        venv_name:
-            Name of venv. If false, we use:
-                <venv_prefix>-<python-version><T>-<bits>
-            Where <T> is '-t' if free-thread else ''.
-        venv_prefix:
-            Used if <venv_name> is false.
-        create:
-            One of:
-                1: Only run `python -m venv <venv_name>` and install packages
-                   if the <venv_name> directory does not exist.
-                2: Always run `python -m venv <venv_name>`.
-                3: Delete any existing venv and then run `python -m venv <venv_name>`.
-            If None, we use create=2.
         packages:
-            String or list of packages, passed directly to `pip install`.
-        verbose:
-            If true we output diagnostics when running commands.
+            List of packages to install.
+        venv_path:
+            Path of venv directory. If None (the default) we use a new and
+            unique venv directory which is deleted afterwards.
+            
+            Otherwise we use venv_path.format(**kwargs) where kwargs is a dict
+            containing these keys:
+                python_version: platform.python_version(),
+                freethreads: 't' if python is freethreads else '' .
+                wordsize: e.g. 64 or 32.
     '''
-    t0 = time.time()
-    
-    if isinstance(packages, str):
-        packages = (packages,)
-    packages = packages or list()
-    
-    if create is None:
-        create = 2
-    assert create in (1, 2, 3), f'Unrecognised {create=}, should be 1, 2 or 3.'
-
-    if sys.prefix != sys.base_prefix:
-        log(f'Already in a venv, {sys.prefix=}.', verbose, t0)
+    AUTOVENV_VENV_PATH = os.environ.get('AUTOVENV_VENV_PATH')
+    if (AUTOVENV_VENV_PATH
+            and os.path.realpath(sys.prefix)
+                == os.path.realpath(AUTOVENV_VENV_PATH)
+            ):
+        # We are already in the autovenv venv; install packages and return.
+        if verbose:
+            print(f'autovenv: Already in autovenv venv, {sys.prefix=}.')
         if packages:
-            command = f'pip install --quiet --upgrade'
-            for package in packages:
-                if package:
-                    command += f' {shlex_quote(package)}'
-            run(command, verbose, t0)
-        return
-    
-    # We are not in a venv.
-    log(f'Not in a venv.', verbose, t0)
-    
-    # Set venv name.
-    if not venv_name:
-        if not venv_prefix:
-            venv_prefix = f'autovenv'
-        venv_name = f'{venv_prefix}-{platform.python_version()}{"" if gil() else "-t"}-{bits()}'
-
-    # Create venv.
-    if create == 3:
-        # Delete any existing venv.
-        if os.path.isdir(venv_name):
-            shutil.rmtree(venv_name, ignore_errors=1)
-        assert not os.path.exists(venv_name)
-    
-    if create == 1 and os.path.isdir(venv_name):
-        # Don't recreate existing venv or install packages.
-        packages = list()
+            if isinstance(packages, str):
+                packages = [packages]
+            if verbose:
+                print(f'autovenv: Installing packages: {packages}.')
+            subprocess.run(
+                    [sys.executable, '-m', 'pip', 'install', '--quiet', '--upgrade']
+                        + packages,
+                    check=1,
+                    )
     else:
-        # Create venv.
-        run(f'{shlex_quote(sys.executable)} -m venv {venv_name}', verbose, t0)
-
-    # Get command to enter venv.
-    if platform.system() == 'Windows':
-        venv_enter = f'"{venv_name}\\Scripts\\activate"'
-    else:
-        venv_enter = f'. {venv_name}/bin/activate'
-    
-    # Rerun ourselves in the venv.
-    command = f'{venv_enter} && python {shlex_join(sys.argv)}'
-    
-    cp = run(command, verbose, t0, check=0, batch=0)
-    sys.exit(cp.returncode)
+        # We are not in the autovenv venv so create/update it and rerun
+        # ourselves in it.
+        if verbose:
+            if sys.prefix == sys.base_prefix:
+                print(f'autovenv: Not in a venv.')
+            else:
+                print(f'autovenv: In non-autovenv venv, {sys.prefix=}.')
+        
+        def setup(venv_path):
+            '''
+            Create/update venv, modify os.environ so that any subprocesses
+            still run inside the venv, and return path of venv's python.
+            '''
+            if verbose:
+                print(f'autovenv: Using venv: {venv_path}')
+            # Create/update venv.
+            subprocess.run([sys.executable, '-m', 'venv', venv_path], check=1)
+            
+            # Update PATH and VIRTUAL_ENV so that any subprocesses still run
+            # inside the venv. This uses internal implementation details of
+            # the venv module.
+            bin_dir = 'Scripts' if platform.system() == 'Windows' else 'bin'
+            p = os.path.join(venv_path, bin_dir)
+            os.environ['PATH'] = p + os.pathsep + os.environ['PATH']
+            os.environ['VIRTUAL_ENV'] = venv_path
+            
+            # Set AUTOVENV_VENV_PATH so we can distinguish between venv's
+            # created by us and venv's created by other means.
+            os.environ['AUTOVENV_VENV_PATH'] = venv_path
+            
+            # Return location of venv's python.
+            return f'{venv_path}/{bin_dir}/python'
+        
+        if venv_path:
+            # Expand selected fields.
+            kwargs = dict(
+                    python_version = platform.python_version(),
+                    freethreads = 't' if _freethreads() else '',
+                    wordsize = _bits(),
+                    )
+            venv_path = venv_path.format(**kwargs)
+            venv_python = setup(venv_path)
+            # Rerun the current python program in the venv.
+            if platform.system() == 'Windows':
+                # Have seen odd behaviour with os.execve() where empty string
+                # args appear to be removed.  So we use a child process
+                # instead.
+                cp = subprocess.run([venv_python] + sys.argv, env=os.environ)
+                sys.exit(cp.returncode)
+            else:
+                os.execve(venv_python, [venv_python] + sys.argv, os.environ)
+        
+        else:
+            # Use tempfile.TemporaryDirectory() to create venv directory that
+            # will be automatically removed after use.
+            with tempfile.TemporaryDirectory(prefix='autovenv-') as venv_path:
+                if verbose:
+                    print(f'autovenv: Using unique venv directory: {venv_path}')
+                venv_python = setup(venv_path)
+                # Rerun the current program in the venv. We need to use
+                # a child process instead of os.execve(), so that our
+                # tempfile.TemporaryDirectory gets to delete the venv
+                # directory.
+                cp = subprocess.run([venv_python] + sys.argv, env=os.environ)
+                sys.exit(cp.returncode)
