@@ -34,6 +34,9 @@ jobs:
         args: [
             '-m "git:-b 1.28.x" -p git: --pro git: --layout git: --4llm git:',
             '-m git: -p git: --pro git: --layout git: --4llm git: --marina git:',
+            
+            # Test free-threading python.
+            '-m git: -p git: -p git: -o linux cibw --remote-github-runners linux --cibw-skip-add-defaults=0 -e CIBW_BUILD="cp314t*" -e CIBW_SKIP="*musllinux*" -e PYMUPDF_SETUP_PY_LIMITED_API=0
             ]
 
       # Avoid cancelling of all runs after a single failure.
