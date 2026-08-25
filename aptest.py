@@ -42,24 +42,24 @@ COMP_POINT = os.environ.get('COMP_POINT')
 
 # Use autovenv.py to create/enter a venv.
 # Note that we don't have a way to use anything other than pypi's pipcl.
-create = 2
-verbose = 1
+autovenv_create = 2
+autovenv_verbose = 1
 
 APTEST_PIPCL = os.environ.get('APTEST_PIPCL')
-packages = [APTEST_PIPCL or 'pipcl', 'xmltodict', 'piprepo', 'setuptools<81']
+autovenv_packages = [APTEST_PIPCL or 'pipcl', 'xmltodict', 'piprepo', 'setuptools<81']
+
 if sys.argv[1:] == ['completion'] or COMP_LINE:
     # We don't want autovenv to output debug info because it'll badly mess
     # up completion. And we use `create = 1` for speed.
-    create = 1
-    verbose = 0
-    packages = None
+    autovenv_create = 1
+    autovenv_verbose = 0
+    autovenv_packages = None
 
-g_venv_prefix = f'venv-aptest'
 autovenv.enter(
-        venv_prefix=g_venv_prefix,
-        create=create,
-        packages=packages,
-        verbose=verbose,
+        venv_path='venv-aptest-{python_version}-{wordsize}{freethreads}',
+        packages=autovenv_packages,
+        create=autovenv_create,
+        verbose=autovenv_verbose,
         )
 
 # We use `pylint disable=wrong-import-position` because these imports need to
@@ -2199,7 +2199,6 @@ def do_cibw(state):
         
         else:
             # Run cibuildwheeel.
-            
             _modify_build_env(state, package)
             
             # Tell cibuildwheel how to test <package>.
@@ -2315,7 +2314,6 @@ def do_cibw(state):
             CIBW_ENVIRONMENT_PASS_LINUX.sort()
             CIBW_ENVIRONMENT_PASS_LINUX = ' '.join(CIBW_ENVIRONMENT_PASS_LINUX)
             env_extra['CIBW_ENVIRONMENT_PASS_LINUX'] = CIBW_ENVIRONMENT_PASS_LINUX
-
             try:
                 pipcl.run(
                         f'cd {directory} && cibuildwheel{cibw_pyodide_args}'
@@ -2995,7 +2993,6 @@ def get_self_gitinfo():
 
 
 def main(state, argv):
-    
     if github_workflow_unimportant():
         return
     
@@ -3012,10 +3009,11 @@ def main(state, argv):
     del argv
     
     # Update convenience link to venv.
+    venv_prefix = f'venv-aptest'
     try:
-        pipcl.fs_symlink(g_venv_prefix, os.path.relpath(sys.prefix))
+        pipcl.fs_symlink(venv_prefix, os.path.relpath(sys.prefix))
     except Exception as e:
-        pipcl.log(f'Warning: unable to create symlink from {g_venv_prefix!r} to {os.path.relpath(sys.prefix)!r}: {e}')
+        pipcl.log(f'Warning: unable to create symlink from {venv_prefix!r} to {os.path.relpath(sys.prefix)!r}: {e}')
         
     if state.devel:
         # Leave pipcl's default, which includes elapsed time and file:line:fn.
