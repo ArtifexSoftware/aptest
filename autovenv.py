@@ -9,6 +9,7 @@ Example usage:
     ...
 '''
 
+import shutil
 import os
 import platform
 import subprocess
@@ -35,6 +36,7 @@ def _bits():
 def enter(*,
         packages=None,
         venv_path=None,
+        create=2,
         verbose=True,
         ):
     '''
@@ -51,6 +53,17 @@ def enter(*,
                 python_version: platform.python_version(),
                 freethreads: 't' if python is freethreads else '' .
                 wordsize: e.g. 64 or 32.
+        create:
+            Controls venv creation if <venv_python> is set:
+            
+            1: If <venv_path> already exists then assume it is up to date -
+               don't run `python -m venv <venv_name>` and don't install
+               packages.
+            2: Always run `python -m venv <venv_name>`.
+            3: Delete any existing venv and then run `python -m venv <venv_name>`.
+            
+        verbose:
+            .
     '''
     AUTOVENV_VENV_PATH = os.environ.get('AUTOVENV_VENV_PATH')
     if (AUTOVENV_VENV_PATH
@@ -79,7 +92,7 @@ def enter(*,
             else:
                 print(f'autovenv: In non-autovenv venv, {sys.prefix=}.')
         
-        def setup(venv_path):
+        def setup(venv_path, create=2):
             '''
             Create/update venv, modify os.environ so that any subprocesses
             still run inside the venv, and return path of venv's python.
@@ -88,7 +101,15 @@ def enter(*,
             if verbose:
                 print(f'autovenv: Using venv: {venv_path}')
             # Create/update venv.
-            subprocess.run([sys.executable, '-m', 'venv', venv_path], check=1)
+            if create == 3:
+                # Delete any existing venv.
+                shutil.rmtree(venv_path, ignore_errors=1)
+                assert not os.path.exists(venv_path)
+            if create == 1 and os.path.isdir(venv_path):
+                # Don't recreate existing venv or install packages.
+                packages = list()
+            else:
+                subprocess.run([sys.executable, '-m', 'venv', venv_path], check=1)
             
             # Update PATH and VIRTUAL_ENV so that any subprocesses still run
             # inside the venv. This uses internal implementation details of
@@ -113,7 +134,7 @@ def enter(*,
                     wordsize = _bits(),
                     )
             venv_path = venv_path.format(**kwargs)
-            venv_python = setup(venv_path)
+            venv_python = setup(venv_path, create=create)
             # Rerun the current python program in the venv.
             if platform.system() == 'Windows':
                 # Have seen odd behaviour with os.execve() where empty string
@@ -130,7 +151,7 @@ def enter(*,
             with tempfile.TemporaryDirectory(prefix='autovenv-') as venv_path:
                 if verbose:
                     print(f'autovenv: Using unique venv directory: {venv_path}')
-                venv_python = setup(venv_path)
+                venv_python = setup(venv_path, create=2)
                 # Rerun the current program in the venv. We need to use
                 # a child process instead of os.execve(), so that our
                 # tempfile.TemporaryDirectory gets to delete the venv
