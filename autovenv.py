@@ -84,6 +84,7 @@ def enter(*,
             Create/update venv, modify os.environ so that any subprocesses
             still run inside the venv, and return path of venv's python.
             '''
+            venv_path = os.path.abspath(venv_path)
             if verbose:
                 print(f'autovenv: Using venv: {venv_path}')
             # Create/update venv.
