@@ -32,11 +32,11 @@ jobs:
                 ]
         
         args: [
-            '-m "git:-b 1.28.x" -p git: --pro git: --layout git: --4llm git:',
-            '-m git: -p git: --pro git: --layout git: --4llm git: --marina git:',
+            '-m "git:-b 1.28.x" -p git: --pro git: --layout git: --4llm git: build test',
+            '-m git: -p git: --pro git: --layout git: --4llm git: --marina git: build test',
             
             # Test free-threading python.
-            '-m git: -p git: -p git: -o linux cibw --remote-github-runners linux --cibw-skip-add-defaults=0 -e CIBW_BUILD="cp314t*" -e CIBW_SKIP="*musllinux*" -e PYMUPDF_SETUP_PY_LIMITED_API=0
+            '-m git: -p git: -o linux cibw --remote-github-runners linux --cibw-skip-add-defaults=0 -e CIBW_BUILD="cp314t*" -e CIBW_SKIP="*musllinux*" -e PYMUPDF_SETUP_PY_LIMITED_API=0',
             ]
 
       # Avoid cancelling of all runs after a single failure.
@@ -59,9 +59,9 @@ jobs:
         run: |
           # Set APTEST_matrix_args2 to APTEST_matrix_args with modifications to
           # allows use as artifact name.
-          python3 -c 'import os, re; APTEST_matrix_args=os.environ["APTEST_matrix_args"]; APTEST_matrix_args2 = re.sub("[: \"]", "_", APTEST_matrix_args); print(f"APTEST_matrix_args2="+APTEST_matrix_args2)' >> $GITHUB_ENV
+          python3 -c 'import os, re; APTEST_matrix_args=os.environ["APTEST_matrix_args"]; APTEST_matrix_args2 = re.sub("[: \"*]", "_", APTEST_matrix_args); print(f"APTEST_matrix_args2="+APTEST_matrix_args2)' >> $GITHUB_ENV
           # Run tests.
-          python aptest.py ${{matrix.args}} build test -a APTEST_args
+          python aptest.py ${{matrix.args}} -a APTEST_args
       
       # Upload generated wheels, to be accessible from github Actions page.
       #
