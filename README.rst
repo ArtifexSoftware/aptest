@@ -2932,6 +2932,12 @@ completion
 Changelog
 ---------
 
+**2026-08-26**
+
+* Added Github tests with pre-release tools.
+  Currently this means pymupdf with python-3.14t, python-3.15, python-3.15t.
+
+
 **2026-08-25**
 
 * Added `Building pymupdfpro libraries for .net`_.
