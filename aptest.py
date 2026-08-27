@@ -327,6 +327,13 @@ g_package_info = {
                 'aliases':  ['pro'],
                 'order': 2,
             },
+        'pymupdf_office':
+            {
+                'git_remote': 'git@github.com:ArtifexSoftware/PyMuPDFPro.git',
+                'git_branch': 'main',
+                'aliases':  ['office'],
+                'order': 2,
+            },
         'pymupdf_layout':
             {
                 'git_remote': 'git@github.com:ArtifexSoftware/pymupdf_layout.git',
@@ -1716,7 +1723,7 @@ def _modify_build_env(state, package):
     Set state.env_extra PYMUPDFPRO_SETUP_SOT_KEY_PATH /
     PYMUPDFPRO_SETUP_SOT_KEY if required.
     '''
-    if (package == 'pymupdfpro'
+    if (package in ('pymupdfpro', 'pymupdf_office')
             and 'smartoffice' not in state.packages
             and 'smartoffice-neo' not in state.packages
             and 'smartoffice-marina' not in state.packages
@@ -1833,10 +1840,11 @@ def do_build_single(state, package):
             if state.sdists:
                 build_sdist(state, package, directory)
 
-            if (package == 'pymupdf'
+            if (package == 'pymupdf'    # pylint: disable=too-many-boolean-expressions
                     and state.graal
-                    and (
-                        'pymupdfpro' in state.packages_build
+                    and (0
+                        or 'pymupdfpro' in state.packages_build
+                        or 'pymupdf_office' in state.packages_build
                         or 'pymupdf_layout' in state.packages_build
                         )
                     ):
@@ -1870,7 +1878,7 @@ def do_build_single(state, package):
             if state.build_type:
                 if package == 'pymupdf':
                     state.env_extra['PYMUPDF_SETUP_MUPDF_BUILD_TYPE'] = state.build_type
-                if package == 'pymupdfpro':
+                if package in ('pymupdfpro', 'pymupdf_office'):
                     state.env_extra['PYMUPDFPRO_SETUP_BUILD_TYPE'] = state.build_type
                 if package == 'pymupdf_layout':
                     state.env_extra['PYMUPDF_LAYOUT_SETUP_BUILD_TYPE'] = state.build_type
@@ -2261,7 +2269,7 @@ def do_cibw(state):
             else:
                 prefix = ''
 
-            if platform.system() == 'Linux' and package == 'pymupdfpro':
+            if platform.system() == 'Linux' and package in ('pymupdfpro', 'pymupdf_office'):
                 # Build will run inside a CentOS-7 container; we
                 # need to install fontconfig-devel so `#include
                 # <fontconfig/fonctconfig.h>` works. And for SO build
