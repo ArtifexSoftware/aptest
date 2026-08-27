@@ -1953,10 +1953,9 @@ def do_build(state):
         # Always uninstall first, to ensure we always install the package from
         # the specified location.
         #
-        pipcl.run(f'pip uninstall -y {package}')
+        pipcl.run(f'pip uninstall -y {package}', prefix='    ')
         wheel = package_to_wheel[package]
-        pipcl.run(f'pip install {wheel}')
-
+        pipcl.run(f'pip install {wheel}', prefix='    ')
 
 def read_pytest_junit(path):
     try:
