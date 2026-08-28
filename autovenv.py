@@ -26,7 +26,7 @@ def _freethreads():
     Py_GIL_DISABLED = sysconfig.get_config_var('Py_GIL_DISABLED')
     if Py_GIL_DISABLED == 1:
         # Free threads build.
-        if not sys._is_gil_enabled():   # pylint:disable=protected-access
+        if not sys._is_gil_enabled():   # pylint:disable=protected-access,no-member
             return True
 
 
@@ -97,6 +97,13 @@ def enter(*,
         if verbose:
             print(text, flush=1)
     
+    if venv_path:
+        venv_path = venv_path.format(
+                python_version = platform.python_version(),
+                freethreads = 't' if _freethreads() else '',
+                wordsize = _bits(),
+                )
+    
     log(f'autovenv.enter(): Starting:')
     log(f'autovenv.enter():     {AUTOVENV_N=}')
     log(f'autovenv.enter():     {AUTOVENV_N_CURRENT=}')
@@ -113,6 +120,10 @@ def enter(*,
         log(f'autovenv.enter(): Have entered autovenv venv.')
         assert AUTOVENV_VENV_PATH
         assert os.path.realpath(sys.prefix) == os.path.realpath(AUTOVENV_VENV_PATH)
+        return
+    
+    elif venv_path and os.path.realpath(venv_path) == os.path.realpath(sys.prefix):
+        log(f'autovenv.enter(): already in requested venv - sys.prefix is same as venv_path (with os.path.realpath()).')
         return
     
     else:
@@ -204,13 +215,6 @@ def enter(*,
             return builder_context
         
         if venv_path:
-            # Expand special fields in <venv_path>.
-            venv_path = venv_path.format(
-                    python_version = platform.python_version(),
-                    freethreads = 't' if _freethreads() else '',
-                    wordsize = _bits(),
-                    )
-            
             builder_context = setup(venv_path, packages, create=create)
             
             # Rerun the current python program in the venv.
