@@ -1210,7 +1210,11 @@ def get_args(state, argv):
                 state.remote_rsync_wsl = args.get_bool()
 
             elif arg == '--run':
-                package = package_alias(next(args))
+                package = next(args)
+                if package.as_text():
+                    package = package_alias(package)
+                else:
+                    package = ''
                 command = next(args)
                 state.run_commands.append((package, command.as_text()))
 
