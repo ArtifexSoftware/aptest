@@ -581,8 +581,8 @@ Details
 Use of Python venv virtual environments
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-If Aptest is not already running inside a Python venv, it automatically creates a
-venv and re-runs itself inside it.
+Aptest automatically creates a venv and re-runs itself inside it
+(disable this by setting ``APTEST=0`` in the environment).
 
 * The `build`_ command builds and installs into the current venv.
 * The `test`_ command tests packages that are installed in the current venv.
@@ -2931,6 +2931,17 @@ completion
 
 Changelog
 ---------
+
+**2026-08-28**
+
+* Added autovenv tests.
+* Added package `pymupdf_office` (with alias `office`) for renamed pymupdfpro package.
+* Added control over whether we enter a venv with environment variable ``APTEST``,
+  see `Use of Python venv virtual environments`_.
+* Fixed `--run`_'s handling of empty package name.
+* Don't show output of ``git diff`` on Windows because can have spurious output from newline diffs.
+* Various improvements to autovenv.
+
 
 **2026-08-26**
 
