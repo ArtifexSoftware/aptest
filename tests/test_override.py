@@ -22,7 +22,10 @@ def test_override_pip():
     # Use aptest to install specific old version of pymupdf from pypi.org, and
     # default pymupdf_layout from pypi.org. This will install into the current
     # venv.
-    pipcl.run(f'{sys.executable} {root}/aptest.py -p pip:==1.26.3 --layout pip: build')
+    pipcl.run(
+            f'{sys.executable} {root}/aptest.py --devel -p pip:==1.26.3 --layout pip: build',
+            env_extra=dict(APTEST_VENV='0'),
+            )
     
     # Check that the installed pymupdf is the specified old version.
     pymupdf_version = pipcl.run(f'python -c "import pymupdf; print(pymupdf.__version__)"', capture=1)
