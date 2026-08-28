@@ -60,7 +60,7 @@ def test_autovenv_named():
     '''
     _log()
     path = f'{g_root}/tests/_test_autovenv.py'
-    venv_path = f'{g_root}/tests/_test_autovenv_venv'
+    venv_path = os.path.normpath(f'{g_root}/tests/_test_autovenv_venv')
     shutil.rmtree(venv_path, ignore_errors=1)
     _write_code(f'''
             import autovenv
