@@ -55,12 +55,17 @@ if sys.argv[1:] == ['completion'] or COMP_LINE:
     autovenv_verbose = 0
     autovenv_packages = None
 
-autovenv.enter(
-        venv_path='venv-aptest-{python_version}-{wordsize}{freethreads}',
-        packages=autovenv_packages,
-        create=autovenv_create,
-        verbose=autovenv_verbose,
-        )
+APTEST_VENV = os.environ.get('APTEST_VENV')
+if APTEST_VENV == '0':
+    # Use current venv (if any).
+    pass
+else:
+    autovenv.enter(
+            venv_path='venv-aptest-{python_version}-{wordsize}{freethreads}',
+            packages=autovenv_packages,
+            create=autovenv_create,
+            verbose=autovenv_verbose,
+            )
 
 # We use `pylint disable=wrong-import-position` because these imports need to
 # be after autovenv.enter().
