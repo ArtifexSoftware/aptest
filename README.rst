@@ -2932,6 +2932,10 @@ completion
 Changelog
 ---------
 
+**2026-08-30**
+
+* Update git workflows to use ``--office``.
+
 **2026-08-28**
 
 * Added autovenv tests.
