@@ -1132,11 +1132,11 @@ def get_args(state, argv):
                     # Build core wheels and sdist.
                     # [pymupdf4llm is pure python so doesn't need to be
                     # mentioned in other --release-* options.]
-                    new_args += f' --sdists -b {b_mupdf}pymupdf,pymupdfpro,pymupdf_layout,pymupdf4llm,pdf4llm'
+                    new_args += f' -b {b_mupdf}pymupdf,pymupdf_office,pymupdf_layout,pymupdf4llm,pdf4llm --sdists'
                 
                 elif arg == '--release-2':
                     # Build macos-intel and linux-arm wheels.
-                    new_args += f' -b {b_mupdf}pymupdf,pymupdfpro,pymupdf_layout,pymupdf4llm,pdf4llm --remote-github-runners macos-intel,linux-arm'
+                    new_args += f' -b {b_mupdf}pymupdf,pymupdf_office,pymupdf_layout,pymupdf4llm,pdf4llm --remote-github-runners macos-intel,linux-arm'
                 
                 elif arg == '--release-3':
                     # Build for win-x32.
