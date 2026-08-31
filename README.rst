@@ -96,6 +96,7 @@ Supported packages
 * ``pymupdf``
 * ``pymupdf4llm``
 * ``pymupdf_layout``
+* ``pymupdf_office``
 * ``pymupdfpro``
 * ``smartoffice``
 * ``smartoffice-marina``
@@ -109,7 +110,7 @@ Notes:
   They are not built into python wheels, instead:
 
   * ``mupdf`` is built into ``pymupdf``.
-  * ``smartoffice``, ``smartoffice-marina`` and ``smartoffice-neo`` are built into ``pymupdfpro``.
+  * ``smartoffice``, ``smartoffice-marina`` and ``smartoffice-neo`` are built into ``pymupdfpro`` or ``pymupdf_office``.
 
 See the `-i`_ option.
 
@@ -227,17 +228,17 @@ generated/installed.]
 Basic build and test
 ^^^^^^^^^^^^^^^^^^^^
 
-Using local checkouts, build packages ``pymupdf``, ``pymupdfpro`` and ``pymupdf_layout``
+Using local checkouts, build packages ``pymupdf``, ``office`` and ``pymupdf_layout``
 (putting wheels into directory ``aptest-wheelhouse/``),
 install (into current venv or ``venv-aptest-<pthonversion>-<wordsize>``)
 and test:
 
-    ``aptest/aptest.py -p PyMuPDF --pro PyMuPDFPro -m mupdf --layout pymupdf_layout build test``
+    ``aptest/aptest.py -p PyMuPDF --office PyMuPDFPro -m mupdf --layout pymupdf_layout build test``
 
-Similarly build, install and test ``pymupdf``, ``pymupdfpro`` and ``pymupdf_layout`` using
+Similarly build, install and test ``pymupdf``, ``pymupdf_office`` and ``pymupdf_layout`` using
 central git repositories:
 
-    ``aptest/aptest.py -p git: --pro git: --layout git: build test``
+    ``aptest/aptest.py -p git: --office git: --layout git: build test``
 
 Build release wheels
 ^^^^^^^^^^^^^^^^^^^^
@@ -256,10 +257,10 @@ and uploading to https://pypi.org (also see `Release procedure`_)::
 Build and test using cibuildwheel
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Build/test ``pymupdf``, ``pymupdfpro`` and ``pymupdf-layout`` using cibuildwheel,
+Build/test ``pymupdf``, ``office`` and ``pymupdf-layout`` using cibuildwheel,
 getting packages from different locations:
 
-    ``aptest/aptest.py -r @github -p pip: --pro PyMuPDFPlus --layout git: cibw``
+    ``aptest/aptest.py -r @github -p pip: --office PyMuPDFPlus --layout git: cibw``
 
 Test current release
 ^^^^^^^^^^^^^^^^^^^^
@@ -278,10 +279,10 @@ Runs specific Github workflow ``PyMuPDFPlus/.github/workflows/test_multiple.yml`
 
     ``aptest/aptest.py -r @github --remote-github-yml test_multiple.yml --pro PyMuPDFPlus --remote-github-yml-inputs --remote-github-runners windows``
 
-Test `<https://pypi.org>`_'s ``pymupdf``, ``pymupdfpro`` and ``pymupdf_layout`` with the test
+Test `<https://pypi.org>`_'s ``pymupdf``, ``pymupdf_office`` and ``pymupdf_layout`` with the test
 suites on central git:
 
-    ``aptest/aptest.py -r @github -p pip: --pro pip: --layout pip: -p git: --pro git: --layout git: build test``
+    ``aptest/aptest.py -r @github -p pip: --office pip: --layout pip: -p git: --pro git: --layout git: build test``
 
 Download wheels from a previous Aptest Github workflow run:
 
@@ -298,13 +299,13 @@ Test Aptest itself:
 
     ``aptest/aptest.py --aptest aptest test``
 
-Build/test ``pymupdfpro`` with alternative ``smartoffice-neo``:
+Build/test ``pymupdf_office`` with alternative ``smartoffice-neo``:
 
-    ``aptest/aptest.py --smartoffice-neo git: --pro git: build test``
+    ``aptest/aptest.py --smartoffice-neo git: --office git: build test``
 
-Build/test ``pymupdfpro`` with alternative ``smartoffice-marina``:
+Build/test ``pymupdf_office`` with alternative ``smartoffice-marina``:
 
-    ``aptest/aptest.py --smartoffice-marina git: --pro git: build test``
+    ``aptest/aptest.py --smartoffice-marina git: --office git: build test``
 
 Run ``pymupdf_layout`` gnn tests with ``mupdf`` version 1.27.2, current ``pymupdf`` in git, and local checkout ``pymupdf_layout/`` of ``pymupdf_layout`` (this assumes that the DocLayNet dataset has been downloaded, see `Using DocLayNet dataset`_):
 
@@ -357,7 +358,7 @@ Instructions for releasing wheels for:
     * ``pymupdf``
     * ``pymupdf4llm``
     * ``pymupdf_layout``
-    * ``pymupdfpro``
+    * ``pymupdf_office``
 
 
 * Get local checkout of latest version of each package, corresponding to what will be released.
@@ -387,7 +388,7 @@ Instructions for releasing wheels for:
 
 * Test local checkouts of all packages on Github machines:
 
-    ``aptest/aptest.py -r @github -p PyMuPDF --pro PyMuPDFPro --layout pymupdf_layout --4llm pymupdf4llm --pdf4llm pymupdf4llm cibw``
+    ``aptest/aptest.py -r @github -p PyMuPDF --office PyMuPDFPro --layout pymupdf_layout --4llm pymupdf4llm --pdf4llm pymupdf4llm cibw``
 
 * In `~/.aptest`_, specify package sources for releases.
 
@@ -456,13 +457,13 @@ Instructions for releasing wheels for:
   * Use the location specified by `--wheelhouse-release`_ in `~/.aptest`_,
     with ``pip install``'s ``--extra-index-url``, for example:
 
-      ``pip install --extra-index-url release-1.27.2 pdf4llm pymupdfpro``
+      ``pip install --extra-index-url release-1.27.2 pdf4llm pymupdf_office``
 
   Or upload to, and install from, a web server:
   
   * ``aptest/aptest.py draft --draft-location julian@ghostscript.com:public_html/wheels-1.27.2/ --wheelhouse release-1.27.2``
   * Enter a venv
-  * ``pip install --extra-index-url https://ghostscript.com/~julian/wheels-1.27.2/simple pdf4llm pymupdfpro``
+  * ``pip install --extra-index-url https://ghostscript.com/~julian/wheels-1.27.2/simple pdf4llm pymupdf_office``
   
   Test the wheels:
   
@@ -552,7 +553,7 @@ Instructions for releasing wheels for:
       
         See: https://github.com/pymupdf/PyMuPDF/discussions/<announcement-id>
         
-        Also released: pymupdf4llm, pymupdf_layout, pdf4llm, pymupdfpro.
+        Also released: pymupdf4llm, pymupdf_layout, pdf4llm, pymupdf_office.
 
 * Possible post-release changes:
 
@@ -959,12 +960,12 @@ local pipcl checkout directory, for example:
 Note that this is very unlikely to be required.
 
 
-Building pymupdfpro libraries for .net
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Building pymupdf_office libraries for .net
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Use Aptest to build pymupdfpro libraries. Example command:
 
-``python aptest\aptest.py --key git@github.com: ARTIFEX_SOFTWARE_SSH_KEY -m "git:-t 1.28.2" -p "git:-t 1.28.2" --pro "git:-t 1.28.2" --run pymupdfpro "python setup.py --rawbuild ..\csharp_devel" build run``
+``python aptest\aptest.py --key git@github.com: ARTIFEX_SOFTWARE_SSH_KEY -m "git:-t 1.28.2" -p "git:-t 1.28.2" --office "git:-t 1.28.2" --run office "python setup.py --rawbuild ..\csharp_devel" build run``
 
 
 Command-line arguments
@@ -1307,15 +1308,15 @@ Options
 
     For example:
 
-    * Build only pymupdfpro::
+    * Build only pymupdf_office::
     
-        -b -,P
+        -b pymupdf_office
 
-        -b -,pymudfpro
+        -b office
 
     * Remove mupdf and layout from list of packages to build::
     
-        -b -m,--layout
+        -b -m,-layout
 
         -b -mupdf,-pymupdf_layout
 
@@ -1376,6 +1377,7 @@ Options
             pymupdf
             pymupdf4llm
             pymupdf_layout
+            pymupdf_office
             pymupdfpro
             smartoffice
             smartoffice-marina
@@ -1450,6 +1452,7 @@ Options
     * `--pymupdf4llm`_ and alias `--4llm`_.
     * `--pymupdf`_ and alias `-p`_ .
     * `--pymupdf_layout`_ and alias `--layout`_.
+    * `--pymupdf_office`_ and alias `--office`_.
     * `--pymupdfpro`_ and alias `--pro`_.
     * `--smartoffice`_ and alias `--sot`_.
     * `--smartoffice-neo`_ and aliases `--sot-neo`_, `--neoso`_.
@@ -1638,11 +1641,11 @@ Options
 
     We allow aliases for package names.
 
-    For example these test only pymupdfpro::
+    For example these test only pymupdf_office::
     
-        -t -,pro
-        -t -,pymudfpro
-        -t pro
+        -t -,pymupdf_office
+        -t -,office
+        -t office
 
     And these remove ``mupdf`` and ``layout`` from the list of packages to test::
     
@@ -2180,6 +2183,19 @@ On devuan this requires a system package install: ``sudo apt install espeak-ng``
     * `--sot-neo`_.
 
 
+.. _--office:
+
+--office <pymupdf_office-location>
+..................................
+    Specify location of package ``pymupdf_office``.
+    
+    Alias for ``-i pymupdf_office <pymupdf_office-location>``.
+    
+    Also see:
+    
+    * `--pymupdf_office`_.
+
+
 .. _--pdf2docx:
 
 --pdf2docx <pdf2docx-location>
@@ -2289,6 +2305,20 @@ On devuan this requires a system package install: ``sudo apt install espeak-ng``
     * `--layout`_.
 
 
+.. _--pymupdf_office:
+
+--pymupdf_office <pymupdf_office-location>
+..........................................
+    Specify location of package ``pymupdf_office``.
+    
+    Alias for ``-i pymupdf_office <pymupdf_office-location>``.
+    
+    Also see:
+    
+    * `-i`_.
+    * `--office`_.
+
+
 .. _--pytest:
 
 --pytest <pytest-flags>
@@ -2373,7 +2403,7 @@ On devuan this requires a system package install: ``sudo apt install espeak-ng``
 
 --release-1
 ...........
-    Build release wheels for ``pymupdf``, ``pymupdfpro``, ``pymupdf4llm`` and
+    Build release wheels for ``pymupdf``, ``pymupdf_office``, ``pymupdf4llm`` and
     ``pymupdf_layout``, for core platforms ``linux-x64``, ``windows-x64`` and ``macos-arm64``.
         
     Also builds sdists.
@@ -2383,7 +2413,7 @@ On devuan this requires a system package install: ``sudo apt install espeak-ng``
 
 --release-2
 ...........
-    Build release wheels for ``pymupdf``, ``pymupdfpro``, ``pymupdf4llm`` and ``pymupdf_layout``, for
+    Build release wheels for ``pymupdf``, ``pymupdf_office``, ``pymupdf4llm`` and ``pymupdf_layout``, for
     platforms ``linux-aarch64`` and ``macos-x64``.
     
     Also see `Release procedure`_.
@@ -2932,6 +2962,13 @@ completion
 Changelog
 ---------
 
+**2026-08-31**
+
+* Fixed `--release-*`_ to use `--office`_.
+* Changed general documentation to talk about ``pymupdf_office`` instead of ``pymupdfpro``.
+* Added documentation for new ``pymupdf_office`` package - see `--pymupdf_office`_, `--office`_.
+
+
 **2026-08-30**
 
 * Update git workflows to use ``--office``.
@@ -2955,7 +2992,7 @@ Changelog
 
 **2026-08-25**
 
-* Added `Building pymupdfpro libraries for .net`_.
+* Added ``Building pymupdfpro libraries for .net``_.
 * Allow `--mupdf`_ without `--pymupdf`_ if `run`_ is specified.
 * Fix windows failure if venv path contains `/`.
 * Improved autovenv.py.
