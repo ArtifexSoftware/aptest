@@ -2962,6 +2962,12 @@ completion
 Changelog
 ---------
 
+**2026-09-01**
+
+* Avoid mixed / and \ in paths.
+* Only show git diff if we are verbose.
+
+
 **2026-08-31**
 
 * Fixed `--release-*`_ to use `--office`_.
