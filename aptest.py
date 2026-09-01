@@ -2199,7 +2199,8 @@ def do_cibw(state):
             do_build_single(state, package)
             failed_packages = list()
             pipcl.run(f'pip list')
-            do_test_single(state, package, failed_packages)
+            if package in state.packages_test:
+                do_test_single(state, package, failed_packages)
             
             # Delete any new prerequisite wheels that are not for <package>, so
             # we behave like cibuildwheel.
