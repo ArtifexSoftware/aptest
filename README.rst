@@ -277,12 +277,12 @@ Running on Github
 ^^^^^^^^^^^^^^^^^^
 Runs specific Github workflow ``PyMuPDFPlus/.github/workflows/test_multiple.yml``, on windows only:
 
-    ``aptest/aptest.py -r @github --remote-github-yml test_multiple.yml --pro PyMuPDFPlus --remote-github-yml-inputs --remote-github-runners windows``
+    ``aptest/aptest.py -r @github --remote-github-yml test_multiple.yml --office PyMuPDFPlus --remote-github-yml-inputs --remote-github-runners windows``
 
 Test `<https://pypi.org>`_'s ``pymupdf``, ``pymupdf_office`` and ``pymupdf_layout`` with the test
 suites on central git:
 
-    ``aptest/aptest.py -r @github -p pip: --office pip: --layout pip: -p git: --pro git: --layout git: build test``
+    ``aptest/aptest.py -r @github -p pip: --office pip: --layout pip: -p git: --office git: --layout git: build test``
 
 Download wheels from a previous Aptest Github workflow run:
 
@@ -384,7 +384,7 @@ Instructions for releasing wheels for:
   * For all issues mentioned as fixed in ``changes.txt``, ensure that
     the corresponding Github issue is labelled as ``Fixed in next release``.
 
-* Ensure that pymupdf4llm's CHANGES.md is up to date.
+* Ensure that ``pymupdf4llm``'s ``CHANGES.md`` is up to date.
 
 * Test local checkouts of all packages on Github machines:
 
@@ -398,15 +398,15 @@ Instructions for releasing wheels for:
   
   To use local checkouts:
 
-      ``-P PyMuPDF --PRO PyMuPDFPlus --LAYOUT pymupdf_layout --4LLM pymupdf4llm --PDF4LLM pymupdf4llm``
+      ``-P PyMuPDF --OFFICE PyMuPDFPlus --LAYOUT pymupdf_layout --4LLM pymupdf4llm --PDF4LLM pymupdf4llm``
   
   Or to use specific sha's for each package:
 
-      ``-P 'git:--sha ...' --PRO 'git:--sha ...' --LAYOUT 'git:--sha ...' --4LLM 'git:--sha ...' --PDF4LLM 'git:--sha ...'``
+      ``-P 'git:--sha ...' --OFFICE 'git:--sha ...' --LAYOUT 'git:--sha ...' --4LLM 'git:--sha ...' --PDF4LLM 'git:--sha ...'``
 
   Or to use the latest remote versions in git:
   
-      ``-P git: --PRO git: --LAYOUT git: --4LLM git: --PDF4LLM git:``
+      ``-P git: --OFFICE git: --LAYOUT git: --4LLM git: --PDF4LLM git:``
   
 * In `~/.aptest`_, specify an empty release wheelhouse directory, for example:
   
@@ -2241,6 +2241,9 @@ On devuan this requires a system package install: ``sudo apt install espeak-ng``
 
 --pro <pymupdfpro-location>
 ...........................
+    **2026-09-01: This is obsolete and only works if deliberately building with
+    an old checkout.**
+    
     Specify location of package ``pymupdfpro``.
     
     Alias for ``-i pymupdfpro <pymupdfpro-location>``.
@@ -2268,6 +2271,9 @@ On devuan this requires a system package install: ``sudo apt install espeak-ng``
 
 --pymupdfpro <pymupdfpro-location>
 ..................................
+    **2026-09-01: This is obsolete and only works if deliberately building with
+    an old checkout.**
+    
     Specify location of package ``pymupdfpro``.
     
     Alias for ``-i pymupdfpro <pymupdfpro-location>``.
@@ -2449,7 +2455,7 @@ On devuan this requires a system package install: ``sudo apt install espeak-ng``
 
 --release-7
 ...........
-    Build release ``pymupdf`` wheel for ``windows-armx64``.
+    Build release ``pymupdf`` wheel for ``windows-arm64``.
     
     Also see `Release procedure`_.
 
@@ -2961,6 +2967,13 @@ completion
 
 Changelog
 ---------
+
+**2026-09-04**
+
+* Fix of `cibw`_ - don't test pure python packages that are excluded by `-t`_.
+* Don't enter venv if ``AUTOVENV_DOIT=0``.
+* Minor updates to docs for legacy `--pro`_ builds.
+
 
 **2026-09-01**
 
