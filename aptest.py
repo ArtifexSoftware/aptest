@@ -3502,14 +3502,15 @@ def _get_local(package, state, test=False):
         pipcl.log(f'{sha=}')
         pipcl.log(f'{branch=}')
         pipcl.log(f'comment:\n{textwrap.indent(comment or "", "    ")}')
-        if pipcl.windows():
-            # `diff` seems to show spurious changes, possible from line endings?
-            pass
-        else:
-            if diff:
-                pipcl.log(f'diff:\n{textwrap.indent(diff or "", "    ")}')
+        if state.verbose:
+            if pipcl.windows():
+                # `diff` seems to show spurious changes, possible from line endings?
+                pass
             else:
-                pipcl.log(f'{diff=}')
+                if diff:
+                    pipcl.log(f'diff:\n{textwrap.indent(diff or "", "    ")}')
+                else:
+                    pipcl.log(f'{diff=}')
     
     if state.check_unchanged:
         Assert(
