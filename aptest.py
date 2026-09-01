@@ -2235,9 +2235,9 @@ def do_cibw(state):
                     CIBW_TEST_COMMAND += f' {state.pytest_options}'
                 if state.pytest_paths:
                     for path in state.pytest_paths:
-                        CIBW_TEST_COMMAND += f' {{project}}/{path}'
+                        CIBW_TEST_COMMAND += ' ' + f'{{project}}/{path}'.replace('/', os.sep)
                 else:
-                    CIBW_TEST_COMMAND += f' {{project}}/tests'
+                    CIBW_TEST_COMMAND += ' ' + f'{{project}}/tests'.replace('/', os.sep)
                 if state.cibw_ignore_test_failures:
                     CIBW_TEST_COMMAND += ' || true'
                 state.env_extra['CIBW_TEST_COMMAND'] = CIBW_TEST_COMMAND
