@@ -24,7 +24,7 @@ def test_override_pip():
     # venv.
     pipcl.run(
             f'{sys.executable} {root}/aptest.py --devel -p pip:==1.26.3 --layout pip: build',
-            env_extra=dict(APTEST_VENV='0'),
+            env_extra=dict(APTEST_VENV='0', APTEST_DOT_APTEST='0'),
             )
     
     # Check that the installed pymupdf is the specified old version.
@@ -48,7 +48,10 @@ def test_override_pip_cibw():
     print(f'## test_override_pip_cibw():')
     text = pipcl.run(
             f'{sys.executable} {root}/aptest.py -V=0 -p pip:==1.27.1 --layout git: cibw',
-            env_extra=dict(CIBW_TEST_COMMAND='python -c "import pymupdf; print(f\'test_override_pip_cibw: {pymupdf.__version__=}\', flush=1); assert pymupdf.__version__==\'1.27.1\'"'),
+            env_extra=dict(
+                CIBW_TEST_COMMAND='python -c "import pymupdf; print(f\'test_override_pip_cibw: {pymupdf.__version__=}\', flush=1); assert pymupdf.__version__==\'1.27.1\'"',
+                APTEST_DOT_APTEST='0',
+                ),
             #capture=1,
             prefix='aptest cibw: ',
             )
@@ -83,7 +86,10 @@ def test_override_slow():
     
     # Run aptest on our local pymupdf and pymupdf_layout from pypi.org. This
     # will install into the current venv.
-    pipcl.run(f'{sys.executable} {root}/aptest.py -p {pymupdf_checkout} --layout pip: build test -t -')
+    pipcl.run(
+            f'{sys.executable} {root}/aptest.py -p {pymupdf_checkout} --layout pip: build test -t -',
+            env_extra=dict(APTEST_DOT_APTEST='0'),
+            )
     
     # Check that the installed pymupdf has our overwritten version number.
     pymupdf_version = pipcl.run(f'python -c "import pymupdf; print(pymupdf.__version__)"', capture=1)
@@ -113,7 +119,10 @@ def test_same_version():
     text += '\ntest_same_version_marker = "special marker"\n'
     pipcl.fs_write(f'{pymupdf_checkout}/src/__init__.py', text)
     
-    pipcl.run(f'{sys.executable} {root}/aptest.py -p {pymupdf_checkout} --layout pip: build')
+    pipcl.run(
+            f'{sys.executable} {root}/aptest.py -p {pymupdf_checkout} --layout pip: build',
+            env_extra=dict(APTEST_DOT_APTEST='0'),
+            )
     
     pymupdf_version = _get_pymupdf_version()
     assert pymupdf_version == '1.26.3', f'Incorrect {pymupdf_version=}'
@@ -122,7 +131,10 @@ def test_same_version():
     
     # Using Aptest to Install directly from pypi.org should overwrite the
     # installed pymupdf.
-    pipcl.run(f'{sys.executable} {root}/aptest.py -p pip:==1.26.3 build')
+    pipcl.run(
+            f'{sys.executable} {root}/aptest.py -p pip:==1.26.3 build',
+            env_extra=dict(APTEST_DOT_APTEST='0'),
+            )
     pymupdf_version = _get_pymupdf_version()
     assert pymupdf_version == '1.26.3', f'Incorrect {pymupdf_version=}'
     
