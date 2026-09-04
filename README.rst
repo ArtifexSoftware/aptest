@@ -2384,9 +2384,15 @@ On devuan this requires a system package install: ``sudo apt install espeak-ng``
 --pytest-wrap gdb | valgrind | helgrind | pyinstrument
 ......................................................
     Makes `test`_ command run `pytest <https://docs.pytest.org>`_ under specified tool.
+    
+    With ``gdb``:
+    
+    * Extra args can be specified with `--pytest-wrap-gdb-args`_.
 
-    If ``pyinstrument``, we run pytest under
-    `pyinstrument <https://pyinstrument.readthedocs.io/en/latest/guide.html>`_.
+    With ``pyinstrument``:
+    
+    * We run pytest under
+      `pyinstrument <https://pyinstrument.readthedocs.io/en/latest/guide.html>`_.
     
     * We generate these files:
     
@@ -2396,6 +2402,14 @@ On devuan this requires a system package install: ``sudo apt install espeak-ng``
     
     * The ``.pyisession`` file can be used to generate other reports.
     * With `-r`_, remote ``.pyisession`` files will be synced back to local wheelhouse.
+
+
+.. _--pytest-wrap-gdb-args:
+
+--pytest-wrap-gdb-args <args>
+.............................
+    Add extra gdb args with ``--pytest-wrap gdb``; see `--pytest-wrap`_.
+
 
 .. _--python:
 
@@ -2528,11 +2542,17 @@ On devuan this requires a system package install: ``sudo apt install espeak-ng``
 
 --remote-github-yml <yml>
 .........................
-    With `-r @github`_, run the specified ``.yml`` file (leafname only) instead
+    With `-r @github`_, run the specified ``.yml`` Github workflow (leafname only) instead
     of running ``aptest.py``.
-    If no packages are specified, runs on Github's
-    ``ArtifexSoftware/aptest`` repository; otherwise exactly one package
-    must be specified.
+    
+    * If ``<yml>`` is of the form ``<package>:<yml2>``,
+      we run the ``<yml2>`` workflow in ``<package>``'s Github repository.
+    
+    * Otherwise if no packages are specified,
+      we run the ``<yml>`` workflow in Github's ``ArtifexSoftware/aptest`` repository.
+    
+    * Otherwise exactly one package must be specified,
+      and we run the ``<yml>`` workflow in its Github repository.
 
 
 .. _--remote-github-yml-inputs:
@@ -2968,6 +2988,12 @@ completion
 Changelog
 ---------
 
+* Improved `--remote-github-yml`_ to allow specification of package.
+* Tests that run ``aptest.py`` now ignore `~/.aptest`_.
+* Added `--pytest-wrap-gdb-args`_.
+* Fix handling of wheel names with common prefix.
+
+
 **2026-09-04**
 
 * Fix of `cibw`_ - don't test pure python packages that are excluded by `-t`_.
@@ -2977,7 +3003,7 @@ Changelog
 
 **2026-09-01**
 
-* Avoid mixed / and \ in paths.
+* Avoid mixed ``/`` and ``\`` in paths.
 * Only show git diff if we are verbose.
 
 
@@ -2995,7 +3021,7 @@ Changelog
 **2026-08-28**
 
 * Added autovenv tests.
-* Added package `pymupdf_office` (with alias `office`) for renamed pymupdfpro package.
+* Added package ``pymupdf_office`` (with alias ``office``) for renamed pymupdfpro package.
 * Added control over whether we enter a venv with environment variable ``APTEST``,
   see `Use of Python venv virtual environments`_.
 * Fixed `--run`_'s handling of empty package name.
