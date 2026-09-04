@@ -1495,15 +1495,21 @@ def do_remote_github(state, args):
         if state.remote_github_yml:
             # Run specific .yml directly.
             pipcl.log(f'Running .yml instead of aptest.py: {state.remote_github_yml}')
-            if not state.packages:
-                # Run on aptest.
-                info = name_info(state, 'aptest')
-            elif len(state.packages) == 1:
-                for package_name, (package_location, args_pos) in state.packages.items():
-                    pass
-                info = name_info(state, package_name)
+            if c := state.remote_github_yml.find(':') >= 0:
+                package, yml = state.remote_github_yml[:c], state.remote_github_yml[c+1:]
+                package = package_alias(package)
+                info = name_info(state, package)
             else:
-                Assert(0, 'Running yml directly requires exactly zero or one package, but {len(state.packages)=}.')
+                yml = state.remote_github_yml
+                if not state.packages:
+                    # Run on aptest.
+                    info = name_info(state, 'aptest')
+                elif len(state.packages) == 1:
+                    for package_name, (package_location, args_pos) in state.packages.items():
+                        pass
+                    info = name_info(state, package_name)
+                else:
+                    Assert(0, f'Running yml directly requires exactly zero or one package, but {len(state.packages)=}.')
             data = dict()
             data['ref'] = branch
             if state.remote_github_yml_inputs:
@@ -1518,7 +1524,7 @@ def do_remote_github(state, args):
             workflow_id = github.gh_run_workflow(
                     token_github_rest,
                     github_api_url(info),
-                    state.remote_github_yml,
+                    yml,
                     data,
                     doit=state.remote_do,
                     )
