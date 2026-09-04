@@ -1,10 +1,14 @@
 '''
-Automatic creation/use of a venv.
+Support for rerunning the current python program in a venv.
+
+This allows a python program to make use of packages from pypi.org without the
+user having to manually create a venv, or install tools such as pipx or uv.
 
 Example usage:
 
     import autovenv
     autovenv.enter(packages=['pytest', 'numpy'])
+    
     import numpy
     ...
 '''
@@ -57,18 +61,18 @@ def enter(*,
             1: If <venv_path> already exists then assume it is up to date:
                * Don't call `venv.create()` to update the venv.
                * Don't call <setupfn>.
-               * Don't install <packages>.
-               Behaviour is undefined if <venv_path> is not valid venv.
-            2: Always create/update the venv.
-               Behaviour may be undefined if an existing venv is not a valid
+               * Don't install <packages> in the venv.
+               Behaviour is undefined if <venv_path> exists but is not a valid
                venv.
+            2: Always create/update the venv.
+               Behaviour may be undefined if an existing venv is invalid.
             3: Delete the venv if it exists, then create a new venv.
         create_kwargs:
             None or kwargs to pass to `venv.create()` when we create/update the
             venv - i.e. `venv.create(venv_path, **create_kwargs)`.  If None we
             use `dict(symlinks=(os.name!='nt'), with_pip=True)`.
         packages:
-            List of packages to install before we enter the venv.
+            List of packages to install in the venv before we rerun in it.
         setupfn:
             Optional function called after we create/update the venv and before
             we rerun in the venv. Passed a `types.SimpleNamespace` as returned by
@@ -95,13 +99,13 @@ def enter(*,
             print(text, flush=1)
     
     if AUTOVENV_DOIT := os.environ.get('AUTOVENV_DOIT') == '0':
-        print(f'autovenv.enter() doing nothing because {AUTOVENV_DOIT=}.')
+        log(f'autovenv.enter() doing nothing because {AUTOVENV_DOIT=}.')
         return
     
-    # AUTOVENV_N and AUTOVENV_N_CURRENT are used to allow predictable behaviour
-    # in the rather esoteric circumstance where we are called multiple times
-    # by the same program, but also if we are called by both parent and child
-    # processes.
+    # AUTOVENV_N and AUTOVENV_N_CURRENT are used to ensure correct behaviour
+    # if a a parent process and a child processes both use autovenv. They also
+    # ensure predictable behaviour if we are called multiple times by the same
+    # program.
     #
     AUTOVENV_N = int(os.environ.get('AUTOVENV_N', '0'))
     AUTOVENV_N_CURRENT = int(os.environ.get('AUTOVENV_N_CURRENT', '0'))
@@ -228,7 +232,7 @@ def enter(*,
             return builder_context
         
         if use_existing_venv and sys.prefix != sys.base_prefix:
-            # Just install packages into current venv.
+            # Just install packages into the current venv.
             log(f'autovenv.enter(): Using existing venv because {use_existing_venv=}. {sys.prefix=}.')
             if packages:
                 if isinstance(packages, str):
