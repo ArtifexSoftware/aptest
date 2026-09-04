@@ -95,6 +95,7 @@ Supported packages
 * ``pipcl``
 * ``pymupdf``
 * ``pymupdf4llm``
+* ``pymupdf_core``
 * ``pymupdf_layout``
 * ``pymupdf_office``
 * ``pymupdfpro``
@@ -109,7 +110,7 @@ Notes:
 
   They are not built into python wheels, instead:
 
-  * ``mupdf`` is built into ``pymupdf``.
+  * ``mupdf`` is built into ``pymupdf_core``.
   * ``smartoffice``, ``smartoffice-marina`` and ``smartoffice-neo`` are built into ``pymupdfpro`` or ``pymupdf_office``.
 
 See the `-i`_ option.
@@ -123,6 +124,39 @@ Package locations
 * https://pypi.org.
 
 See the `-i`_ option.
+
+
+Usage with v2 packages
+----------------------
+
+As of 2026-09, Pymupdf 2.x defaults to requiring the same version of layout and 4llm.
+
+* This means that instead of specifying package ``pymupdf``,
+  it is usually necessary to specify locations for packages ``pymupdf-core``, ``pymupdf4llm`` and ``pymupdf_layout``.
+
+  For example:
+
+  ``aptest/aptest.py -p PyMuPDF --layout pymupdf_layout --4llm pymupdf4llm build test``
+
+Otherwise things can go wrong in various ways, for example:
+
+* ``aptest/aptest.py -p PyMuPDF build test``
+  
+  * This will build and install ``pymupdf-core``, the main Pymupdf code.
+  * But it will not build or install layout or 4llm.
+  * So tests could fail depending on what versions (if any) of layout and 4llm are already installed in the venv.
+
+This situation is not ideal
+- the use of multiple core packages makes routine development more complicated than it needs to be.
+
+* To make things slightly easier,
+  one can preset locations of packages in `~/.aptest`_ using upper-case names,
+  and activate them with special location ``@``:
+
+  * In `~/.aptest`_, add a line ``-P PyMuPDF --LAYOUT pymupdf_layout --4LLM pymupdf4llm``.
+  * Then run ``aptest/aptest.py -p @ --layout @ --4llm @ ...``
+
+* Other ways of simplifying usage will hopefully be added in future.
 
 
 Building packages
@@ -351,6 +385,10 @@ Install wheels from the web server with one of:
 
 Release procedure
 -----------------
+
+Also see:
+
+    * `--release-*`_.
 
 Instructions for releasing wheels for:
 
@@ -1079,7 +1117,7 @@ cibw
     
     If ``CIBW_BUILD`` is ``all``:
     
-    * We set CIBW_BUILD to build and test with all supported Python versions.
+    * We set ``CIBW_BUILD`` to build and test with all supported Python versions.
 
     If ``CIBW_ARCHS`` is unset:
     
@@ -1103,6 +1141,25 @@ cibw
         `cibuildwheel <https://cibuildwheel.pypa.io>`_.
       * `cibw`_ is generally used to build releases,
         for which version numbers should match anyway.
+    
+    Handling mutually-dependent packages:
+    
+    * `cibuildwheel <https://cibuildwheel.pypa.io>`_ only tests individual packages,
+      and is unable to easily build and test packages that are mutually
+      dependent.
+    
+    * So we make two iterations through the list of packages:
+    
+      1. Run ``cibuildwheel`` on each package with ``CIBW_TEST_COMMAND`` unset.
+      
+         This populates our wheelhouse with each package's wheel, but does not
+         attempt to run tests.
+      
+      2. Run ``cibuildwheel`` on each package with ``CIBW_TEST_COMMAND`` set.
+      
+         When running tests,
+         ``cibuildwheel`` will find required packages in the wheelhouse,
+         even for mutually-dependent packages.
 
     Also see:
 
@@ -1373,9 +1430,11 @@ Options
             mupdf
             parse_bench
             pdf2docx
+            pdf4llm
             pdf_feature_inspector
             pymupdf
             pymupdf4llm
+            pymupdf_core
             pymupdf_layout
             pymupdf_office
             pymupdfpro
@@ -1388,6 +1447,7 @@ Options
     ``package-location`` should be one of:
         
         ``"git:[-b|--branch <branch>] [--depth <depth>] [-s|--sha <40-char-sha>] [-t|--tag <tag>] [<remote>]"``
+        
             Clone/update from git remote into local checkout
             ``aptest-git-<package-name>``, from which we build/install from source.
             
@@ -1402,8 +1462,13 @@ Options
             * ``<remote>``: hard-coded for each package (typically a Github repository).
             * ``<depth>``: 1.
     
-        ``pip:``
+        ``pip:[<suffix>]``
             Install from https://pypi.org using pip.
+            
+            For example:
+            
+            * ``pip:`` will get the latest available version of the package.
+            * ``pip:==1.26.3`` will get version 1.26.3 of the package.
         
         ``pip:*.tar.gz``
             Install from local sdist using pip.
@@ -1411,13 +1476,11 @@ Options
         ``pip:*.whl``
             Install from local wheel using pip.
 
-        ``pip:<suffix>``
-            Install ``<package-name><suffix>`` from https://pypi.org using pip.
-            For example ``pip:==1.26.3`` will install version 1.26.3 of
-            the package.
-
         ``<directory>``
             A local directory, typically a git checkout, from which we build/install from source.
+        
+        ``@``
+            Use location specified by an earlier upper case package name/alias; see `upper-case-package names`_.
 
     **Separate locations for building and testing**
     
@@ -1425,20 +1488,21 @@ Options
     for building, and the second location used for testing. This allows
     packages on https://pypi.org to be tested, for example:
 
-        ``aptest.py -i pymupdf pip: -i pymupdf PyMuPDF build test``
-            Test current pymupdf release with testsuite in ``PyMuPDF/tests``.
+        ``aptest.py -i pymupdf_core pip: -i pymupdf_core PyMuPDF build test``
+            Test current pymupdf-core release with testsuite in ``PyMuPDF/tests``.
 
-        ``aptest.py -i pymupdf pip: -i pymupdf git: build test``
-            Test current pymupdf release with testsuite in current git.
+        ``aptest.py -i pymupdf_core pip: -i pymupdf_core git: build test``
+            Test current pymupdf-core release with testsuite in current PyMuPDF git.
 
 .. _upper-case-package names:
 
     **Using upper-case package names**
     
-    If a package is specified using an upper-case name, the package location
-    is stored in a separate list that is only used if `--use-release-args`_
-    is specified. This is typically used in `~/.aptest`_ to simplify making
-    releases.
+    If a package is specified using an upper-case name,
+    the package location is stored in a separate list.
+    
+    * This separate list is used by `--release-*`_.
+    * It is also used if a package location is ``@`` (see above).
     
     **Aliases**
     
@@ -1448,9 +1512,11 @@ Options
     * `--mupdf`_ and alias `-m`_.
     * `--parse_bench`_ and alias `--pb`_.
     * `--pdf2docx`_.
+    * `--pdf4llm`_.
     * `--pdf_feature_inspector`_ and alias `--pfi`_.
     * `--pymupdf4llm`_ and alias `--4llm`_.
-    * `--pymupdf`_ and alias `-p`_ .
+    * `--pymupdf`_ and alias `--pall`_.
+    * `--pymupdf_core`_ and alias `-p`_.
     * `--pymupdf_layout`_ and alias `--layout`_.
     * `--pymupdf_office`_ and alias `--office`_.
     * `--pymupdfpro`_ and alias `--pro`_.
@@ -1523,11 +1589,11 @@ Options
     * `-i`_.
     * `--parse_bench`_.
 
-.. _-p:
+.. _--pall:
 
--p <pymupdf-location>
-.....................
-    Specify location of package ``pymupdf``.
+--pall <pymupdf-location>
+.........................
+    Specify location of empty package ``pymupdf``.
     
     Alias for ``-i pymupdf <location>``.
     
@@ -1724,15 +1790,14 @@ Options
 --atexit-speak (bool)
 .....................
 
-If true:
+    If true:
 
-* We install python package ``pyttsx3``.
-* On exit we use ``pyttsx3`` to speak *"aptest failed"* or *"aptest complete"*.
-* If this fails we write ``\a`` to generate an audible beep.
+    * We install python package ``pyttsx3``.
+    * On exit we use ``pyttsx3`` to speak *"aptest failed"* or *"aptest complete"*.
+    * If this fails we write ``\a`` to generate an audible beep.
 
-On devuan this requires a system package install: ``sudo apt install espeak-ng``
-
-(``sudo apt install espeak`` gives runtime error ``SetVoiceByName failed with unknown return code -1 for voice: gmw/en``.)
+    On devuan this requires a system package install: ``sudo apt install espeak-ng``
+    (note that ``sudo apt install espeak`` gives runtime error ``SetVoiceByName failed with unknown return code -1 for voice: gmw/en``.)
 
 
 .. _--build-pip-no-clean:
@@ -2065,7 +2130,7 @@ On devuan this requires a system package install: ``sudo apt install espeak-ng``
 
     * Use file ``thirdparty-so-key`` for accessing git remotes starting with ``git@gitlab.artifex.com:``:
 
-      ``--key git@gitlab.artifex.com: thirdparty-so-key``.
+      ``--key git@gitlab.artifex.com: thirdparty-so-key``
 
     * Also specify an environment variable for a Github repository secret,
       that allows access to gitlab when running in a Github action.
@@ -2144,7 +2209,7 @@ On devuan this requires a system package install: ``sudo apt install espeak-ng``
 
 --mupdf <mupdf-location>
 ........................
-    Specify location of package ``mupdf``.
+    Specify location of pseudo package ``mupdf``.
     
     Alias for ``-i mupdf <mupdf-location>``.
     
@@ -2159,7 +2224,7 @@ On devuan this requires a system package install: ``sudo apt install espeak-ng``
 --marina <smartoffice-marina-location>
 ......................................
 
-    Specify location of package ``smartoffice-marina``.
+    Specify location of pseudo package ``smartoffice-marina``.
     
     Alias for ``-i smartoffice-marina <smartoffice-marina-location>``.
     
@@ -2173,7 +2238,7 @@ On devuan this requires a system package install: ``sudo apt install espeak-ng``
 --neoso <smartoffice-neo-location>
 ....................................
 
-    Specify location of package ``smartoffice-neo``.
+    Specify location of pseudo package ``smartoffice-neo``.
     
     Alias for ``-i smartoffice-neo <smartoffice-neo-location>``.
     
@@ -2196,6 +2261,20 @@ On devuan this requires a system package install: ``sudo apt install espeak-ng``
     * `--pymupdf_office`_.
 
 
+.. _-p:
+
+-p <pymupdf_core-location>
+...............................
+    Specify location of package ``pymupdf_core``.
+    
+    Alias for ``-i pymupd_core <location>``.
+    
+    Also see:
+    
+    * `-i`_.
+    * `--pymupdf_core`_.
+
+
 .. _--pdf2docx:
 
 --pdf2docx <pdf2docx-location>
@@ -2203,6 +2282,22 @@ On devuan this requires a system package install: ``sudo apt install espeak-ng``
     Specify location of package ``pdf2docx``.
     
     Alias for ``-i pdf2docx <pdf2docx-location>``.
+    
+    Also see:
+    
+    * `-i`_.
+
+
+.. _--pdf4llm:
+
+--pdf4llm <pdf4llm-location>
+..............................
+    Specify location of package ``pdf4llm``.
+    
+    For local checkout this should be the root of a ``pymupdf4llm`` checkout;
+    Aptest already knows to use the subdirectory `pdf4llm/`.
+    
+    Alias for ``-i pdf4llm <pdf4llm-location>``.
     
     Also see:
     
@@ -2257,14 +2352,14 @@ On devuan this requires a system package install: ``sudo apt install espeak-ng``
 
 --pymupdf <pymupdf-location>
 ............................
-    Specify location of package ``pymupdf``.
+    Specify location of empty package ``pymupdf``.
     
     Alias for ``-i pymupdf <pymupdf-location>``.
     
     Also see:
     
     * `-i`_.
-    * `-p`_.
+    * `--pall`_.
 
 
 .. _--pymupdfpro:
@@ -2295,6 +2390,19 @@ On devuan this requires a system package install: ``sudo apt install espeak-ng``
     
     * `-i`_.
     * `--4llm`_.
+
+.. _--pymupdf_core:
+
+--pymupdf_core <pymupdf_core-location>
+......................................
+    Specify location of package ``pymupdf_core``.
+    
+    Alias for ``-i pymupdf_core <pymupdf_core-location>``.
+    
+    Also see:
+    
+    * `-i`_.
+    * `-p`_.
 
 
 .. _--pymupdf_layout:
@@ -2384,9 +2492,15 @@ On devuan this requires a system package install: ``sudo apt install espeak-ng``
 --pytest-wrap gdb | valgrind | helgrind | pyinstrument
 ......................................................
     Makes `test`_ command run `pytest <https://docs.pytest.org>`_ under specified tool.
+    
+    With ``gdb``:
+    
+    * Extra args can be specified with `--pytest-wrap-gdb-args`_.
 
-    If ``pyinstrument``, we run pytest under
-    `pyinstrument <https://pyinstrument.readthedocs.io/en/latest/guide.html>`_.
+    With ``pyinstrument``:
+    
+    * We run pytest under
+      `pyinstrument <https://pyinstrument.readthedocs.io/en/latest/guide.html>`_.
     
     * We generate these files:
     
@@ -2397,6 +2511,14 @@ On devuan this requires a system package install: ``sudo apt install espeak-ng``
     * The ``.pyisession`` file can be used to generate other reports.
     * With `-r`_, remote ``.pyisession`` files will be synced back to local wheelhouse.
 
+
+.. _--pytest-wrap-gdb-args:
+
+--pytest-wrap-gdb-args <args>
+.............................
+    Add extra gdb args with ``--pytest-wrap gdb``; see `--pytest-wrap`_.
+
+
 .. _--python:
 
 --python <python>
@@ -2405,57 +2527,85 @@ On devuan this requires a system package install: ``sudo apt install espeak-ng``
     python command.
 
 
-.. _--release-*:
+--release-*
+...........
+
+Builds release wheels etc on Github.
+
+General notes:
+
+* Use upper-case package locations
+  (see `-i`_'s `upper-case-package names`_ section),
+  typically specified in `~/.aptest`_.
+
+* Require that `--wheelhouse-release`_ has been specified,
+  and use its value for the wheelhouse.
+
+  * The new value must be different from the default wheelhouse,
+    so that we can protect against non-release builds deleting a partially complete
+    release procedure.
+
+  * We never remove the contents of this wheelhouse,
+    because multiple invocations of Aptest are required to build the release wheels. So
+    `--clean-wheelhouse`_ is ignored.
+
+* We fail if ``--MUPDF`` is specified - release builds must use ``pymupdf_core``'s hard-coded default mupdf.
+
+Also see:
+
+* `Release procedure`_.
+* `--wheelhouse`_.
+* `--wheelhouse-release`_.
 
 --release-1
 ...........
-    Build release wheels for ``pymupdf``, ``pymupdf_office``, ``pymupdf4llm`` and
-    ``pymupdf_layout``, for core platforms ``linux-x64``, ``windows-x64`` and ``macos-arm64``.
+    Build release wheels for
+    ``pymupdf``, ``pymupdf_core``, ``pymupdf_office``, ``pymupdf4llm``, ``pdf4llm`` and ``pymupdf_layout``,
+    for core platforms ``linux-x64``, ``windows-x64`` and ``macos-arm64``.
         
     Also builds sdists.
-    
-    Also see `Release procedure`_.
 
 
 --release-2
 ...........
-    Build release wheels for ``pymupdf``, ``pymupdf_office``, ``pymupdf4llm`` and ``pymupdf_layout``, for
-    platforms ``linux-aarch64`` and ``macos-x64``.
+    Build release wheels for
+    ``pymupdf``, ``pymupdf_core``, ``pymupdf_office``, ``pymupdf4llm``, ``pdf4llm`` and ``pymupdf_layout``,
+    for platforms ``linux-aarch64`` and ``macos-x64``.
     
     Also see `Release procedure`_.
 
 
 --release-3
 ...........
-    Build release ``pymupdf`` wheel for platform ``windows-x32``.
+    Build release ``pymupdf_core`` wheel for platform ``windows-x32``.
     
     Also see `Release procedure`_.
 
 
 --release-4
 ...........
-    Build release ``pymupdf`` wheel for platform ``linux-x64-musl``.
+    Build release ``pymupdf_core`` wheel for platform ``linux-x64-musl``.
     
     Also see `Release procedure`_.
 
 
 --release-5
 ...........
-    Build release ``pymupdf`` wheel for platform ``pyodide``.
+    Build release ``pymupdf_core`` wheel for platform ``pyodide``.
     
     Also see `Release procedure`_.
 
 
 --release-6
 ...........
-    Build release ``pymupdf`` wheel for platform ``linux-x64`` and free threading python-3.14.
+    Build release ``pymupdf_core`` wheel for platform ``linux-x64`` and free threading python-3.14.
     
     Also see `Release procedure`_.
 
 
 --release-7
 ...........
-    Build release ``pymupdf`` wheel for ``windows-arm64``.
+    Build release ``pymupdf_core`` wheel for ``windows-arm64``.
     
     Also see `Release procedure`_.
 
@@ -2528,11 +2678,17 @@ On devuan this requires a system package install: ``sudo apt install espeak-ng``
 
 --remote-github-yml <yml>
 .........................
-    With `-r @github`_, run the specified ``.yml`` file (leafname only) instead
+    With `-r @github`_, run the specified ``.yml`` Github workflow (leafname only) instead
     of running ``aptest.py``.
-    If no packages are specified, runs on Github's
-    ``ArtifexSoftware/aptest`` repository; otherwise exactly one package
-    must be specified.
+    
+    * If ``<yml>`` is of the form ``<package>:<yml2>``,
+      we run the ``<yml2>`` workflow in ``<package>``'s Github repository.
+    
+    * Otherwise if no packages are specified,
+      we run the ``<yml>`` workflow in Github's ``ArtifexSoftware/aptest`` repository.
+    
+    * Otherwise exactly one package must be specified,
+      and we run the ``<yml>`` workflow in its Github repository.
 
 
 .. _--remote-github-yml-inputs:
@@ -2542,7 +2698,7 @@ On devuan this requires a system package install: ``sudo apt install espeak-ng``
     Specify inputs used with `--remote-github-yml`_. ``<inputs>`` should be a
     comma-separated list of ``<name>=<value>`` pairs.
     
-    For example if the .yml file has::
+    For example if the ``.yml`` file has::
     
         on:
           workflow_dispatch:
@@ -2874,31 +3030,6 @@ Copy ``<path>`` (a file or directory) to remote.
     0.5.
 
 
-.. _--use-release-args:
-
---use-release-args (bool)
-.........................
-    * Use upper-case package locations
-      (see `-i`_'s `upper-case-package names`_ section),
-      typically specified in `~/.aptest`_.
-
-    * Require that `--wheelhouse-release`_ has been specified,
-      and use its value for the wheelhouse.
-      
-      * The new value must be different from the default wheelhouse,
-        so that we can protect against non-release builds deleting a partially complete
-        release procedure.
-      * We never remove the contents of this wheelhouse,
-        because multiple invocations of Aptest are required to build the release wheels. So
-        `--clean-wheelhouse`_ is ignored.
-      * We fail if ``--MUPDF`` is specified - release builds must use ``pymupdf``'s built-in default mupdf.
-    
-    Also see:
-    
-    * `-i`_.
-    * `--wheelhouse`_.
-    * `--wheelhouse-release`_.
-
 .. _--venv-name:
 
 --venv-name <venv_name>
@@ -2909,12 +3040,26 @@ Copy ``<path>`` (a file or directory) to remote.
     for example ``venv-aptest-3.14.2-64``.
 
 
+.. _--v1:
+
+--v1 (bool)
+...........
+    Change internal package definitions so we build/test pre-2.0 packages.
+    
+    * Better to be the first command-line arg.
+    * Removes package ``pymupdf_core``.
+    * Removes package ``pymupdf``'s ``pure`` tag.
+    * `--release-*`_ is not supported.
+
+
 .. _--wheelhouse:
 
 --wheelhouse <wheelhouse_dir>
 .............................
     Directory in which to place wheels, instead of
     default ``aptest-wheelhouse``.
+    
+    If ``@`` we use the wheelhouse specified by `--wheelhouse-release`_.
     
     Also see:
     
@@ -2968,6 +3113,36 @@ completion
 Changelog
 ---------
 
+**Next release**
+
+* Updated to use new version 2.0 package names and dependencies etc.
+  
+  See new README section `Usage with v2 packages`_.
+
+* Changes to usage:
+
+  * Added `--pytest-wrap-gdb-args`_.
+  * Added support for ``--<package> @``; this uses location specified by ``<PACKAGE> <location>`` (e.g. in `~/.aptest`_). See `upper-case-package names`_.
+  * Added `--v1`_ to allow limited support for pre-2.0 packages.
+  * Improved `--remote-github-yml`_ to allow specification of package.
+  * Improved `--wheelhouse`_ to convert ``@`` to the wheelhouse specified by `--wheelhouse-release`_.
+  * Main Pymupdf package is now called ``pymupdf_core``; see `--pymupdf_core`_, `-p`_.
+  * Package alias `-p`_ now means the ``pymupdf_core`` package, not the (now empty) ``pymupdf`` package.
+  * Package ``pymupdf`` is now an empty package that depends on ``pymupdf_core`` and ``pymupdf4llm``; see `--pymupdf`_ and `--pall`_.
+  * Removed ``--use-release-args`` (this was always for internal use only).
+
+* Other:
+
+  * Added generic support for packages that are in subdirectories of a Git repository; used for existing ``pdf4llm`` and new ``pymupdf_core``.
+  * Added support for new package ``pymupdf_core`` - see `--pymupdf_core`_, `-p`_.
+  * Fixed `cibw`_'s handling of pure packages with dependencies.
+  * Fixed `cibw`_ with mutually-dependent packages such as ``pymupdf-2.0`` and ``pymupdf4llm-2.0``; we now run ``cibuildwheel`` twice, the first time without running tests.
+  * Fixed handling of circular dependencies when building packages.
+  * Fixed handling of wheel names with common prefix.
+  * Improved error diagnostics when getting git information.
+  * Improved internal tests - those that run ``aptest.py`` now ignore `~/.aptest`_.
+
+
 **2026-09-04**
 
 * Fix of `cibw`_ - don't test pure python packages that are excluded by `-t`_.
@@ -2977,7 +3152,7 @@ Changelog
 
 **2026-09-01**
 
-* Avoid mixed / and \ in paths.
+* Avoid mixed ``/`` and ``\`` in paths.
 * Only show git diff if we are verbose.
 
 
@@ -2995,7 +3170,7 @@ Changelog
 **2026-08-28**
 
 * Added autovenv tests.
-* Added package `pymupdf_office` (with alias `office`) for renamed pymupdfpro package.
+* Added package ``pymupdf_office`` (with alias ``office``) for renamed pymupdfpro package.
 * Added control over whether we enter a venv with environment variable ``APTEST``,
   see `Use of Python venv virtual environments`_.
 * Fixed `--run`_'s handling of empty package name.
@@ -3011,7 +3186,7 @@ Changelog
 
 **2026-08-25**
 
-* Added ``Building pymupdfpro libraries for .net``_.
+* Added `Building pymupdf_office libraries for .net`_.
 * Allow `--mupdf`_ without `--pymupdf`_ if `run`_ is specified.
 * Fix windows failure if venv path contains `/`.
 * Improved autovenv.py.
@@ -3127,7 +3302,7 @@ Changelog
   * Recreate pypi-style database before uploading with `draft`_.
   * Recreate pypi-style database before exiting.
 * Minor improvements to output from autoenv on startup.
-* Modify .github/workflows/test_multiple.yml to match pymupdfpro now defaulting to marina.
+* Modify ``.github/workflows/test_multiple.yml`` to match pymupdfpro now defaulting to marina.
 * Show current directory on startup.
 * With `upload`_, also upload pyodide wheels to pypi, which now accepts them.
 
@@ -3392,7 +3567,7 @@ Changelog
 
 * With `cibw`_ command, support `--pytest-path`_ (was previously ignored).
 * Fix `--python`_.
-* Generate junit .xml file when running pytest.
+* Generate junit ``.xml`` file when running pytest.
 * Fix `--clean-setup`_ with pymupdf's mupdf.
 * Avoid duplicate ``aptest-out-*`` files when re-running ourselves in venv or on remote machine.
 * Add support for ``pip:...`` to ``--swig``.
@@ -3444,7 +3619,7 @@ Changelog
 * Show git sha and diff of Aptest itself on startup if verbose.
 * `cibw`_: don't attempt to build/test layout on macos-intel-python3.14
   because onnxruntime not available.
-* Fixed .github/workflows/test_multiple.yml failures.
+* Fixed ``.github/workflows/test_multiple.yml`` failures.
 * Improved error diagnostics.
 * Improved clean options.
 
