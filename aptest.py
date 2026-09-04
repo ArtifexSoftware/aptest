@@ -64,6 +64,7 @@ else:
             venv_path='venv-aptest-{python_version}-{wordsize}{freethreads}',
             packages=autovenv_packages,
             create=autovenv_create,
+            use_existing_venv=0,
             verbose=autovenv_verbose,
             )
 
