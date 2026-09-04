@@ -86,6 +86,10 @@ def enter(*,
         verbose:
             .
     '''
+    if AUTOVENV_DOIT := os.environ.get('AUTOVENV_DOIT') == '0':
+        print(f'autovenv.enter() doing nothing because {AUTOVENV_DOIT=}.')
+        return
+    
     AUTOVENV_N = int(os.environ.get('AUTOVENV_N', '0'))
     AUTOVENV_N_CURRENT = int(os.environ.get('AUTOVENV_N_CURRENT', '0'))
     AUTOVENV_VENV_PATH = os.environ.get('AUTOVENV_VENV_PATH', None)
