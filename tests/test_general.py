@@ -18,10 +18,11 @@ def test_dirname():
     print(f'{root_relative=}')
     print(f'{os.getcwd()=}')
     leaf = os.path.basename(root)   # Typically 'aptest'.
-    pipcl.run(f'cd {root}/.. && {sys.executable} {leaf}/aptest.py -V=0 --aptest {leaf}')
-    pipcl.run(f'cd {root}/.. && {sys.executable} {leaf}/aptest.py -V=0 --aptest {leaf}/')
-    pipcl.run(f'cd {root} && {sys.executable} ./aptest.py -V=0 --aptest ../{leaf}')
-    pipcl.run(f'cd {root} && {sys.executable} ./aptest.py -V=0 --aptest ../{leaf}/')
+    env_extra = dict(APTEST_DOT_APTEST='0')
+    pipcl.run(f'cd {root}/.. && {sys.executable} {leaf}/aptest.py -V=0 --aptest {leaf}', env_extra=env_extra)
+    pipcl.run(f'cd {root}/.. && {sys.executable} {leaf}/aptest.py -V=0 --aptest {leaf}/', env_extra=env_extra)
+    pipcl.run(f'cd {root} && {sys.executable} ./aptest.py -V=0 --aptest ../{leaf}', env_extra=env_extra)
+    pipcl.run(f'cd {root} && {sys.executable} ./aptest.py -V=0 --aptest ../{leaf}/', env_extra=env_extra)
 
 
 def test_log_timestamps():
@@ -45,6 +46,10 @@ def test_log_timestamps():
             ''')
     path = f'{root_relative}/tests/_test_log_timestamps.py'
     pipcl.fs_write(path, code)
-    text = pipcl.run(f'{sys.executable} {path}', env_extra=dict(PYTHONPATH=root_relative), capture=1)
+    text = pipcl.run(
+            f'{sys.executable} {path}',
+            env_extra=dict(APTEST_DOT_APTEST='0', PYTHONPATH=root_relative),
+            capture=1,
+            )
     print(f'test_log_timestamps():')
     print(textwrap.indent(text, '    '))
