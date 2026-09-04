@@ -45,6 +45,7 @@ def enter(*,
         create_kwargs=None,
         packages=None,
         setupfn=None,
+        use_existing_venv=True,
         venv_path=None,
         verbose=False,
         ):
@@ -75,6 +76,8 @@ def enter(*,
             
             For example can be used instead of <packages> if more control is
             required.
+        use_existing_venv:
+            If true (the default), we do nothing if we are already in a venv.
         venv_path:
             Path of venv directory. If None (the default) we use a new and
             unique venv directory which is deleted afterwards.
@@ -85,21 +88,27 @@ def enter(*,
                 wordsize: e.g. 64 or 32.
         verbose:
             .
+    If environment has AUTOVENV_DOIT=0, we do nothing.
     '''
+    def log(text):
+        if verbose:
+            print(text, flush=1)
+    
     if AUTOVENV_DOIT := os.environ.get('AUTOVENV_DOIT') == '0':
         print(f'autovenv.enter() doing nothing because {AUTOVENV_DOIT=}.')
         return
     
+    # AUTOVENV_N and AUTOVENV_N_CURRENT are used to allow predictable behaviour
+    # in the rather esoteric circumstance where we are called multiple times
+    # by the same program, but also if we are called by both parent and child
+    # processes.
+    #
     AUTOVENV_N = int(os.environ.get('AUTOVENV_N', '0'))
     AUTOVENV_N_CURRENT = int(os.environ.get('AUTOVENV_N_CURRENT', '0'))
     AUTOVENV_VENV_PATH = os.environ.get('AUTOVENV_VENV_PATH', None)
     
     AUTOVENV_N += 1
     os.environ['AUTOVENV_N'] = str(AUTOVENV_N)
-    
-    def log(text):
-        if verbose:
-            print(text, flush=1)
     
     if venv_path:
         venv_path = venv_path.format(
@@ -131,7 +140,7 @@ def enter(*,
         return
     
     else:
-        assert AUTOVENV_N == AUTOVENV_N_CURRENT + 1
+        assert AUTOVENV_N == AUTOVENV_N_CURRENT + 1, f'{AUTOVENV_N=} {AUTOVENV_N_CURRENT=}'
         
         # We are not in an autovenv venv so create/update it and rerun
         # ourselves in it.
@@ -218,7 +227,22 @@ def enter(*,
             os.environ['AUTOVENV_N'] = _g_initial_AUTOVENV_N
             return builder_context
         
-        if venv_path:
+        if use_existing_venv and sys.prefix != sys.base_prefix:
+            # Just install packages into current venv.
+            log(f'autovenv.enter(): Using existing venv because {use_existing_venv=}. {sys.prefix=}.')
+            if packages:
+                if isinstance(packages, str):
+                    packages = [packages]
+                log(f'autovenv.enter(): Installing packages into current venv: {packages}.')
+                subprocess.run(
+                        [sys.executable, '-m', 'pip', 'install', '--quiet', '--upgrade']
+                            + packages,
+                        check=1,
+                        )
+            AUTOVENV_N_CURRENT = AUTOVENV_N
+            os.environ['AUTOVENV_N_CURRENT'] = str(AUTOVENV_N_CURRENT)
+                
+        elif venv_path:
             builder_context = setup(venv_path, packages, create=create)
             
             # Rerun the current python program in the venv.

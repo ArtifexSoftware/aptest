@@ -2528,11 +2528,17 @@ On devuan this requires a system package install: ``sudo apt install espeak-ng``
 
 --remote-github-yml <yml>
 .........................
-    With `-r @github`_, run the specified ``.yml`` file (leafname only) instead
+    With `-r @github`_, run the specified ``.yml`` Github workflow (leafname only) instead
     of running ``aptest.py``.
-    If no packages are specified, runs on Github's
-    ``ArtifexSoftware/aptest`` repository; otherwise exactly one package
-    must be specified.
+    
+    * If ``<yml>`` is of the form ``<package>:<yml2>``,
+      we run the ``<yml2>`` workflow in ``<package>``'s Github repository.
+    
+    * Otherwise if no packages are specified,
+      we run the ``<yml>`` workflow in Github's ``ArtifexSoftware/aptest`` repository.
+    
+    * Otherwise exactly one package must be specified,
+      and we run the ``<yml>`` workflow in its Github repository.
 
 
 .. _--remote-github-yml-inputs:
@@ -2967,6 +2973,9 @@ completion
 
 Changelog
 ---------
+
+* Improved `--remote-github-yml`_ to allow specification of package.
+
 
 **2026-09-04**
 

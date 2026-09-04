@@ -39,7 +39,7 @@ def test_autovenv_default():
             import autovenv
             import os
             import sys
-            autovenv.enter(packages='requests')
+            autovenv.enter(packages='requests', use_existing_venv=0)
             PATH = os.environ.get("PATH")
             VIRTUAL_ENV = os.environ.get("VIRTUAL_ENV")
             print(f'test_autovenv_default: {{PATH=}}')
@@ -65,7 +65,7 @@ def test_autovenv_named():
     _write_code(f'''
             import autovenv
             import sys
-            autovenv.enter(venv_path={venv_path!r}, packages='requests')
+            autovenv.enter(venv_path={venv_path!r}, packages='requests', use_existing_venv=0)
             venv_path = sys.prefix
             import requests
             print(f'test_autovenv_named(): {{sys.prefix=}}')
@@ -102,7 +102,7 @@ def test_autovenv_named_setupfn():
                         ],
                         check=1,
                         )
-            autovenv.enter(venv_path={venv_path!r}, setupfn=venv_setup)
+            autovenv.enter(venv_path={venv_path!r}, setupfn=venv_setup, use_existing_venv=0)
             venv_path = sys.prefix
             import requests
             print(f'test_autovenv_named_setupfn(): {{sys.prefix=}}')
@@ -152,7 +152,7 @@ def test_autovenv_existing():
     _write_code(f'''
             import sys
             import autovenv
-            autovenv.enter(venv_path={venv_path!r}, packages='requests')
+            autovenv.enter(venv_path={venv_path!r}, packages='requests', use_existing_venv=0)
             import requests
             print(f'test_autovenv_existing(): {{sys.prefix=}}')
             print(f'test_autovenv_existing(): {{requests.__file__=}}')
@@ -185,12 +185,12 @@ def test_autovenv_chain():
             import autovenv
             AUTOVENV_VENV_PATH = os.environ.get('AUTOVENV_VENV_PATH')
             print(f'test_autovenv_chain(): start: {{AUTOVENV_VENV_PATH=}}')
-            autovenv.enter(venv_path={venv_path1!r}, packages='requests')
+            autovenv.enter(venv_path={venv_path1!r}, packages='requests', use_existing_venv=0)
             import requests
             print(f'test_autovenv_chain(): {{requests.__file__=}}')
-            autovenv.enter(venv_path={venv_path2!r}, packages=['requests', 'swig'])
+            autovenv.enter(venv_path={venv_path2!r}, packages=['requests', 'swig'], use_existing_venv=0)
             import swig
-            autovenv.enter(venv_path={venv_path3!r}, packages=['requests', 'swig'])
+            autovenv.enter(venv_path={venv_path3!r}, packages=['requests', 'swig'], use_existing_venv=0)
             ''',
             path,
             )
@@ -212,10 +212,10 @@ def test_autovenv_chain_unnamed():
             import autovenv
             AUTOVENV_VENV_PATH = os.environ.get('AUTOVENV_VENV_PATH')
             print(f'test_autovenv_chain_unnamed(): start: {{AUTOVENV_VENV_PATH=}}')
-            autovenv.enter(packages='requests')
+            autovenv.enter(packages='requests', use_existing_venv=0)
             import requests
             print(f'test_autovenv_chain_unnamed():{{requests.__file__=}}')
-            autovenv.enter(packages=['requests', 'swig'])
+            autovenv.enter(packages=['requests', 'swig'], use_existing_venv=0)
             import swig
             print(f'test_autovenv_chain_unnamed():{{swig.__file__=}}')
             ''',
@@ -242,7 +242,7 @@ def test_autovenv_nested():
             import sys
             import autovenv
             print(f'### path1')
-            autovenv.enter(venv_path={venv_path1!r})
+            autovenv.enter(venv_path={venv_path1!r}, use_existing_venv=0)
             subprocess.run([sys.executable, {path2!r}], check=1)
             ''',
             path1,
