@@ -735,6 +735,7 @@ def make_state():
     state.pytest_timeout = None
     state.pytest_timeout_method = None
     state.pytest_wrap = None
+    state.pytest_wrap_gdb_args = None
     state.python = None
     state.remote_dir = 'artifex-remote'
     state.remote_arg = None
@@ -1087,6 +1088,10 @@ def get_args(state, argv):
                         state.pytest_wrap in ('gdb', 'valgrind', 'helgrind', 'pyinstrument'),
                         f'{state.pytest_wrap=} should be one of: gdb valgrind helgrind pyinstrument',
                         )
+            
+            elif arg == '--pytest-wrap-gdb-args':
+                state.pytest_wrap_gdb_args = next(args).as_str()
+                pipcl.log(f'### {state.pytest_wrap_gdb_args=}')
 
             elif arg == '--python':
                 pos = args.pos
@@ -2896,7 +2901,8 @@ def do_test_single(state, package, failed_packages):
             elif state.pytest_wrap:
                 command = f'python -m {command}'
                 if state.pytest_wrap == 'gdb':
-                    command = f'gdb -ex "set print inferior-events off" --args {command}'
+                    pipcl.log(f'### {state.pytest_wrap_gdb_args=}')
+                    command = f'gdb -ex "set print inferior-events off" {state.pytest_wrap_gdb_args or ""} --args {command}'
                 elif state.pytest_wrap == 'valgrind':
                     state.env_extra['PYMUPDF_RUNNING_ON_VALGRIND'] = '1'
                     state.env_extra['PYTHONMALLOC'] = 'malloc'
