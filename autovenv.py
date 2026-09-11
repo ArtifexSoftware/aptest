@@ -20,6 +20,7 @@ import subprocess
 import sys
 import sysconfig
 import tempfile
+import time
 import venv
 
 
@@ -42,7 +43,7 @@ def _bits():
 # initial value; it can be defined if our parent process itself used autovenv.
 #
 _g_initial_AUTOVENV_N = os.environ.get('AUTOVENV_N', '0')
-
+_g_t0 = time.time()
 
 def enter(*,
         create=2,
@@ -67,6 +68,13 @@ def enter(*,
             2: Always create/update the venv.
                Behaviour may be undefined if an existing venv is invalid.
             3: Delete the venv if it exists, then create a new venv.
+            
+            Example timings:
+                Create new venv: 3.5s.
+                Update existing venv: 2.0s.
+                Install single package lxml: 1.5s
+                Install single package lxml when already up to date: 1.1s.
+                
         create_kwargs:
             None or kwargs to pass to `venv.create()` when we create/update the
             venv - i.e. `venv.create(venv_path, **create_kwargs)`.  If None we
@@ -96,7 +104,8 @@ def enter(*,
     '''
     def log(text):
         if verbose:
-            print(text, flush=1)
+            t = time.time() - _g_t0
+            print(f'[+{t:.1f}] {text}', flush=1)
     
     if AUTOVENV_DOIT := os.environ.get('AUTOVENV_DOIT') == '0':
         log(f'autovenv.enter() doing nothing because {AUTOVENV_DOIT=}.')
