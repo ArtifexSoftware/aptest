@@ -1790,7 +1790,7 @@ def do_build_single(state, package):
         return ret_wheel
     pip_wheel_no_clean = ' --no-clean' if state.build_pip_no_clean else ''
 
-    new_files = pipcl.NewFiles(f'{state.wheelhouse}/{package}*.whl')
+    new_files = pipcl.NewFiles(f'{state.wheelhouse}/{package}-*.whl')
 
     if location.startswith('pip:'):
         Assert(package != 'mupdf', f'Not a package on pypi.org: {package}')
