@@ -89,7 +89,10 @@ def enter(*,
             For example can be used instead of <packages> if more control is
             required.
         use_existing_venv:
-            If true (the default), we do nothing if we are already in a venv.
+            If true (the default), we use any venv that we are already in even
+            if <venv_path> is set to a different venv. In this case we just
+            install packages and return.
+            
         venv_path:
             Path of venv directory. If None (the default) we use a new and
             unique venv directory which is deleted afterwards.
