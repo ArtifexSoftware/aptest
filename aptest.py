@@ -2104,7 +2104,16 @@ def do_cibw(state):
         state.env_extra['CIBW_PYODIDE_VERSION'] = state.cibw_pyodide_version
         state.env_extra['CIBW_ENABLE'] = 'pyodide-prerelease'
 
-    for package in state.packages_build:    # pylint: disable=too-many-nested-blocks
+    # 2026-09-16: We build all wheels first without testing:
+    #
+    # * Run cibw on each packge with CIBW_TEST_COMMAND unset.
+    # * Run cibw on each packge with CIBW_TEST_COMMAND set.
+    #
+    # This is required so that we cope with mutually-dependent wheels such as
+    # pymupdf4llm and pymupdf_layout.
+    #
+    for do_test in 0, 1:
+      for package in state.packages_build:    # pylint: disable=too-many-nested-blocks
         pipcl.log(f'{package=}')
         directory = _get_local(package, state)
         
@@ -2231,7 +2240,7 @@ def do_cibw(state):
             _modify_build_env(state, package)
             
             # Tell cibuildwheel how to test <package>.
-            if package in state.packages_test:
+            if do_test and package in state.packages_test:
                 CIBW_TEST_COMMAND = f'pip install --upgrade pytest'
                 if state.pytest_timeout:
                     CIBW_TEST_COMMAND += f' && pip install --upgrade pytest-timeout'
@@ -2348,7 +2357,7 @@ def do_cibw(state):
                         f'cd {directory} && cibuildwheel{cibw_pyodide_args}'
                             f' --output-dir {os.path.abspath(state.wheelhouse)}',
                         env_extra=env_extra,
-                        prefix=f'{package}: ',
+                        prefix=f'{do_test=} {package}: ',
                         )
             finally:
                 try:
