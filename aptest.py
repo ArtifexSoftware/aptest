@@ -1992,7 +1992,278 @@ def read_pytest_junit(path):
             return xmltodict.parse(f)
     except Exception as e:
         pipcl.log(f'Failed to read pytest junit file {path=}: {e}')
-    
+
+
+def do_cibw_single(state, package, CIBW_BUILD, cibw_pyodide_args, do_test=1):
+    pipcl.log(f'{package=}')
+    directory = _get_local(package, state)
+
+    if not directory:
+        # location is pip.
+        pipcl.log(f'Unable to process with cibuildwheel because location is pip: {package=} and no second location')
+        return
+
+        # Experimental code to try to get cibw to test an existing wheel.
+        #directory = _get_local(package, state, test=1)
+        #if not directory:
+        #    pipcl.log(f'Unable to process with cibuildwheel because location is pip: {package=} and now second location')
+        #    continue
+        #
+        #location, _args_pos = state.packages[package]
+        #assert location.startswith('pip:')
+        #if location.endswith(('.whl', '.tar.gz')):
+        #    pipcl.log(f'Unable to process with cibuildwheel because location is pip: .whl/.tar.gz. {package=} {location=}')
+        #    continue
+        #name = f'{package}{location[4:]}'
+        #state.env_extra['CIBW_BUILD_FRONTEND'] = f'pip wheel {name}'
+
+    if package == 'pymupdf4llm' and not _4llm_new_layout(directory):
+        # setup.py is in subdirectory pymupdf4llm/.
+        directory += '/pymupdf4llm'
+    elif package == 'pdf4llm':
+        directory += '/pdf4llm'
+
+    pipcl.log(f'{package} _get_local() => {directory=}')
+    directory_abs = os.path.abspath(directory)
+
+    if package == 'mupdf':
+        if platform.system() == 'Linux' and not state.cibw_pyodide:
+            # Need /host/ prefix so accessible from within manylinux docker.
+            state.env_extra['PYMUPDF_SETUP_MUPDF_BUILD'] = f'/host{directory_abs}'
+        else:
+            state.env_extra['PYMUPDF_SETUP_MUPDF_BUILD'] = directory_abs
+        # fixme: be able to set to '' for system install?
+        return
+
+    if package.startswith('smartoffice'):
+        if platform.system() == 'Linux' and not state.cibw_pyodide:
+            # Need /host/ prefix so accessible from within manylinux docker.
+            state.env_extra['PYMUPDFPRO_SETUP_SOT'] = f'/host{directory_abs}'
+
+            # This doesn't work:
+            #
+            # 2026-03-20: attempt to workaround failure on github when building pro:
+            # test_4158(): PYMUPDFPRO_SETUP_SOT='/host/home/runner/work/aptest/aptest/aptest-git-smartoffice'
+            # ../../../project/tests/test_simple.py:348:test_4158(): Running: env_extra=None cd /host/home/runner/work/aptest/aptest/aptest-git-smartoffice && git show -s --format=%cI HEAD
+            # fatal: detected dubious ownership in repository at '/host/home/runner/work/aptest/aptest/aptest-git-smartoffice'
+            # To add an exception for this directory, call:
+            # git config --global --add safe.directory /host/home/runner/work/aptest/aptest/aptest-git-smartoffice
+            #
+            #
+            # Maybe we need to run it inside docker? Or in the test itself?
+            #
+            pipcl.run(f'git config --global --add safe.directory {directory_abs}', check=0)
+        else:
+            state.env_extra['PYMUPDFPRO_SETUP_SOT'] = directory_abs
+
+        if package == 'smartoffice-marina':
+            state.env_extra['PYMUPDFPRO_SOT_MARINA'] = '1'
+
+        if 0 and platform.system() == 'Linux' and package == 'smartoffice-marina':
+            # Building with cmake in a manylinux docker can go wrong if we've previously built marina
+            # outside of manylinux, because the CMakeCache.txt will contains the non-manylinux paths, leading to:
+            #
+            #   CMake Error: The current CMakeCache.txt directory
+            #   /host/home/.../epage/cmake-build/lib/CMakeCache.txt
+            #   is different than the directory
+            #   /home/.../epage/cmake-build/lib where CMakeCache.txt was
+            #   created. This may result in binaries being created in the
+            #   wrong place. If you are not sure, reedit the CMakeCache.txt
+            #
+            pipcl.fs_remove(f'{directory_abs}/epage/cmake-build/lib/CMakeCache.txt')
+
+        return
+
+    if state.sdists and platform.system() == 'Linux':
+        pipcl.log(f'Calling build_sdist() {package=} {directory=}.')
+        build_sdist(state, package, directory)
+
+    python_version_tuple = (
+            int(platform.python_version_tuple()[0]),
+            int(platform.python_version_tuple()[1]),
+            )
+
+    # As of 2026-03-23, no onnxruntime wheel is available for macos-intel
+    # python-3.14. For python<=3.13, wheels for older releases are
+    # available.
+    if (1
+            and python_version_tuple == (3, 14)
+            and package in ('pdf4llm', 'pymupdf4llm')
+            and platform.system() == 'Darwin'
+            and platform.machine() == 'x86_64'
+            ):
+        pipcl.log(f'Not doing build/test on macos/intel/python-3.14 because onnxruntime not available: {package=}')
+
+    elif package in ('pdf2docx', 'pdf4llm', 'pymupdf4llm', 'pipcl'):
+        # Build/test directly because pure python.
+        pipcl.log(f'Not using cibuildwheel for {package=} because cibuildwheel does not support pure python wheels.')
+        new_files = pipcl.NewFiles(f'{state.wheelhouse}/*.whl')
+        do_build_single(state, package)
+        failed_packages = list()
+        pipcl.run(f'pip list')
+        if package in state.packages_test:
+            do_test_single(state, package, failed_packages)
+
+        # Delete any new prerequisite wheels that are not for <package>, so
+        # we behave like cibuildwheel.
+        new_wheels = new_files.get()
+        for wheel_path in new_wheels:
+            assert wheel_path.endswith('.whl')
+            if not os.path.basename(wheel_path).startswith(f'{package}-'):
+                pipcl.log(f'Deleting {wheel_path=}.')
+                pipcl.fs_remove(wheel_path)
+
+        if failed_packages:
+            raise Exception(f'Test failed for {package=}.')
+
+    else:
+        # Run cibuildwheeel.
+        _modify_build_env(state, package)
+
+        # Tell cibuildwheel how to test <package>.
+        if do_test and package in state.packages_test:
+            CIBW_TEST_COMMAND = f'pip install --upgrade pytest'
+            if state.pytest_timeout:
+                CIBW_TEST_COMMAND += f' && pip install --upgrade pytest-timeout'
+            CIBW_TEST_COMMAND += f' && pip list'
+            CIBW_TEST_COMMAND += f' && pytest'
+            if state.pytest_timeout:
+                CIBW_TEST_COMMAND += f' --timeout {state.pytest_timeout}'
+            if state.pytest_timeout_method:
+                CIBW_TEST_COMMAND += f' --timeout-method {state.pytest_timeout_method}'
+            if state.pytest_junit_xml:
+                path_junit_xml = f'{os.path.abspath(state.wheelhouse)}/{package}-pytest-junit.xml'
+                CIBW_TEST_COMMAND += f' --junit-xml={path_junit_xml}'
+            if state.pytest_options:
+                CIBW_TEST_COMMAND += f' {state.pytest_options}'
+            if state.pytest_paths:
+                for path in state.pytest_paths:
+                    CIBW_TEST_COMMAND += ' ' + f'{{project}}/{path}'.replace('/', os.sep)
+            else:
+                CIBW_TEST_COMMAND += ' ' + f'{{project}}/tests'.replace('/', os.sep)
+            if state.cibw_ignore_test_failures:
+                CIBW_TEST_COMMAND += ' || true'
+            state.env_extra['CIBW_TEST_COMMAND'] = CIBW_TEST_COMMAND
+
+        else:
+            pipcl.log(f'Not testing because not in state.packages_test: {package=}')
+        # fixme: prefer to just run pytest directly. Needs
+        # test/conftest.py to always `pip install` packages
+        # required for testing.
+        #state.env_extra['CIBW_TEST_COMMAND'] = f'pytest {{project}}/tests'
+
+        # Use a copy of state.env_extra because we modify it if
+        # using manylinux docker.
+        #
+        env_extra = state.env_extra.copy()
+
+        CIBW_ENVIRONMENT_PASS_LINUX = list(env_extra.keys())
+
+        if platform.system() == 'Linux':
+            prefix = '/host'
+            # Update key files to be within /host in manylinux
+            # docker. Otherwise for example tests that access remote git
+            # repositories will not use the appropriate key.
+            #
+            # Also add key environment variables to CIBW_ENVIRONMENT_PASS_LINUX.
+            #
+            new_keys = list()
+            for url_prefix, path, env, pos in state.keys:
+                if path or env:
+                    if path:
+                        path = f'{prefix}{os.path.abspath(path)}'
+                    if env:
+                        CIBW_ENVIRONMENT_PASS_LINUX.append(env)
+                    new_keys.append((url_prefix, path, env, pos))
+            state.keys += new_keys
+            state.keys.sort(reverse=True)
+
+        else:
+            prefix = ''
+
+        if platform.system() == 'Linux' and package in ('pymupdfpro', 'pymupdf_office'):
+            # Build will run inside a CentOS-7 container; we
+            # need to install fontconfig-devel so `#include
+            # <fontconfig/fonctconfig.h>` works. And for SO build
+            # we need ssh to allow its git submodule commands.
+            #
+            CIBW_BEFORE_BUILD_LINUX = (
+                    'echo "aptest: installing fontconfig-devel and ssh"'
+                    ' && yum -y install fontconfig-devel'
+                    ' && yum groupinstall -y fonts'
+                    ' && yum install -y openssh-clients'
+                    )
+            # We also need to declare that PYMUPDFPRO_SETUP_SOT is
+            # a safe git directory if set, because ownership of
+            # PYMUPDFPRO_SETUP_SOT in /host/... in docker may have
+            # different owner from current user.
+            PYMUPDFPRO_SETUP_SOT = state.env_extra.get('PYMUPDFPRO_SETUP_SOT')
+            if PYMUPDFPRO_SETUP_SOT:
+                CIBW_BEFORE_BUILD_LINUX += f' && git config --global --add safe.directory {PYMUPDFPRO_SETUP_SOT}'
+
+            env_extra['CIBW_BEFORE_BUILD_LINUX'] = CIBW_BEFORE_BUILD_LINUX
+
+        PIP_EXTRA_INDEX_URL = f'file://{prefix}{os.path.abspath(state.wheelhouse)}/simple'.replace('\\', '/')
+
+        # Ensure that when cibuildwheel runs pip to
+        # install prerequisite packages, it also looks in
+        # state.wheelhouse. PIP_EXTRA_INDEX_URL is equivalent to
+        # pip's `--extra-index-url`.
+        env_extra['PIP_EXTRA_INDEX_URL'] = PIP_EXTRA_INDEX_URL
+
+        if (1
+                and package == 'pymupdf_layout'
+                and platform.system() == 'Darwin'
+                and platform.machine() == 'x86_64'
+                ):
+            # 2026-02-08: onnxruntime is not available on macos-intel-python3.14.
+            #
+            pipcl.log(f'Excluding cp314* because onnxruntime not available on macos-intel/python-3.14.')
+            env_extra['CIBW_BUILD'] = CIBW_BUILD.replace(' cp314*', '')
+        else:
+            env_extra['CIBW_BUILD'] = CIBW_BUILD
+
+        # Pass all the environment variables we have set in
+        # state.env_extra, to Linux docker. Note that this will
+        # miss any settings in the original environment.
+        CIBW_ENVIRONMENT_PASS_LINUX.append('PYMUPDFPRO_SETUP_SOT_KEY')  # This can be set in os.environ.
+        # Some tests look at GITHUB_ACTIONS e.g. if known to fail on Github.
+        CIBW_ENVIRONMENT_PASS_LINUX.append('GITHUB_ACTIONS')
+        CIBW_ENVIRONMENT_PASS_LINUX.append('PIP_EXTRA_INDEX_URL')
+        CIBW_ENVIRONMENT_PASS_LINUX.sort()
+        CIBW_ENVIRONMENT_PASS_LINUX = ' '.join(CIBW_ENVIRONMENT_PASS_LINUX)
+        env_extra['CIBW_ENVIRONMENT_PASS_LINUX'] = CIBW_ENVIRONMENT_PASS_LINUX
+        try:
+            pipcl.run(
+                    f'cd {directory} && cibuildwheel{cibw_pyodide_args}'
+                        f' --output-dir {os.path.abspath(state.wheelhouse)}',
+                    env_extra=env_extra,
+                    prefix=f'{do_test=} {package}: ',
+                    )
+        finally:
+            try:
+                if state.pytest_junit_xml:
+                    state.results['packages'][package]['junit'] = read_pytest_junit(path_junit_xml)
+            except Exception:
+                pass
+
+    pipcl.log(f'Build/test succeeded for {package=}.')
+
+    pipcl.run(f'ls -ld {state.wheelhouse}/*')
+    pipcl.run(f'piprepo build {state.wheelhouse}')
+
+    if 1:
+        pipcl.log(f'Contents of: {state.wheelhouse=} are:')
+        for dirpath, dirnames, filenames in os.walk(state.wheelhouse):
+            for filename in filenames:
+                path = os.path.join(dirpath, filename)
+                st = os.stat(path)
+                pipcl.log(f'{st=}: {path=}')
+            for dirname in dirnames:
+                path_dir = os.path.join(dirpath, dirname)
+                st = os.stat(path_dir)
+                pipcl.log(f'{st=}: {path_dir=}')
+
 
 def do_cibw(state):
     '''
@@ -2124,276 +2395,9 @@ def do_cibw(state):
     # step, and instead use the wheel in the wheelhouse. But this doesn't
     # appear to be possible.)
     #
-    for do_test in 0, 1:    # pylint: disable=too-many-nested-blocks
+    for do_test in 0, 1:
         for package in state.packages_build:
-            pipcl.log(f'{package=}')
-            directory = _get_local(package, state)
-
-            if not directory:
-                # location is pip.
-                pipcl.log(f'Unable to process with cibuildwheel because location is pip: {package=} and no second location')
-                continue
-
-                # Experimental code to try to get cibw to test an existing wheel.
-                #directory = _get_local(package, state, test=1)
-                #if not directory:
-                #    pipcl.log(f'Unable to process with cibuildwheel because location is pip: {package=} and now second location')
-                #    continue
-                #
-                #location, _args_pos = state.packages[package]
-                #assert location.startswith('pip:')
-                #if location.endswith(('.whl', '.tar.gz')):
-                #    pipcl.log(f'Unable to process with cibuildwheel because location is pip: .whl/.tar.gz. {package=} {location=}')
-                #    continue
-                #name = f'{package}{location[4:]}'
-                #state.env_extra['CIBW_BUILD_FRONTEND'] = f'pip wheel {name}'
-
-            if package == 'pymupdf4llm' and not _4llm_new_layout(directory):
-                # setup.py is in subdirectory pymupdf4llm/.
-                directory += '/pymupdf4llm'
-            elif package == 'pdf4llm':
-                directory += '/pdf4llm'
-
-            pipcl.log(f'{package} _get_local() => {directory=}')
-            directory_abs = os.path.abspath(directory)
-
-            if package == 'mupdf':
-                if platform.system() == 'Linux' and not state.cibw_pyodide:
-                    # Need /host/ prefix so accessible from within manylinux docker.
-                    state.env_extra['PYMUPDF_SETUP_MUPDF_BUILD'] = f'/host{directory_abs}'
-                else:
-                    state.env_extra['PYMUPDF_SETUP_MUPDF_BUILD'] = directory_abs
-                # fixme: be able to set to '' for system install?
-                continue
-
-            if package.startswith('smartoffice'):
-                if platform.system() == 'Linux' and not state.cibw_pyodide:
-                    # Need /host/ prefix so accessible from within manylinux docker.
-                    state.env_extra['PYMUPDFPRO_SETUP_SOT'] = f'/host{directory_abs}'
-
-                    # This doesn't work:
-                    #
-                    # 2026-03-20: attempt to workaround failure on github when building pro:
-                    # test_4158(): PYMUPDFPRO_SETUP_SOT='/host/home/runner/work/aptest/aptest/aptest-git-smartoffice'
-                    # ../../../project/tests/test_simple.py:348:test_4158(): Running: env_extra=None cd /host/home/runner/work/aptest/aptest/aptest-git-smartoffice && git show -s --format=%cI HEAD
-                    # fatal: detected dubious ownership in repository at '/host/home/runner/work/aptest/aptest/aptest-git-smartoffice'
-                    # To add an exception for this directory, call:
-                    # git config --global --add safe.directory /host/home/runner/work/aptest/aptest/aptest-git-smartoffice
-                    #
-                    #
-                    # Maybe we need to run it inside docker? Or in the test itself?
-                    #
-                    pipcl.run(f'git config --global --add safe.directory {directory_abs}', check=0)
-                else:
-                    state.env_extra['PYMUPDFPRO_SETUP_SOT'] = directory_abs
-
-                if package == 'smartoffice-marina':
-                    state.env_extra['PYMUPDFPRO_SOT_MARINA'] = '1'
-
-                if 0 and platform.system() == 'Linux' and package == 'smartoffice-marina':
-                    # Building with cmake in a manylinux docker can go wrong if we've previously built marina
-                    # outside of manylinux, because the CMakeCache.txt will contains the non-manylinux paths, leading to:
-                    #
-                    #   CMake Error: The current CMakeCache.txt directory
-                    #   /host/home/.../epage/cmake-build/lib/CMakeCache.txt
-                    #   is different than the directory
-                    #   /home/.../epage/cmake-build/lib where CMakeCache.txt was
-                    #   created. This may result in binaries being created in the
-                    #   wrong place. If you are not sure, reedit the CMakeCache.txt
-                    #
-                    pipcl.fs_remove(f'{directory_abs}/epage/cmake-build/lib/CMakeCache.txt')
-
-                continue
-
-            if state.sdists and platform.system() == 'Linux':
-                pipcl.log(f'Calling build_sdist() {package=} {directory=}.')
-                build_sdist(state, package, directory)
-
-            python_version_tuple = (
-                    int(platform.python_version_tuple()[0]),
-                    int(platform.python_version_tuple()[1]),
-                    )
-
-            # As of 2026-03-23, no onnxruntime wheel is available for macos-intel
-            # python-3.14. For python<=3.13, wheels for older releases are
-            # available.
-            if (1
-                    and python_version_tuple == (3, 14)
-                    and package in ('pdf4llm', 'pymupdf4llm')
-                    and platform.system() == 'Darwin'
-                    and platform.machine() == 'x86_64'
-                    ):
-                pipcl.log(f'Not doing build/test on macos/intel/python-3.14 because onnxruntime not available: {package=}')
-
-            elif package in ('pdf2docx', 'pdf4llm', 'pymupdf4llm', 'pipcl'):
-                # Build/test directly because pure python.
-                pipcl.log(f'Not using cibuildwheel for {package=} because cibuildwheel does not support pure python wheels.')
-                new_files = pipcl.NewFiles(f'{state.wheelhouse}/*.whl')
-                do_build_single(state, package)
-                failed_packages = list()
-                pipcl.run(f'pip list')
-                if package in state.packages_test:
-                    do_test_single(state, package, failed_packages)
-
-                # Delete any new prerequisite wheels that are not for <package>, so
-                # we behave like cibuildwheel.
-                new_wheels = new_files.get()
-                for wheel_path in new_wheels:
-                    assert wheel_path.endswith('.whl')
-                    if not os.path.basename(wheel_path).startswith(f'{package}-'):
-                        pipcl.log(f'Deleting {wheel_path=}.')
-                        pipcl.fs_remove(wheel_path)
-
-                if failed_packages:
-                    raise Exception(f'Test failed for {package=}.')
-
-            else:
-                # Run cibuildwheeel.
-                _modify_build_env(state, package)
-
-                # Tell cibuildwheel how to test <package>.
-                if do_test and package in state.packages_test:
-                    CIBW_TEST_COMMAND = f'pip install --upgrade pytest'
-                    if state.pytest_timeout:
-                        CIBW_TEST_COMMAND += f' && pip install --upgrade pytest-timeout'
-                    CIBW_TEST_COMMAND += f' && pip list'
-                    CIBW_TEST_COMMAND += f' && pytest'
-                    if state.pytest_timeout:
-                        CIBW_TEST_COMMAND += f' --timeout {state.pytest_timeout}'
-                    if state.pytest_timeout_method:
-                        CIBW_TEST_COMMAND += f' --timeout-method {state.pytest_timeout_method}'
-                    if state.pytest_junit_xml:
-                        path_junit_xml = f'{os.path.abspath(state.wheelhouse)}/{package}-pytest-junit.xml'
-                        CIBW_TEST_COMMAND += f' --junit-xml={path_junit_xml}'
-                    if state.pytest_options:
-                        CIBW_TEST_COMMAND += f' {state.pytest_options}'
-                    if state.pytest_paths:
-                        for path in state.pytest_paths:
-                            CIBW_TEST_COMMAND += ' ' + f'{{project}}/{path}'.replace('/', os.sep)
-                    else:
-                        CIBW_TEST_COMMAND += ' ' + f'{{project}}/tests'.replace('/', os.sep)
-                    if state.cibw_ignore_test_failures:
-                        CIBW_TEST_COMMAND += ' || true'
-                    state.env_extra['CIBW_TEST_COMMAND'] = CIBW_TEST_COMMAND
-
-                else:
-                    pipcl.log(f'Not testing because not in state.packages_test: {package=}')
-                # fixme: prefer to just run pytest directly. Needs
-                # test/conftest.py to always `pip install` packages
-                # required for testing.
-                #state.env_extra['CIBW_TEST_COMMAND'] = f'pytest {{project}}/tests'
-
-                # Use a copy of state.env_extra because we modify it if
-                # using manylinux docker.
-                #
-                env_extra = state.env_extra.copy()
-
-                CIBW_ENVIRONMENT_PASS_LINUX = list(env_extra.keys())
-
-                if platform.system() == 'Linux':
-                    prefix = '/host'
-                    # Update key files to be within /host in manylinux
-                    # docker. Otherwise for example tests that access remote git
-                    # repositories will not use the appropriate key.
-                    #
-                    # Also add key environment variables to CIBW_ENVIRONMENT_PASS_LINUX.
-                    #
-                    new_keys = list()
-                    for url_prefix, path, env, pos in state.keys:
-                        if path or env:
-                            if path:
-                                path = f'{prefix}{os.path.abspath(path)}'
-                            if env:
-                                CIBW_ENVIRONMENT_PASS_LINUX.append(env)
-                            new_keys.append((url_prefix, path, env, pos))
-                    state.keys += new_keys
-                    state.keys.sort(reverse=True)
-
-                else:
-                    prefix = ''
-
-                if platform.system() == 'Linux' and package in ('pymupdfpro', 'pymupdf_office'):
-                    # Build will run inside a CentOS-7 container; we
-                    # need to install fontconfig-devel so `#include
-                    # <fontconfig/fonctconfig.h>` works. And for SO build
-                    # we need ssh to allow its git submodule commands.
-                    #
-                    CIBW_BEFORE_BUILD_LINUX = (
-                            'echo "aptest: installing fontconfig-devel and ssh"'
-                            ' && yum -y install fontconfig-devel'
-                            ' && yum groupinstall -y fonts'
-                            ' && yum install -y openssh-clients'
-                            )
-                    # We also need to declare that PYMUPDFPRO_SETUP_SOT is
-                    # a safe git directory if set, because ownership of
-                    # PYMUPDFPRO_SETUP_SOT in /host/... in docker may have
-                    # different owner from current user.
-                    PYMUPDFPRO_SETUP_SOT = state.env_extra.get('PYMUPDFPRO_SETUP_SOT')
-                    if PYMUPDFPRO_SETUP_SOT:
-                        CIBW_BEFORE_BUILD_LINUX += f' && git config --global --add safe.directory {PYMUPDFPRO_SETUP_SOT}'
-
-                    env_extra['CIBW_BEFORE_BUILD_LINUX'] = CIBW_BEFORE_BUILD_LINUX
-
-                PIP_EXTRA_INDEX_URL = f'file://{prefix}{os.path.abspath(state.wheelhouse)}/simple'.replace('\\', '/')
-
-                # Ensure that when cibuildwheel runs pip to
-                # install prerequisite packages, it also looks in
-                # state.wheelhouse. PIP_EXTRA_INDEX_URL is equivalent to
-                # pip's `--extra-index-url`.
-                env_extra['PIP_EXTRA_INDEX_URL'] = PIP_EXTRA_INDEX_URL
-
-                if (1
-                        and package == 'pymupdf_layout'
-                        and platform.system() == 'Darwin'
-                        and platform.machine() == 'x86_64'
-                        ):
-                    # 2026-02-08: onnxruntime is not available on macos-intel-python3.14.
-                    #
-                    pipcl.log(f'Excluding cp314* because onnxruntime not available on macos-intel/python-3.14.')
-                    env_extra['CIBW_BUILD'] = CIBW_BUILD.replace(' cp314*', '')
-                else:
-                    env_extra['CIBW_BUILD'] = CIBW_BUILD
-
-                # Pass all the environment variables we have set in
-                # state.env_extra, to Linux docker. Note that this will
-                # miss any settings in the original environment.
-                CIBW_ENVIRONMENT_PASS_LINUX.append('PYMUPDFPRO_SETUP_SOT_KEY')  # This can be set in os.environ.
-                # Some tests look at GITHUB_ACTIONS e.g. if known to fail on Github.
-                CIBW_ENVIRONMENT_PASS_LINUX.append('GITHUB_ACTIONS')
-                CIBW_ENVIRONMENT_PASS_LINUX.append('PIP_EXTRA_INDEX_URL')
-                CIBW_ENVIRONMENT_PASS_LINUX.sort()
-                CIBW_ENVIRONMENT_PASS_LINUX = ' '.join(CIBW_ENVIRONMENT_PASS_LINUX)
-                env_extra['CIBW_ENVIRONMENT_PASS_LINUX'] = CIBW_ENVIRONMENT_PASS_LINUX
-                try:
-                    pipcl.run(
-                            f'cd {directory} && cibuildwheel{cibw_pyodide_args}'
-                                f' --output-dir {os.path.abspath(state.wheelhouse)}',
-                            env_extra=env_extra,
-                            prefix=f'{do_test=} {package}: ',
-                            )
-                finally:
-                    try:
-                        if state.pytest_junit_xml:
-                            state.results['packages'][package]['junit'] = read_pytest_junit(path_junit_xml)
-                    except Exception:
-                        pass
-
-            pipcl.log(f'Build/test succeeded for {package=}.')
-
-            pipcl.run(f'ls -ld {state.wheelhouse}/*')
-            pipcl.run(f'piprepo build {state.wheelhouse}')
-
-            if 1:
-                pipcl.log(f'Contents of: {state.wheelhouse=} are:')
-                for dirpath, dirnames, filenames in os.walk(state.wheelhouse):
-                    for filename in filenames:
-                        path = os.path.join(dirpath, filename)
-                        st = os.stat(path)
-                        pipcl.log(f'{st=}: {path=}')
-                    for dirname in dirnames:
-                        path_dir = os.path.join(dirpath, dirname)
-                        st = os.stat(path_dir)
-                        pipcl.log(f'{st=}: {path_dir=}')
+            do_cibw_single(state, package, CIBW_BUILD, cibw_pyodide_args, do_test)
     
     pipcl.log(f'Build/test succeeded for packages {state.packages_build}.')
 
