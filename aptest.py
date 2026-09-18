@@ -132,6 +132,9 @@ def git_push(path, repository, remote_branch, state, *, tmpcommit=True, doit=Tru
     if not doit:
         return branch
     if tmpcommit:
+        # Do explicit checking before getting output of `git diff`, because
+        # pipcl.run(capture=1) swallows any useful git diagnostics on stderr.
+        Assert(os.path.isdir(f'{path}/.git'), f'Not a git checkout: {path}')
         diff = pipcl.run(f'cd {path} && git diff --ignore-submodules=dirty', capture=1)
         if diff:
             # `git stash && git apply` leaves everything unchanged, but creates
@@ -305,12 +308,20 @@ g_package_info = {
                 'aliases':  [],
                 'order': 2,
             },
+        'pymupdf_core':
+            {
+                'git_remote': 'git@github.com:pymupdf/PyMuPDF.git',
+                'git_branch': 'main',
+                'aliases':  ['pcore'],
+                'order': 1,
+            },
         'pymupdf':
             {
                 'git_remote': 'git@github.com:pymupdf/PyMuPDF.git',
                 'git_branch': 'main',
                 'aliases':  ['p'],
                 'order': 1,
+                'directory': 'pymupdf-all',
             },
         'pymupdf4llm':
             {
@@ -323,6 +334,7 @@ g_package_info = {
             {
                 'git_remote': 'git@github.com:pymupdf/pymupdf4llm.git',
                 'git_branch': 'main',
+                'directory': 'pdf4llm',
                 'aliases':  [],
                 'order': 4, # Need to be higher than pymupdf_layout.
             },
@@ -363,7 +375,7 @@ g_package_info = {
                 'submodules': False,
                 'order': 1, # Fetch before Layout
             },
-        'smartoffice-marina':
+        'smartoffice_marina':
             {
                 'git_remote': 'git@github.com:epapyrusinc/marina.git',
                 'git_branch': 'master',
@@ -371,7 +383,7 @@ g_package_info = {
                 'submodules': True,
                 'order': 1, # Fetch before Layout
             },
-        'smartoffice-neo':
+        'smartoffice_neo':
             {
                 'git_remote': 'git@gitlab.artifex.com:smartoffice/smartoffice.git',
                 'git_branch': 'master',
@@ -421,6 +433,7 @@ g_package_info = {
         }
 
 for name, value in g_package_info.items():
+    assert '-' not in name, f'{name=}'
     assert 'aliases' in value, f'g_package_info[{name!r}] has no alias list'
     if value.get('submodules') is None:
         value['submodules'] = True
@@ -595,6 +608,7 @@ def add_package(state, name, location):
     if not location.text.startswith(('git:', 'pip:')):
         # Match with local checkouts to help arg completion.
         ok_locations = list()
+        ok_locations.append('@')
         for path in sorted(glob.glob(f'*/.git/')):
             #ok_locations.append(path[:-5])  # With trailing `/`.
             ok_locations.append(path[:-6])
@@ -607,6 +621,10 @@ def add_package(state, name, location):
                 # Just output a warning.
                 pipcl.log(f'Warning, location is not a Git checkout in current directory: {location=}')
     
+    if location == '@':
+        # Use upper-case specification, e.g. from ~/.aptest.
+        location = state.packages_for_release[name]
+        
     if name.lower() != name:
         # Upper case names are defaults for making releases, for which we use
         # state.packages_for_release.
@@ -896,8 +914,8 @@ def get_args(state, argv):
             
             # Allow `--foo=bar` here.
             arg = args.next(spliteq=1)
-            
             #pipcl.log(f'{arg=}')
+            
             if 0:
                 pass
 
@@ -1117,44 +1135,62 @@ def get_args(state, argv):
                 new_args = ''
                 new_args += f' --log-prefix {shlex.quote(arg.as_str() + ": ")}'
                 pipcl.log(f'{new_args=}')
-                new_args += ' -r @github cibw'
+                new_args += ' -r @github'
+                new_args += ' cibw'
                 new_args += ' --check-unchanged'
-                new_args += ' --use-release-args'
                 
-                # We do not allow --MUPDF to be specified (this is checked if
-                # --use-release-args is specified). But for testing purposes we
-                # allow --mupdf, in which case we need to include mupdf in the
-                # list of packages to build.
+                # We do not allow --MUPDF to be specified when making releases,
+                # because we should use pymupdf's hard-coded default.
+                #
+                Assert('mupdf' not in state.packages_for_release.keys(), "`--MUPDF` must not be specified with `--release-*`.")
+                
+                # For testing purposes we allow --mupdf, in which case we need
+                # to include mupdf in the list of packages to build.
                 b_mupdf = 'mupdf,' if 'mupdf' in state.packages else ''
+                
+                Assert(state.packages_for_release, f'No release package locations specified - use upper-case specifications such as `-P git:`.')
+                Assert(state.wheelhouse_release, f'No release wheelhouse specified, use `--wheelhouse-release <directory-name>`.')
+                Assert(state.wheelhouse_release != state.wheelhouse, f'{state.wheelhouse_release=} is not different from {state.wheelhouse=}.')
+                state.wheelhouse = state.wheelhouse_release
+                
+                # We never clean the release wheelhouse.
+                state.clean_wheelhouse = False
+                
+                # Add all packages registered with upper-case names. Each
+                # --release-* arg will select the packages is needs to build
+                # with `-b`.
+                for package, location in state.packages_for_release.items():
+                    new_args += f' --{package} {shlex.quote(location.as_str())}'
                 
                 if 0:
                     pass
                 
                 elif arg == '--release-test':
                     # Undocumented test option, for quick test of github.
-                    new_args += f' --sdists -b {b_mupdf}pymupdf4llm --cibw-ignore-test-failures'
+                    pass
+                    #new_args += f' --sdists -b {b_mupdf}pymupdf4llm --cibw-ignore-test-failures'
                 
                 elif arg == '--release-1':
                     # Build core wheels and sdist.
                     # [pymupdf4llm is pure python so doesn't need to be
                     # mentioned in other --release-* options.]
-                    new_args += f' -b {b_mupdf}pymupdf,pymupdf_office,pymupdf_layout,pymupdf4llm,pdf4llm --sdists'
+                    new_args += f' -b {b_mupdf}pymupdf_core,pymupdf,pymupdf_office,pymupdf_layout,pymupdf4llm,pdf4llm --sdists'
                 
                 elif arg == '--release-2':
                     # Build macos-intel and linux-arm wheels.
-                    new_args += f' -b {b_mupdf}pymupdf,pymupdf_office,pymupdf_layout,pymupdf4llm,pdf4llm --remote-github-runners macos-intel,linux-arm'
+                    new_args += f' -b {b_mupdf}pymupdf_core,pymupdf,pymupdf_office,pymupdf_layout,pymupdf4llm,pdf4llm --remote-github-runners macos-intel,linux-arm'
                 
                 elif arg == '--release-3':
                     # Build for win-x32.
-                    new_args += f' -b {b_mupdf}pymupdf --remote-github-runners windows -e CIBW_ARCHS_WINDOWS=x86 --cibw-skip-add-defaults=0'
+                    new_args += f' -b {b_mupdf}pymupdf_core,pymupdf --remote-github-runners windows -e CIBW_ARCHS_WINDOWS=x86 --cibw-skip-add-defaults=0'
                 
                 elif arg == '--release-4':
                     # Build for linux-musllinux.
-                    new_args += f' -b {b_mupdf}pymupdf --remote-github-runners linux -e "CIBW_BUILD=cp310-musllinux_x86_64" --cibw-skip-add-defaults=0'
+                    new_args += f' -b {b_mupdf}pymupdf_core,pymupdf --remote-github-runners linux -e "CIBW_BUILD=cp310-musllinux_x86_64" --cibw-skip-add-defaults=0'
                 
                 elif arg == '--release-5':
                     # Build for Pyodide.
-                    new_args += f' -b {b_mupdf}pymupdf --cibw-pyodide --remote-github-runners linux'
+                    new_args += f' -b {b_mupdf}pymupdf_core,pymupdf --cibw-pyodide --remote-github-runners linux'
                 
                 elif arg == '--release-6':
                     # Build for cp314t.
@@ -1163,11 +1199,11 @@ def get_args(state, argv):
                     # py_limited_api and Py_GIL_DISABLED are not supported
                     # together as of 2026-02-20, e.g. see PEP 803 and PEP 809.
                     #
-                    new_args += f' -b {b_mupdf}pymupdf --remote-github-runners linux --cibw-skip-add-defaults=0 -e CIBW_BUILD="cp314t*" -e CIBW_SKIP="*musllinux*" -e PYMUPDF_SETUP_PY_LIMITED_API=0'
+                    new_args += f' -b {b_mupdf}pymupdf_core,pymupdf --remote-github-runners linux --cibw-skip-add-defaults=0 -e CIBW_BUILD="cp314t*" -e CIBW_SKIP="*musllinux*" -e PYMUPDF_SETUP_PY_LIMITED_API=0'
                 
                 elif arg == '--release-7':
                     # Build pymupdf for windows-arm64.
-                    new_args += f' -b {b_mupdf}pymupdf -e PYMUPDF_SETUP_MUPDF_VS_UPGRADE=1 --remote-github-runners windows-arm64'
+                    new_args += f' -b {b_mupdf}pymupdf_core,pymupdf -e PYMUPDF_SETUP_MUPDF_VS_UPGRADE=1 --remote-github-runners windows-arm64'
                 
                 else:
                     Assert(0, f'Unrecognised {arg=}.')
@@ -1299,17 +1335,6 @@ def get_args(state, argv):
             elif arg == '-u':
                 state.github_upload = args.get_bool()
             
-            elif arg == '--use-release-args':
-                Assert(state.packages_for_release, f'No release package locations specified - use upper-case specifications such as `-P git:`.')
-                Assert(state.wheelhouse_release, f'No release wheelhouse specified, use `--wheelhouse-release <directory-name>`.')
-                Assert(state.wheelhouse_release != state.wheelhouse, f'{state.wheelhouse_release=} is not different from {state.wheelhouse=}.')
-                state.wheelhouse = state.wheelhouse_release
-                # We never clean the release wheelhouse.
-                state.clean_wheelhouse = False
-                for package, location in state.packages_for_release.items():
-                    assert package != 'mupdf', f'The mupdf location must not be set in release builds - use pymupdf default: {package=} {location=}'
-                    add_package(state, package, location)
-
             elif arg == '-v':
                 _venv = next(args)
                 Assert(_venv in ('0', '1', '2', '3'), f'Invalid venv={_venv.text}.')
@@ -1450,6 +1475,7 @@ def check_checkout_unchanged(state, directory):
 
 
 def check_checkout_pushed(state, directory):
+    Assert(os.path.isdir(f'{directory}/.git'), f'Not a git checkout: {directory}')
     out = pipcl.run(f'cd {directory} && git branch -r --contains', capture=1)
     assert isinstance(out, str)
     Assert(
@@ -1812,19 +1838,19 @@ def do_build_single(state, package):
         for p in glob.glob(f'{state.wheelhouse}/{package}-*.whl'):
             pipcl.log(f'Removing: {p}')
             pipcl.fs_remove(p)
-        pipcl.run(f'pip wheel{pip_wheel_no_clean} --no-cache-dir -w {state.wheelhouse} {name}')
+        pipcl.run(f'pip wheel{pip_wheel_no_clean} --no-deps --no-cache-dir -w {state.wheelhouse} {name}')
         ret_wheel = new_files.get_one()
-        pipcl.run(f'pip uninstall -y {name}')
-        pipcl.run(f'pip install -v {name}')
+        #pipcl.run(f'pip uninstall -y {name}')
+        #pipcl.run(f'pip install -v {name}')
     else:
         directory = _get_local(package, state)
 
         if package == 'pymupdf4llm' and not _4llm_new_layout(directory):
             # setup.py is in subdirectory pymupdf4llm/.
             directory += '/pymupdf4llm'
-        elif package == 'pdf4llm':
-            # setup.py is in subdirectory.
-            directory += '/pdf4llm'
+        #elif package == 'pdf4llm':
+        #    # setup.py is in subdirectory.
+        #    directory += '/pdf4llm'
         directory_abs = os.path.abspath(directory)
         pipcl.log(f'{package=} {directory=}')
         if package == 'mupdf':
@@ -1897,7 +1923,7 @@ def do_build_single(state, package):
             _modify_build_env(state, package)
 
             if state.build_type:
-                if package == 'pymupdf':
+                if package == 'pymupdf_core':
                     state.env_extra['PYMUPDF_SETUP_MUPDF_BUILD_TYPE'] = state.build_type
                 if package in ('pymupdfpro', 'pymupdf_office'):
                     state.env_extra['PYMUPDFPRO_SETUP_BUILD_TYPE'] = state.build_type
@@ -1905,24 +1931,24 @@ def do_build_single(state, package):
                     state.env_extra['PYMUPDF_LAYOUT_SETUP_BUILD_TYPE'] = state.build_type
             
             pipcl.run(
-                    f'pip wheel{pip_wheel_no_clean} -v --extra-index-url {pip_index_url} -w {state.wheelhouse} {directory_abs}',
+                    f'pip wheel{pip_wheel_no_clean} --no-deps -v --extra-index-url {pip_index_url} -w {state.wheelhouse} {directory_abs}',
                     env_extra=state.env_extra,
                     prefix=f'build {package}: ',
                     )
             ret_wheel = new_files.get_one()
 
-            pipcl.run(
-                    f'pip install -v --extra-index-url {pip_index_url} {ret_wheel}',
-                    env_extra=state.env_extra,
-                    prefix=f'install {package}: ',
-                    )
+            #pipcl.run(
+            #        f'pip install -v --extra-index-url {pip_index_url} {ret_wheel}',
+            #        env_extra=state.env_extra,
+            #        prefix=f'install {package}: ',
+            #        )
 
-    if package == 'pymupdf':  # pylint: disable=condition-evals-to-constant
-        # Set PYMUPDF_SETUP_VERSION so subsequent builds are configured
-        # for the PyMuPDF we have just built.
-        PYMUPDF_SETUP_VERSION = importlib.metadata.version('pymupdf')
-        state.env_extra['PYMUPDF_SETUP_VERSION'] = PYMUPDF_SETUP_VERSION
-        pipcl.log(f'### Have set {PYMUPDF_SETUP_VERSION=}')
+    #if package == 'pymupdf':  # pylint: disable=condition-evals-to-constant
+    #    # Set PYMUPDF_SETUP_VERSION so subsequent builds are configured
+    #    # for the PyMuPDF we have just built.
+    #    PYMUPDF_SETUP_VERSION = importlib.metadata.version('pymupdf')
+    #    state.env_extra['PYMUPDF_SETUP_VERSION'] = PYMUPDF_SETUP_VERSION
+    #    pipcl.log(f'### Have set {PYMUPDF_SETUP_VERSION=}')
 
     return ret_wheel
 
@@ -1978,13 +2004,22 @@ def do_build(state):
                 prefix='piprepo build: ',
                 )
     
+    # We use `pip --extra-index-url {pip_index_url}` so that pip
+    # finds prerequisite wheels in state.wheelhouse.
+    pip_index_url = f'file://{os.path.abspath(state.wheelhouse)}/simple'
+    
+    # pip fails if pip_index_url contains back-slashes, with
+    # `ERROR: Could not install packages due to an OSError: [Errno
+    # 13] Permission denied:...`.
+    pip_index_url = pip_index_url.replace('\\', '/')
+    
     for package in reversed(state.packages_build):
         # Always uninstall first, to ensure we always install the package from
         # the specified location.
         #
         pipcl.run(f'pip uninstall -y {package}', prefix='    ')
         wheel = package_to_wheel[package]
-        pipcl.run(f'pip install {wheel}', prefix='    ')
+        pipcl.run(f'pip install --extra-index-url {pip_index_url} {wheel}', prefix='    ')
 
 def read_pytest_junit(path):
     try:
@@ -2017,11 +2052,6 @@ def do_cibw_single(state, package, CIBW_BUILD, cibw_pyodide_args, do_test=1):
         #name = f'{package}{location[4:]}'
         #state.env_extra['CIBW_BUILD_FRONTEND'] = f'pip wheel {name}'
 
-    if package == 'pymupdf4llm' and not _4llm_new_layout(directory):
-        # setup.py is in subdirectory pymupdf4llm/.
-        directory += '/pymupdf4llm'
-    elif package == 'pdf4llm':
-        directory += '/pdf4llm'
 
     pipcl.log(f'{package} _get_local() => {directory=}')
     directory_abs = os.path.abspath(directory)
@@ -2094,24 +2124,27 @@ def do_cibw_single(state, package, CIBW_BUILD, cibw_pyodide_args, do_test=1):
             ):
         pipcl.log(f'Not doing build/test on macos/intel/python-3.14 because onnxruntime not available: {package=}')
 
-    elif package in ('pdf2docx', 'pdf4llm', 'pymupdf4llm', 'pipcl'):
+    elif package in ('pymupdf', 'pdf2docx', 'pdf4llm', 'pymupdf4llm', 'pipcl'):
         # Build/test directly because pure python.
         pipcl.log(f'Not using cibuildwheel for {package=} because cibuildwheel does not support pure python wheels.')
         new_files = pipcl.NewFiles(f'{state.wheelhouse}/*.whl')
         do_build_single(state, package)
         failed_packages = list()
-        pipcl.run(f'pip list')
-        if package in state.packages_test:
-            do_test_single(state, package, failed_packages)
-
+        #pipcl.run(f'pip list')
         # Delete any new prerequisite wheels that are not for <package>, so
         # we behave like cibuildwheel.
         new_wheels = new_files.get()
         for wheel_path in new_wheels:
             assert wheel_path.endswith('.whl')
-            if not os.path.basename(wheel_path).startswith(f'{package}-'):
-                pipcl.log(f'Deleting {wheel_path=}.')
-                pipcl.fs_remove(wheel_path)
+            #if not os.path.basename(wheel_path).startswith(f'{package}-'):
+            #    pipcl.log(f'Deleting {wheel_path=}.')
+            #    pipcl.fs_remove(wheel_path)
+
+        if do_test and package in state.packages_test:
+            pip_index_url = f'file://{os.path.abspath(state.wheelhouse)}/simple'
+            pip_index_url = pip_index_url.replace('\\', '/')
+            pipcl.run(f'pip install --extra-index-url {pip_index_url} {wheel_path}')
+            do_test_single(state, package, failed_packages)
 
         if failed_packages:
             raise Exception(f'Test failed for {package=}.')
@@ -2893,8 +2926,6 @@ def do_test_single(state, package, failed_packages):
             if state.pytest_paths:
                 for path in state.pytest_paths:
                     command += f' {path}'
-            elif package == 'pdf4llm':
-                command += f' pdf4llm/tests'
             else:
                 # We need to somehow limit things to {package}/tests/
                 # because otherwise pytest can recurse into other
@@ -3256,10 +3287,10 @@ def main(state, argv):
     
     if (1
             and 'mupdf' in state.packages
-            and 'pymupdf' not in state.packages
+            and 'pymupdf_core' not in state.packages
             and 'run' not in state.commands
             ):
-        Assert(0, f'If `mupdf` is specified then `pymupdf` should also be specified.')
+        Assert(0, f'If `mupdf` is specified then `pymupdf_core` should also be specified.')
     
     # Populate state.results with package information.
     state.results['packages'] = dict()
@@ -3453,8 +3484,10 @@ def _get_local(package, state, test=False):
     
     if location is None or location.startswith('pip:'):
         return None
+    
+    info = name_info(state, package)
+    
     if location.startswith('git:'):
-        info = name_info(state, package)
         local = f'aptest-git-{package}'
         if state.git_local_detailed:
             if tail := location[len('git:'):]:
@@ -3557,6 +3590,9 @@ def _get_local(package, state, test=False):
                 f'Checkout is changed but {state.check_unchanged=}: {package=} {directory=}.',
                 )
         # todo: also check that sha is on remote.
+    
+    if d := info.get('directory'):
+        return f'{directory}/{d}'
     
     return directory
     
