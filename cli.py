@@ -157,7 +157,8 @@ class Completions:
     
     def add(self, suggestion, pos):
         if pos < self.pos:
-            pipcl.log(f'Warning: was not expecting {pos=} < {self.pos=}.')
+            # This is expected to happen if we re-add an earlier arg.
+            #pipcl.log(f'Warning: {suggestion=}. was not expecting {pos=} < {self.pos=}. {self.items=}.')
             self.items.clear()
             self.pos = pos
         if pos > self.pos:
