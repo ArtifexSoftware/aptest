@@ -293,6 +293,7 @@ g_package_info = {
                 'git_branch': 'main',
                 'aliases':  [],
                 'order': -1,
+                'pure': True,
             },
         'mupdf':
             {
@@ -307,6 +308,7 @@ g_package_info = {
                 'git_branch': 'master',
                 'aliases':  [],
                 'order': 2,
+                'pure': True,
             },
         'pymupdf_core':
             {
@@ -322,6 +324,7 @@ g_package_info = {
                 'aliases':  ['p'],
                 'order': 1,
                 'directory': 'pymupdf-all',
+                'pure': True
             },
         'pymupdf4llm':
             {
@@ -329,6 +332,7 @@ g_package_info = {
                 'git_branch': 'main',
                 'aliases':  ['4llm'],
                 'order': 3, # Need to be higher than pymupdf_layout.
+                'pure': True,
             },
         'pdf4llm':
             {
@@ -337,6 +341,7 @@ g_package_info = {
                 'directory': 'pdf4llm',
                 'aliases':  [],
                 'order': 4, # Need to be higher than pymupdf_layout.
+                'pure': True,
             },
         'pymupdfpro':
             {
@@ -405,6 +410,7 @@ g_package_info = {
                 'git_branch': 'main',
                 'aliases':  [],
                 'order': -2,
+                'pure': True,
             },
         
         # Experimental, doesn't work.
@@ -798,6 +804,8 @@ def make_state():
     if GITHUB_ACTIONS == 'true':
         state.verbose = True
     
+    state.v1 = False
+    
     state.wheelhouse = 'aptest-wheelhouse'
     state.wheelhouse_release = None
     
@@ -918,6 +926,12 @@ def get_args(state, argv):
             
             if 0:
                 pass
+            
+            elif arg == '--v1':
+                del g_package_info['pymupdf_core']
+                del g_package_info['pymupdf']['directory']
+                g_package_info['pymupdf']['pure'] = False
+                state.v1 = True
 
             elif arg == '-a':
                 pos1 = args.pos
@@ -1127,6 +1141,7 @@ def get_args(state, argv):
             elif arg.startswith('--release-'):
                 # Must be last arg.
                 #assert args.pos[0] == len(args.argv), f'{len(args.argv)=} {args.pos=}.'
+                Assert(not state.v1, 'Cannot make 1.x releases.')
                 Assert(
                         not state.git_local_detailed,
                         'Do not specify --git-local-detailed,'
@@ -1927,7 +1942,7 @@ def do_build_single(state, package):
             _modify_build_env(state, package)
 
             if state.build_type:
-                if package == 'pymupdf_core':
+                if package == ('pymupdf' if state.v1 else 'pymupdf_core'):
                     state.env_extra['PYMUPDF_SETUP_MUPDF_BUILD_TYPE'] = state.build_type
                 if package in ('pymupdfpro', 'pymupdf_office'):
                     state.env_extra['PYMUPDFPRO_SETUP_BUILD_TYPE'] = state.build_type
@@ -2128,7 +2143,8 @@ def do_cibw_single(state, package, CIBW_BUILD, cibw_pyodide_args, do_test=1):
             ):
         pipcl.log(f'Not doing build/test on macos/intel/python-3.14 because onnxruntime not available: {package=}')
 
-    elif package in ('pymupdf', 'pdf2docx', 'pdf4llm', 'pymupdf4llm', 'pipcl'):
+    #elif package in ('pymupdf', 'pdf2docx', 'pdf4llm', 'pymupdf4llm', 'pipcl'):
+    elif g_package_info[package].get('pure'):
         # Build/test directly because pure python.
         pipcl.log(f'Not using cibuildwheel for {package=} because cibuildwheel does not support pure python wheels.')
         new_files = pipcl.NewFiles(f'{state.wheelhouse}/*.whl')
@@ -3292,10 +3308,10 @@ def main(state, argv):
     
     if (1
             and 'mupdf' in state.packages
-            and 'pymupdf_core' not in state.packages
+            and ('pymupdf' if state.v1 else 'pymupdf_core') not in state.packages
             and 'run' not in state.commands
             ):
-        Assert(0, f'If `mupdf` is specified then `pymupdf_core` should also be specified.')
+        Assert(0, f'If `mupdf` is specified then `{"pymupdf" if state.v1 else "pymupdf_core"}` should also be specified.')
     
     # Populate state.results with package information.
     state.results['packages'] = dict()
