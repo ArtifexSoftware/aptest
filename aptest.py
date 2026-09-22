@@ -1348,7 +1348,11 @@ def get_args(state, argv):
                 Assert(state.verbose in (0, 1), f'Verbose level should be 0 or 1')
             
             elif arg == '--wheelhouse':
-                state.wheelhouse = next(args).as_str()
+                _wheelhouse = next(args).as_str()
+                if _wheelhouse == '@':
+                    _wheelhouse = state.wheelhouse_release
+                    assert _wheelhouse, f'With `@`, `--wheelhouse-release` must be specified.'
+                state.wheelhouse = _wheelhouse
 
             elif arg == '--wheelhouse-release':
                 state.wheelhouse_release = next(args).as_str()
@@ -2134,6 +2138,7 @@ def do_cibw_single(state, package, CIBW_BUILD, cibw_pyodide_args, do_test=1):
         # Delete any new prerequisite wheels that are not for <package>, so
         # we behave like cibuildwheel.
         new_wheels = new_files.get()
+        assert len(new_wheels) == 1
         for wheel_path in new_wheels:
             assert wheel_path.endswith('.whl')
             #if not os.path.basename(wheel_path).startswith(f'{package}-'):
