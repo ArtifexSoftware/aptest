@@ -1774,6 +1774,7 @@ def build_sdist(state, package, directory):
             'pdf2docx',
             'pdf4llm',
             'pymupdf',
+            'pymupdf-core',
             'pymupdf4llm',
             'pipcl',
             ):
