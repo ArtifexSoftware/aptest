@@ -23,9 +23,9 @@ jobs:
                 ]
         
         args: [
-                'python3.15  aptest.py -m git: -p git: build test -e PYMUPDF_TEST_QUICK=1',
-                'python3.14t aptest.py -m git: -p git: build test -e PYMUPDF_TEST_QUICK=1 -e PYMUPDF_SETUP_PY_LIMITED_API=0',
-                'python3.15t aptest.py -m git: -p git: build test -e PYMUPDF_TEST_QUICK=1 -e PYMUPDF_SETUP_PY_LIMITED_API=0',
+                'python3.15  aptest.py -m git: -p git: --4llm git: --layout git: build test -e PYMUPDF_TEST_QUICK=1',
+                'python3.14t aptest.py -m git: -p git: --4llm git: --layout git: build test -e PYMUPDF_TEST_QUICK=1 -e PYMUPDF_SETUP_PY_LIMITED_API=0',
+                'python3.15t aptest.py -m git: -p git: --4llm git: --layout git: build test -e PYMUPDF_TEST_QUICK=1 -e PYMUPDF_SETUP_PY_LIMITED_API=0',
                 ]
 
       # Avoid cancelling of all runs after a single failure.

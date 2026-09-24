@@ -22,7 +22,7 @@ jobs:
             ]
         
         args: [
-            '-m git: -p git:',
+            '-m git: -p git: --4llm git: --layout git:',
             ]
 
       # Avoid cancelling of all runs after a single failure.
@@ -47,7 +47,7 @@ jobs:
           python3 -c 'import os, re; APTEST_matrix_args=os.environ["APTEST_matrix_args"]; APTEST_matrix_args2 = re.sub("[: \"]", "_", APTEST_matrix_args); print(f"APTEST_matrix_args2="+APTEST_matrix_args2)' >> $GITHUB_ENV
           
           # We need PYMUPDF_SETUP_MUPDF_VS_UPGRADE=1 because 142 tools don't work on arm.
-          python aptest.py ${{matrix.args}} -m git: -p git: build test -e PYMUPDF_SETUP_MUPDF_VS_UPGRADE=1 -a APTEST_args
+          python aptest.py ${{matrix.args}} build test -e PYMUPDF_SETUP_MUPDF_VS_UPGRADE=1 -a APTEST_args
       
       - uses: actions/upload-artifact@v4
         with:
