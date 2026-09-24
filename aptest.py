@@ -314,7 +314,7 @@ g_package_info = {
             {
                 'git_remote': 'git@github.com:pymupdf/PyMuPDF.git',
                 'git_branch': 'main',
-                'aliases':  ['pcore'],
+                'aliases':  ['p'],
                 'order': 1,
             },
         'pymupdf':
