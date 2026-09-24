@@ -1860,17 +1860,12 @@ def do_build_single(state, package):
             pipcl.fs_remove(p)
         pipcl.run(f'pip wheel{pip_wheel_no_clean} --no-deps --no-cache-dir -w {state.wheelhouse} {name}')
         ret_wheel = new_files.get_one()
-        #pipcl.run(f'pip uninstall -y {name}')
-        #pipcl.run(f'pip install -v {name}')
     else:
         directory = _get_local(package, state)
 
         if package == 'pymupdf4llm' and not _4llm_new_layout(directory):
             # setup.py is in subdirectory pymupdf4llm/.
             directory += '/pymupdf4llm'
-        #elif package == 'pdf4llm':
-        #    # setup.py is in subdirectory.
-        #    directory += '/pdf4llm'
         directory_abs = os.path.abspath(directory)
         pipcl.log(f'{package=} {directory=}')
         if package == 'mupdf':
@@ -1956,19 +1951,6 @@ def do_build_single(state, package):
                     prefix=f'build {package}: ',
                     )
             ret_wheel = new_files.get_one()
-
-            #pipcl.run(
-            #        f'pip install -v --extra-index-url {pip_index_url} {ret_wheel}',
-            #        env_extra=state.env_extra,
-            #        prefix=f'install {package}: ',
-            #        )
-
-    #if package == 'pymupdf':  # pylint: disable=condition-evals-to-constant
-    #    # Set PYMUPDF_SETUP_VERSION so subsequent builds are configured
-    #    # for the PyMuPDF we have just built.
-    #    PYMUPDF_SETUP_VERSION = importlib.metadata.version('pymupdf')
-    #    state.env_extra['PYMUPDF_SETUP_VERSION'] = PYMUPDF_SETUP_VERSION
-    #    pipcl.log(f'### Have set {PYMUPDF_SETUP_VERSION=}')
 
     return ret_wheel
 
