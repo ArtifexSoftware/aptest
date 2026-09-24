@@ -321,7 +321,7 @@ g_package_info = {
             {
                 'git_remote': 'git@github.com:pymupdf/PyMuPDF.git',
                 'git_branch': 'main',
-                'aliases':  ['p'],
+                'aliases':  ['pall'],
                 'order': 1,
                 'directory': 'pymupdf-all',
                 'pure': True
@@ -931,6 +931,7 @@ def get_args(state, argv):
                 del g_package_info['pymupdf_core']
                 del g_package_info['pymupdf']['directory']
                 g_package_info['pymupdf']['pure'] = False
+                g_package_info['pymupdf']['aliases'] = ['p']
                 state.v1 = True
 
             elif arg == '-a':
