@@ -36,7 +36,7 @@ jobs:
             '-m git: -p git: --office git: --layout git: --4llm git: --marina git: build test',
             
             # Test free-threading python.
-            '-m git: -p git: -o linux cibw --remote-github-runners linux --cibw-skip-add-defaults=0 -e CIBW_BUILD="cp314t*" -e CIBW_SKIP="*musllinux*" -e PYMUPDF_SETUP_PY_LIMITED_API=0',
+            '-m git: -p git: -o linux cibw --remote-github-runners linux --cibw-skip-add-defaults=0 -e CIBW_BUILD="cp314t*" -e CIBW_SKIP="*musllinux*" -e PYMUPDF_SETUP_PY_LIMITED_API=0 -e PYMUPDF_TEST_USE_LAYOUT=0 -e PYMUPDF_TEST_USE_4LLM=0',
             ]
 
       # Avoid cancelling of all runs after a single failure.
