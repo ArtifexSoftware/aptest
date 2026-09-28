@@ -2433,9 +2433,14 @@ def do_cibw(state):
     # step, and instead use the wheel in the wheelhouse. But this doesn't
     # appear to be possible.)
     #
-    for do_test in 0, 1:
-        for package in state.packages_build:
-            do_cibw_single(state, package, CIBW_BUILD, cibw_pyodide_args, do_test)
+    for package in state.packages_build:
+        do_cibw_single(state, package, CIBW_BUILD, cibw_pyodide_args, do_test=0)
+    
+    for package in state.packages_build:
+        if package in state.packages_test:
+            do_cibw_single(state, package, CIBW_BUILD, cibw_pyodide_args, do_test=1)
+        else:
+            pipcl.log(f'Not calling do_cibw_single() because not in state.packages_test: {package=}')
     
     pipcl.log(f'Build/test succeeded for packages {state.packages_build}.')
 
