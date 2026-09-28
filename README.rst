@@ -3113,7 +3113,7 @@ completion
 Changelog
 ---------
 
-**Next release**
+**2026-09-28**
 
 * Updated to use new version 2.0 package names and dependencies etc.
   
