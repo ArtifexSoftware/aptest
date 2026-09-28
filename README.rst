@@ -3113,6 +3113,11 @@ completion
 Changelog
 ---------
 
+**2026-09-28 b**
+
+* Possible fix for test_multiple python3.14t build+test.
+
+
 **2026-09-28**
 
 * Updated to use new version 2.0 package names and dependencies etc.
