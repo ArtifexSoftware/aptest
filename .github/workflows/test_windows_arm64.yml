@@ -22,7 +22,7 @@ jobs:
             ]
         
         args: [
-            '-m git: -p git: --4llm git: --layout git:',
+            '-m git: -p git: -e PYMUPDF_TEST_USE_LAYOUT=0 -e PYMUPDF_TEST_USE_4LLM=0',
             ]
 
       # Avoid cancelling of all runs after a single failure.

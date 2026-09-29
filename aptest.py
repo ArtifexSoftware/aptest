@@ -1177,6 +1177,7 @@ def get_args(state, argv):
                 # with `-b`.
                 for package, location in state.packages_for_release.items():
                     new_args += f' --{package} {shlex.quote(location.as_str())}'
+                pipcl.log(f'{new_args=}')
                 
                 if 0:
                     pass
