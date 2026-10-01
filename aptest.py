@@ -64,7 +64,7 @@ else:
             venv_path='venv-aptest-{python_version}-{wordsize}{freethreads}',
             packages=autovenv_packages,
             create=autovenv_create,
-            use_existing_venv=0,
+            use_existing_venv=1,
             verbose=autovenv_verbose,
             )
 
@@ -3501,11 +3501,22 @@ def _get_local(package, state, test=False):
         local = f'aptest-git-{package}'
         if state.git_local_detailed:
             if tail := location[len('git:'):]:
-                # Append branch/tag etc to the local checkout name.
+                # Append branch/tag etc to the local checkout name. We use
+                # pipcl.git_get_parse_text() so we can ignore any sha, because
+                # it's less useful to have per-sha clones.
                 pipcl.log(f'{tail=}')
-                # Put different branches/tags into different directories.
-                tail = re.sub('[\\/ "\':]', '_', tail)
-                local += f'-{tail}'
+                branch, depth, remote, sha, tag = pipcl.git_get_parse_text(location)
+                def escape(text):
+                    return re.sub('[\\/ "\':-]', '_', text)
+                if branch:
+                    local += f'-b-{escape(branch)}'
+                if remote:
+                    local += f'-r-{escape(remote)}'
+                if sha:
+                    # Do nothing, it's less useful to have per-sha clones.
+                    local += f'-s'
+                if tag:
+                    local += f'-t-{escape(tag)}'
         #pipcl.log(f'{local=}')
         with pipcl.LogPrefix(f'{local}: '):
             env_extra = state.env_extra
