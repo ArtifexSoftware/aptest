@@ -563,7 +563,7 @@ def dummy_completion3():
     '''
 
 
-def apply_deltas(items, deltas, check=1, aliasfn=lambda name: name):
+def apply_deltas(items, deltas, check=1, aliasfn=lambda name: name, sortfn=None):
     '''
     Modifies <items> according to <deltas>.
     
@@ -577,6 +577,8 @@ def apply_deltas(items, deltas, check=1, aliasfn=lambda name: name):
         <items>.
     aliasfn:
         Function that takes an alias and returns the full name.
+    sortfn:
+        If set we do `sortfn(items)` before returning.
     '''
     if deltas and not deltas[0].startswith(('+', '-')):
         del items[:]
@@ -595,6 +597,9 @@ def apply_deltas(items, deltas, check=1, aliasfn=lambda name: name):
                 delta = delta[1:]
             delta = aliasfn(delta)
             items.append(delta)
+    
+    if sortfn:
+        sortfn(items)
 
     
 def add_package(state, name, location):
@@ -660,14 +665,21 @@ def add_package(state, name, location):
     state.packages_build.append(name)
     state.packages_test.append(name)
 
+    packages_sort(state.packages_build)
+    packages_sort(state.packages_test)
+
+
+def packages_sort(items):
+    '''
+    Sort <items> by 'order' values in g_package_info.
+    '''
     def keyfn(name):
         info = g_package_info.get(name)
         if info:
             return info['order']
         else:
             return 0
-    state.packages_build.sort(key=keyfn)
-    state.packages_test.sort(key=keyfn)
+    items.sort(key=keyfn)
 
 
 def _add_key(state, prefix, path, env, pos):
