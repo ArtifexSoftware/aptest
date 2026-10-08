@@ -2996,6 +2996,10 @@ def do_test_single(state, package, failed_packages):
             # can use aptest's pytest.ini, and not find any matching test files.
             if package == 'aptest':
                 pipcl.run(f'pip install swig')
+            
+            if package == 'pymupdf_lite':
+                state.env_extra['PYMUPDF_TEST_USE_LAYOUT'] = '0'
+                state.env_extra['PYMUPDF_TEST_USE_4LLM'] = '0'
 
             if state.pytest_junit_xml:
                 path_junit_xml = f'{os.path.abspath(state.wheelhouse)}/{package}-pytest-junit.xml'
