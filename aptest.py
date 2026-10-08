@@ -3186,6 +3186,13 @@ def main(state, argv):
     # avoids recursion when we rerun ourselves on local or remote machine.
     del argv
     
+    Assert(
+            not ('pymupdf' in state.packages_build and 'pymupdf_lite' in state.packages_build)
+                and not ('pymupdf' in state.packages_test and 'pymupdf_lite' in state.packages_test)
+                ,
+            f'Only one of `pymupdf` and `pymupdf_lite` may be specified',
+            )
+    
     # Update convenience link to venv.
     venv_prefix = f'venv-aptest'
     try:
