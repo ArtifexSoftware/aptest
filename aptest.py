@@ -2005,6 +2005,15 @@ def set_pseudo_package_env(state):
             state.env_extra['PYMUPDFPRO_SOT_MARINA'] = '1'
 
 
+def create_wheel(state, *args, **kwargs):
+    '''
+    Creates a wheel by creating an internal pipcl.Package().
+    '''
+    package = pipcl.Package(*args, **kwargs)
+    leaf = package.build_wheel(state.wheelhouse)
+    return f'{state.wheelhouse}/{leaf}'
+
+
 def do_build(state):
     
     set_pseudo_package_env(state)
