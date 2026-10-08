@@ -1768,18 +1768,21 @@ def build_sdist(state, package, directory):
     '''
     Build sdist if <package> is allowed to have a sdist.
     '''
+    if not state.sdists:
+        return
+    if platform.system() != 'Linux':
+        return
     if package in (
             'pdf2docx',
             'pdf4llm',
             'pymupdf',
-            'pymupdf-core',
-            'pymupdf4llm',
             'pipcl',
             ):
         # pymupdf4llm's setup.py requires `-d` is after `sdist`.
         pipcl.run(
                 f'cd {directory} && python setup.py sdist -d {os.path.abspath(state.wheelhouse)}',
                 prefix=f'sdist {package}: ',
+                env_extra=state.env_extra,
                 )
 
 
