@@ -1800,6 +1800,20 @@ Options
     (note that ``sudo apt install espeak`` gives runtime error ``SetVoiceByName failed with unknown return code -1 for voice: gmw/en``.)
 
 
+.. _--bt:
+
+--bt <buildtest-packages-modify>
+.....................................
+    Modify both build and test package lists.
+    
+    Equivalent to ``-b <buildtest-packages-modify> -t <buildtest-packages-modify>``.
+    
+    Also see:
+    
+    * `-b`_.
+    * `-t`_.
+
+
 .. _--build-pip-no-clean:
 
 --build-pip-no-clean (bool)
@@ -1988,6 +2002,8 @@ Options
     
     If true, we include any branch/tag/remote specification in local git clone
     path with ``git:...``.
+    
+    We do not include Git sha's because this is less useful.
     
     For example with ``--git-local-detailed -m=git:-b 1.27.x``,
     the local directory will be ``aptest-git-mupdf--b_1.27.x``.
@@ -2560,8 +2576,8 @@ Also see:
 --release-1
 ...........
     Build release wheels for
-    ``pymupdf``, ``pymupdf_core``, ``pymupdf_office``, ``pymupdf4llm``, ``pdf4llm`` and ``pymupdf_layout``,
-    for core platforms ``linux-x64``, ``windows-x64`` and ``macos-arm64``.
+    ``pymupdf``, ``pymupdf_office``, ``pymupdf4llm`` (empty), ``pdf4llm`` and ``pymupdf_layout`` (empty),
+    for ``linux-x64``, ``windows-x64`` and ``macos-arm64``.
         
     Also builds sdists.
 
@@ -2569,43 +2585,50 @@ Also see:
 --release-2
 ...........
     Build release wheels for
-    ``pymupdf``, ``pymupdf_core``, ``pymupdf_office``, ``pymupdf4llm``, ``pdf4llm`` and ``pymupdf_layout``,
-    for platforms ``linux-aarch64`` and ``macos-x64``.
+    ``pymupdf``, ``pymupdf_office``, ``pymupdf4llm`` (empty), ``pdf4llm`` and ``pymupdf_layout`` (empty),
+    for ``linux-arm64``.
     
     Also see `Release procedure`_.
 
 
 --release-3
 ...........
-    Build release ``pymupdf_core`` wheel for platform ``windows-x32``.
+    Build release ``pymupdf_lite`` wheel for ``windows-x32``.
     
     Also see `Release procedure`_.
 
 
 --release-4
 ...........
-    Build release ``pymupdf_core`` wheel for platform ``linux-x64-musl``.
+    Build release ``pymupdf_lite`` wheel for ``linux-x64-musl``.
     
     Also see `Release procedure`_.
 
 
 --release-5
 ...........
-    Build release ``pymupdf_core`` wheel for platform ``pyodide``.
+    Build release ``pymupdf_lite`` wheel for ``pyodide``.
     
     Also see `Release procedure`_.
 
 
 --release-6
 ...........
-    Build release ``pymupdf_core`` wheel for platform ``linux-x64`` and free threading python-3.14.
+    Build release ``pymupdf_lite`` wheel for ``linux-x64`` and python-3.14t (free-threading).
     
     Also see `Release procedure`_.
 
 
 --release-7
 ...........
-    Build release ``pymupdf_core`` wheel for ``windows-arm64``.
+    Build release ``pymupdf_lite`` wheel for ``windows-arm64``.
+    
+    Also see `Release procedure`_.
+
+
+--release-8
+...........
+    Build release ``pymupdf_lite`` wheel for ``macos-intel``.
     
     Also see `Release procedure`_.
 
@@ -3112,6 +3135,24 @@ completion
 
 Changelog
 ---------
+
+**2026-10-08**
+
+* Added `--bt`_, to simultaneously change build and test lists.
+* Fixed `-b`_ and `-t`_, where build and test lists could become unsorted.
+* Don't include sha in local checkout name with `--git-local-detailed`_.
+* Release builds:
+
+  * Use `--bt`_ instead of just `-b`_, so correct tests are run.
+  * Build ``pymupdf_lite`` wheels if layout/4llm are not supported, e.g. on Pyodide.
+  * Added `--release-8`_ for macos-intel pymupdf-lite (onnxruntime not available).
+  * Aavoid github/windows/pymupdf-office problems with long file paths.
+* Increment minimum python version to 3.11, as 3.10 is end of life.
+* Removed ``--v1``, we don't currently attempt to be able to build old releases.
+* Support v2.0 ``pymupdf`` and ``pymupdf-lite`` packages.
+* Updated default github macos machine to macos-15, as macos-14 is being retired.
+* Use existing venv if we are already in one.
+
 
 **2026-09-28 b**
 
