@@ -1828,9 +1828,8 @@ def _4llm_new_layout(directory):
 
 def do_build_single(state, package):
     '''
-    Build and install <package>.
+    Build <package> and return path of wheel.
     '''
-    
     # We use `pip --extra-index-url {pip_index_url}` so that pip
     # finds prerequisite wheels in state.wheelhouse.
     pip_index_url = f'file://{os.path.abspath(state.wheelhouse)}/simple'
@@ -1874,10 +1873,6 @@ def do_build_single(state, package):
         ret_wheel = new_files.get_one()
     else:
         directory = _get_local(package, state)
-
-        if package == 'pymupdf4llm' and not _4llm_new_layout(directory):
-            # setup.py is in subdirectory pymupdf4llm/.
-            directory += '/pymupdf4llm'
         directory_abs = os.path.abspath(directory)
         pipcl.log(f'{package=} {directory=}')
         if package == 'mupdf':
@@ -1907,12 +1902,24 @@ def do_build_single(state, package):
                     env_extra=swig_env_extra,
                     prefix='{directory} make: ',
                     )
+        elif package in ('pymupdf_layout', 'pymupdf4llm'):
+            if 'pymupdf' in state.packages:
+                # Create empty wheel directly.
+                paths = glob.glob(f'{state.wheelhouse}/pymupdf-*.whl')
+                assert len(paths) == 1, f'Cannot find pymupdf wheel - needed this to build {package} ({paths=}).'
+                path = paths[0]
+                version = os.path.basename(path).split('-')[1]
+                ret_wheel = create_wheel(state, package, version, pure=True)
+            else:
+                # Do nothing.
+                pass
         else:
             if package:
                 pipcl.run(f'pip uninstall -y {package}')
-
-            if state.sdists:
-                build_sdist(state, package, directory)
+            if package == 'pymupdf':
+                pipcl.run(f'pip uninstall -y pymupdf_lite')
+            if package == 'pymupdf_lite':
+                pipcl.run(f'pip uninstall -y pymupdf pymupdf_layout pymupdf4llm')
 
             if (package == 'pymupdf'    # pylint: disable=too-many-boolean-expressions
                     and state.graal
@@ -1948,14 +1955,16 @@ def do_build_single(state, package):
                 state.env_extra['PIPCL_GRAAL_NATIVE_VENV'] = os.path.abspath(venv_native)
             
             _modify_build_env(state, package)
+            
+            build_sdist(state, package, directory)
 
             if state.build_type:
-                if package == ('pymupdf' if state.v1 else 'pymupdf_core'):
+                if package in ('pymupdf', 'pymupdf_lite'):
                     state.env_extra['PYMUPDF_SETUP_MUPDF_BUILD_TYPE'] = state.build_type
                 if package in ('pymupdfpro', 'pymupdf_office'):
                     state.env_extra['PYMUPDFPRO_SETUP_BUILD_TYPE'] = state.build_type
-                if package == 'pymupdf_layout':
-                    state.env_extra['PYMUPDF_LAYOUT_SETUP_BUILD_TYPE'] = state.build_type
+                #if package == 'pymupdf_layout':
+                #    state.env_extra['PYMUPDF_LAYOUT_SETUP_BUILD_TYPE'] = state.build_type
             
             pipcl.run(
                     f'pip wheel{pip_wheel_no_clean} --no-deps -v --extra-index-url {pip_index_url} -w {state.wheelhouse} {directory_abs}',
