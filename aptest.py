@@ -310,28 +310,26 @@ g_package_info = {
                 'order': 2,
                 'pure': True,
             },
-        'pymupdf_core':
+        'pymupdf':
             {
                 'git_remote': 'git@github.com:pymupdf/PyMuPDF.git',
                 'git_branch': 'main',
                 'aliases':  ['p'],
                 'order': 1,
             },
-        'pymupdf':
+        'pymupdf_lite':
             {
                 'git_remote': 'git@github.com:pymupdf/PyMuPDF.git',
                 'git_branch': 'main',
-                'aliases':  ['pall'],
+                'aliases':  ['plite'],
                 'order': 1,
-                'directory': 'pymupdf-all',
-                'pure': True
             },
         'pymupdf4llm':
             {
                 'git_remote': 'git@github.com:pymupdf/pymupdf4llm.git',
                 'git_branch': 'main',
                 'aliases':  ['4llm'],
-                'order': 3, # Need to be higher than pymupdf_layout.
+                'order': 2, # Need to be higher than pymupdf_layout.
                 'pure': True,
             },
         'pdf4llm':
@@ -343,19 +341,12 @@ g_package_info = {
                 'order': 4, # Need to be higher than pymupdf_layout.
                 'pure': True,
             },
-        'pymupdfpro':
-            {
-                'git_remote': 'git@github.com:ArtifexSoftware/PyMuPDFPro.git',
-                'git_branch': 'main',
-                'aliases':  ['pro'],
-                'order': 2,
-            },
         'pymupdf_office':
             {
                 'git_remote': 'git@github.com:ArtifexSoftware/PyMuPDFPro.git',
                 'git_branch': 'main',
                 'aliases':  ['office'],
-                'order': 2,
+                'order': 3, # Need to be after layout/4llm.
             },
         'pymupdf_layout':
             {
@@ -364,6 +355,7 @@ g_package_info = {
                 'aliases':  ['layout'],
                 'submodules': False,
                 'order': 2,
+                'pure': 1,
             },
         'langchain_pymupdf_layout':
             {
