@@ -97,7 +97,7 @@ g_root = pipcl.relpath(g_root_abs)
 g_date_time = time.strftime('%F-%H-%M-%S')
 
 # With cibw we build and test Python 3.x for x in this range.
-python_versions_minor = range(10, 14+1)
+python_versions_minor = range(11, 14+1)
 
 # We use APTEST_NESTED to indicate that we are being re-run inside a venv or on
 # a remote machine, by an outer aptest invocation.
