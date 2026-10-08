@@ -1013,7 +1013,7 @@ def get_args(state, argv):
             
             elif arg == '--devel':
                 state.devel = args.get_bool()
-
+            
             elif arg == '--draft-location':
                 state.draft_location = next(args).as_str()
 
@@ -1067,7 +1067,7 @@ def get_args(state, argv):
             
             elif arg == '--graal':
                 state.graal = args.get_bool(overwrite=0)
-
+            
             elif arg in ('-h', '--help'):
                 state.show_help = True
 
