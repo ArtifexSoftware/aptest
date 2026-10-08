@@ -486,7 +486,7 @@ def gh_runner_alias(name):
     Returns full name if arg is an alias for a github runner OS.
     '''
     runner_aliases = [
-            ('macos-14',         ['macos', 'macos-arm']),
+            ('macos-15',         ['macos', 'macos-arm']),
             ('macos-15-intel',   ['macos-intel']),
             ('ubuntu-24.04-arm', ['linux-arm']),
             ('ubuntu-latest',    ['linux', 'linux-intel']),
