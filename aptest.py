@@ -952,7 +952,15 @@ def get_args(state, argv):
             elif arg == '-b':
                 _names = next(args).as_text()
                 _names = _names.split(',') if _names else list()
-                apply_deltas(state.packages_build, _names, aliasfn=package_alias)
+                apply_deltas(state.packages_build, _names, aliasfn=package_alias, sortfn=packages_sort)
+                for p in state.packages_build:
+                    Assert(p in state.packages, f'Package location not specified: {p}.')
+
+            elif arg == '--bt':
+                _names = next(args).as_text()
+                _names = _names.split(',') if _names else list()
+                apply_deltas(state.packages_build, _names, aliasfn=package_alias, sortfn=packages_sort)
+                apply_deltas(state.packages_test, _names, aliasfn=package_alias, sortfn=packages_sort)
                 for p in state.packages_build:
                     Assert(p in state.packages, f'Package location not specified: {p}.')
 
@@ -1290,7 +1298,7 @@ def get_args(state, argv):
             elif arg == '-t':
                 _names = next(args).as_text()
                 _names = _names.split(',') if _names else list()
-                apply_deltas(state.packages_test, _names, aliasfn=package_alias)
+                apply_deltas(state.packages_test, _names, aliasfn=package_alias, sortfn=packages_sort)
 
             elif arg == '--tee-auto':
                 tee_auto = args.get_bool()
