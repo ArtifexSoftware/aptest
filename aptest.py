@@ -2063,10 +2063,27 @@ def read_pytest_junit(path):
         pipcl.log(f'Failed to read pytest junit file {path=}: {e}')
 
 
-def do_cibw_single(state, package, CIBW_BUILD, cibw_pyodide_args, do_test=1):
+def do_cibw_single(state, package, CIBW_BUILD, cibw_pyodide_args, *, do_test=1):
+    '''
+    Run cibuildwheel to build and test a package.
+    
+    Args:
+        state
+            .
+        package
+            .
+        CIBW_BUILD
+            .
+        cibw_pyodide_args
+            .
+        do_test
+            If false we do not set CIBW_TEST_COMMAND.
+    '''
     pipcl.log(f'{package=}')
+    pipcl.log(f'{do_test=}')
+    
     directory = _get_local(package, state)
-
+    
     if not directory:
         # location is pip.
         pipcl.log(f'Unable to process with cibuildwheel because location is pip: {package=} and no second location')
@@ -2085,7 +2102,6 @@ def do_cibw_single(state, package, CIBW_BUILD, cibw_pyodide_args, do_test=1):
         #    continue
         #name = f'{package}{location[4:]}'
         #state.env_extra['CIBW_BUILD_FRONTEND'] = f'pip wheel {name}'
-
 
     pipcl.log(f'{package} _get_local() => {directory=}')
     directory_abs = os.path.abspath(directory)
@@ -2138,10 +2154,6 @@ def do_cibw_single(state, package, CIBW_BUILD, cibw_pyodide_args, do_test=1):
 
         return
 
-    if state.sdists and platform.system() == 'Linux':
-        pipcl.log(f'Calling build_sdist() {package=} {directory=}.')
-        build_sdist(state, package, directory)
-
     python_version_tuple = (
             int(platform.python_version_tuple()[0]),
             int(platform.python_version_tuple()[1]),
@@ -2158,64 +2170,78 @@ def do_cibw_single(state, package, CIBW_BUILD, cibw_pyodide_args, do_test=1):
             ):
         pipcl.log(f'Not doing build/test on macos/intel/python-3.14 because onnxruntime not available: {package=}')
 
-    #elif package in ('pymupdf', 'pdf2docx', 'pdf4llm', 'pymupdf4llm', 'pipcl'):
-    elif g_package_info[package].get('pure'):
+    elif g_package_info[package].get('pure'):   # pylint: disable=too-many-nested-blocks
         # Build/test directly because pure python.
         pipcl.log(f'Not using cibuildwheel for {package=} because cibuildwheel does not support pure python wheels.')
         new_files = pipcl.NewFiles(f'{state.wheelhouse}/*.whl')
         do_build_single(state, package)
         failed_packages = list()
-        #pipcl.run(f'pip list')
-        # Delete any new prerequisite wheels that are not for <package>, so
-        # we behave like cibuildwheel.
-        new_wheels = new_files.get()
-        assert len(new_wheels) == 1
-        for wheel_path in new_wheels:
-            assert wheel_path.endswith('.whl')
-            #if not os.path.basename(wheel_path).startswith(f'{package}-'):
-            #    pipcl.log(f'Deleting {wheel_path=}.')
-            #    pipcl.fs_remove(wheel_path)
+        wheel_path = new_files.get_one()
+        assert wheel_path.endswith('.whl')
 
         if do_test and package in state.packages_test:
-            pip_index_url = f'file://{os.path.abspath(state.wheelhouse)}/simple'
-            pip_index_url = pip_index_url.replace('\\', '/')
-            pipcl.run(f'pip install --extra-index-url {pip_index_url} {wheel_path}')
-            do_test_single(state, package, failed_packages)
+            if package in ('pymupdf_layout', 'pymupdf4llm'):
+                pipcl.log(f'Not testing {package=} directly - this is done as part of test of pymupdf.')
+            else:
+                pip_index_url = f'file://{os.path.abspath(state.wheelhouse)}/simple'
+                pip_index_url = pip_index_url.replace('\\', '/')
+                pipcl.run(f'pip install --extra-index-url {pip_index_url} {wheel_path}')
+                do_test_single(state, package, failed_packages)
 
         if failed_packages:
             raise Exception(f'Test failed for {package=}.')
 
     else:
         # Run cibuildwheeel.
-        _modify_build_env(state, package)
+        _modify_build_env(state, package, cibw=True)
 
         # Tell cibuildwheel how to test <package>.
-        if do_test and package in state.packages_test:
-            CIBW_TEST_COMMAND = f'pip install --upgrade pytest'
-            if state.pytest_timeout:
-                CIBW_TEST_COMMAND += f' && pip install --upgrade pytest-timeout'
-            CIBW_TEST_COMMAND += f' && pip list'
-            CIBW_TEST_COMMAND += f' && pytest'
-            if state.pytest_timeout:
-                CIBW_TEST_COMMAND += f' --timeout {state.pytest_timeout}'
-            if state.pytest_timeout_method:
-                CIBW_TEST_COMMAND += f' --timeout-method {state.pytest_timeout_method}'
-            if state.pytest_junit_xml:
-                path_junit_xml = f'{os.path.abspath(state.wheelhouse)}/{package}-pytest-junit.xml'
-                CIBW_TEST_COMMAND += f' --junit-xml={path_junit_xml}'
-            if state.pytest_options:
-                CIBW_TEST_COMMAND += f' {state.pytest_options}'
+        if do_test:
+            dirs = list()
+            pipcl.log(f'{package=} {state.packages_test=}')
+            if package in state.packages_test:
+                dirs.append('{project}')
+            if package == 'pymupdf':
+                # Also test layout/4llm here.
+                for p in ('pymupdf_layout', 'pymupdf4llm'):
+                    if p in state.packages_test:
+                        dirs.append(abspath(state, _get_local(p, state), cibw=True))
+            if package == 'pymupdf_lite':
+                state.env_extra['PYMUPDF_TEST_USE_LAYOUT'] = '0'
+                state.env_extra['PYMUPDF_TEST_USE_4LLM'] = '0'
             if state.pytest_paths:
-                for path in state.pytest_paths:
-                    CIBW_TEST_COMMAND += ' ' + f'{{project}}/{path}'.replace('/', os.sep)
+                leafs = state.pytest_paths
             else:
-                CIBW_TEST_COMMAND += ' ' + f'{{project}}/tests'.replace('/', os.sep)
-            if state.cibw_ignore_test_failures:
-                CIBW_TEST_COMMAND += ' || true'
-            state.env_extra['CIBW_TEST_COMMAND'] = CIBW_TEST_COMMAND
+                leafs = ['tests']
+            dirs2 = list()
+            for d in dirs:
+                for leaf in leafs:
+                    dirs2.append(f'{d}/{leaf}')
+            
+            if dirs2:
+                CIBW_TEST_COMMAND = f'pip install --upgrade pytest'
+                if state.pytest_timeout:
+                    CIBW_TEST_COMMAND += f' && pip install --upgrade pytest-timeout'
+                CIBW_TEST_COMMAND += f' && pip list'
+                
+                for d in dirs2:
+                    CIBW_TEST_COMMAND += f' ; ' if state.cibw_ignore_test_failures else ' && '
+                    CIBW_TEST_COMMAND += f'pytest'
+                    if state.pytest_timeout:
+                        CIBW_TEST_COMMAND += f' --timeout {state.pytest_timeout}'
+                    if state.pytest_timeout_method:
+                        CIBW_TEST_COMMAND += f' --timeout-method {state.pytest_timeout_method}'
+                    if state.pytest_junit_xml:
+                        path_junit_xml = f'{os.path.abspath(state.wheelhouse)}/{package}-pytest-junit.xml'
+                        CIBW_TEST_COMMAND += f' --junit-xml={path_junit_xml}'
+                    if state.pytest_options:
+                        CIBW_TEST_COMMAND += f' {state.pytest_options}'
+                    CIBW_TEST_COMMAND += ' ' + d.replace('/', os.sep)
+                
+                state.env_extra['CIBW_TEST_COMMAND'] = CIBW_TEST_COMMAND
 
         else:
-            pipcl.log(f'Not testing because not in state.packages_test: {package=}')
+            pipcl.log(f'Not testing because {do_test=},')
         # fixme: prefer to just run pytest directly. Needs
         # test/conftest.py to always `pip install` packages
         # required for testing.
@@ -2302,6 +2328,12 @@ def do_cibw_single(state, package, CIBW_BUILD, cibw_pyodide_args, do_test=1):
         CIBW_ENVIRONMENT_PASS_LINUX.sort()
         CIBW_ENVIRONMENT_PASS_LINUX = ' '.join(CIBW_ENVIRONMENT_PASS_LINUX)
         env_extra['CIBW_ENVIRONMENT_PASS_LINUX'] = CIBW_ENVIRONMENT_PASS_LINUX
+        
+        pipcl.log(f'Before running cibuildwheel, contents of {state.wheelhouse=} are:')
+        for dirpath, dirnames, filenames in os.walk(state.wheelhouse):
+            for filename in filenames:
+                p = os.path.join(dirpath, filename)
+                pipcl.log(f'    {p}')
         try:
             pipcl.run(
                     f'cd {directory} && cibuildwheel{cibw_pyodide_args}'
