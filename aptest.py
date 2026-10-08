@@ -1786,7 +1786,7 @@ def build_sdist(state, package, directory):
                 )
 
 
-def _modify_build_env(state, package):
+def _modify_build_env(state, package, cibw=False):
     '''
     Set state.env_extra PYMUPDFPRO_SETUP_SOT_KEY_PATH /
     PYMUPDFPRO_SETUP_SOT_KEY if required.
@@ -1805,6 +1805,17 @@ def _modify_build_env(state, package):
             state.env_extra['PYMUPDFPRO_SETUP_SOT_KEY_PATH'] = os.path.abspath(key_path)
         elif key_env:
             state.env_extra['PYMUPDFPRO_SETUP_SOT_KEY'] = os.environ[key_env]
+    
+    if package == 'pymupdf':
+        assert 'pymupdf_layout' in state.packages and 'pymupdf4llm' in state.packages, (
+                'Package pymupdf requires pymupdf_layout and pymupdf4llm'
+                )
+        state.env_extra['PYMUPDF_SETUP_PATH_LAYOUT'] = abspath(state, _get_local('pymupdf_layout', state), cibw=cibw)
+        state.env_extra['PYMUPDF_SETUP_PATH_4LLM'] = abspath(state, _get_local('pymupdf4llm', state), cibw=cibw)
+
+    if package == 'pymupdf_lite':
+        state.env_extra.pop('PYMUPDF_SETUP_PATH_LAYOUT', None)
+        state.env_extra.pop('PYMUPDF_SETUP_PATH_4LLM', None)
 
 
 def _4llm_new_layout(directory):
