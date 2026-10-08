@@ -1143,20 +1143,13 @@ def get_args(state, argv):
                 state.remote = _remote.as_text()
 
             elif arg.startswith('--release-'):
-                # Must be last arg.
-                #assert args.pos[0] == len(args.argv), f'{len(args.argv)=} {args.pos=}.'
-                Assert(not state.v1, 'Cannot make 1.x releases.')
-                Assert(
-                        not state.git_local_detailed,
-                        'Do not specify --git-local-detailed,'
-                        ' because the resulting long directory name has been seen to break PyMuPDF:docs/samples/code-printer.py.'
-                        )
                 new_args = ''
                 new_args += f' --log-prefix {shlex.quote(arg.as_str() + ": ")}'
                 pipcl.log(f'{new_args=}')
                 new_args += ' -r @github'
                 new_args += ' cibw'
                 new_args += ' --check-unchanged'
+                new_args += ' --git-local-detailed=0'
                 
                 # We do not allow --MUPDF to be specified when making releases,
                 # because we should use pymupdf's hard-coded default.
