@@ -24,7 +24,7 @@ jobs:
         os: [
                 ubuntu-latest,
                 windows-2022,
-                macos-14,
+                macos-15,
                 ]
 
       # Avoid cancelling of all runs after a single failure.
@@ -42,7 +42,7 @@ jobs:
           ARTIFEX_SOFTWARE_SSH_KEY: ${{secrets.ARTIFEX_SOFTWARE_SSH_KEY}}
           PYMUPDFPRO_SETUP_SOT_KEY: ${{secrets.PYMUPDFPRO_SETUP_SOT_KEY}}
         run:
-          'python aptest.py -m "git:-b 1.28.x" -P git: --OFFICE git: --LAYOUT git: --4LLM git: --PDF4LLM git: --wheelhouse-release aptest-wheelhouse-release --release-1 -a APTEST_args'
+          'python aptest.py -m "git:-b 1.28.x" -P git: --LAYOUT git: --4LLM git: --OFFICE git: --PDF4LLM git: --wheelhouse-release aptest-wheelhouse-release --release-1 -a APTEST_args'
       
       # Upload generated wheels, to be accessible from github Actions page.
       #
