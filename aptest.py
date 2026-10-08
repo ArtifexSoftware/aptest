@@ -3403,6 +3403,11 @@ def main(state, argv):
             sha, comment, diff, branch = pipcl.git_info(directory)
             state.results['packages'][package]['git'] = dict(sha=sha, comment=comment, diff=diff, branch=branch)
     
+    if 1:
+        pipcl.log(f'{state.packages=}')
+        pipcl.log(f'{state.packages_build=}')
+        pipcl.log(f'{state.packages_test=}')
+    
     try:    # pylint: disable=too-many-nested-blocks.
         # Handle commands.
         #
@@ -3595,7 +3600,7 @@ def _get_local(package, state, test=False):
                 # pipcl.git_get_parse_text() so we can ignore any sha, because
                 # it's less useful to have per-sha clones.
                 pipcl.log(f'{tail=}')
-                branch, depth, remote, sha, tag = pipcl.git_get_parse_text(location)
+                branch, _depth, remote, sha, tag = pipcl.git_get_parse_text(location)
                 def escape(text):
                     return re.sub('[\\/ "\':-]', '_', text)
                 if branch:
