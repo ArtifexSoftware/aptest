@@ -2389,6 +2389,7 @@ def do_cibw(state):
     
     Writes pytest results into state.results['packages'][package]['junit'].
     '''
+    pipcl.log(f'{state.packages_test=}')
     pipcl.run(
             f'pip install --upgrade --force-reinstall {state.cibw_name}',
             prefix=f'pip install {state.cibw_name}: ',
@@ -2491,7 +2492,7 @@ def do_cibw(state):
         # CIBW_PYODIDE_VERSION.
         state.env_extra['CIBW_PYODIDE_VERSION'] = state.cibw_pyodide_version
         state.env_extra['CIBW_ENABLE'] = 'pyodide-prerelease'
-
+    
     # 2026-09-16:
     #
     # We need to run cibuildwheel on each of the packages twice, so that
@@ -2512,14 +2513,12 @@ def do_cibw(state):
     # step, and instead use the wheel in the wheelhouse. But this doesn't
     # appear to be possible.)
     #
-    for package in state.packages_build:
-        do_cibw_single(state, package, CIBW_BUILD, cibw_pyodide_args, do_test=0)
     
     for package in state.packages_build:
-        if package in state.packages_test:
-            do_cibw_single(state, package, CIBW_BUILD, cibw_pyodide_args, do_test=1)
-        else:
-            pipcl.log(f'Not calling do_cibw_single() because not in state.packages_test: {package=}')
+        do_cibw_single(state, package, CIBW_BUILD, cibw_pyodide_args, do_test=0)
+
+    for package in state.packages_test:
+        do_cibw_single(state, package, CIBW_BUILD, cibw_pyodide_args, do_test=1)
     
     pipcl.log(f'Build/test succeeded for packages {state.packages_build}.')
 
