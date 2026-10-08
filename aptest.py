@@ -3386,10 +3386,11 @@ def main(state, argv):
     
     if (1
             and 'mupdf' in state.packages
-            and ('pymupdf' if state.v1 else 'pymupdf_core') not in state.packages
+            and 'pymupdf' not in state.packages
+            and 'pymupdf_lite' not in state.packages
             and 'run' not in state.commands
             ):
-        Assert(0, f'If `mupdf` is specified then `{"pymupdf" if state.v1 else "pymupdf_core"}` should also be specified.')
+        Assert(0, f'If `mupdf` is specified then pymupdf or pymupdf_lite should also be specified.')
     
     # Populate state.results with package information.
     state.results['packages'] = dict()
