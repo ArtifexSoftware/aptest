@@ -1170,7 +1170,7 @@ def get_args(state, argv):
                 
                 # Add all packages registered with upper-case names. Each
                 # --release-* arg will select the packages is needs to build
-                # with `-b`.
+                # and test, using `--bt`.
                 for package, location in state.packages_for_release.items():
                     new_args += f' --{package} {shlex.quote(location.as_str())}'
                 
@@ -1179,30 +1179,27 @@ def get_args(state, argv):
                 
                 elif arg == '--release-test':
                     # Undocumented test option, for quick test of github.
-                    pass
-                    #new_args += f' --sdists -b {b_mupdf}pymupdf4llm --cibw-ignore-test-failures'
+                    new_args += ' --bt -'
                 
                 elif arg == '--release-1':
-                    # Build core wheels and sdist.
-                    # [pymupdf4llm is pure python so doesn't need to be
-                    # mentioned in other --release-* options.]
-                    new_args += f' -b {b_mupdf}pymupdf_core,pymupdf,pymupdf_office,pymupdf_layout,pymupdf4llm,pdf4llm --sdists'
+                    # windows-x64, linux-x64, macos-arm64.
+                    new_args += f' --bt {b_mupdf}pymupdf,pymupdf_office,pymupdf_layout,pymupdf4llm,pdf4llm --sdists'
                 
                 elif arg == '--release-2':
-                    # Build macos-intel and linux-arm wheels.
-                    new_args += f' -b {b_mupdf}pymupdf_core,pymupdf,pymupdf_office,pymupdf_layout,pymupdf4llm,pdf4llm --remote-github-runners macos-intel,linux-arm'
+                    # linux-arm64.
+                    new_args += f' --bt {b_mupdf}pymupdf,pymupdf_office,pymupdf_layout,pymupdf4llm,pdf4llm --remote-github-runners linux-arm'
                 
                 elif arg == '--release-3':
-                    # Build for win-x32.
-                    new_args += f' -b {b_mupdf}pymupdf_core,pymupdf --remote-github-runners windows -e CIBW_ARCHS_WINDOWS=x86 --cibw-skip-add-defaults=0'
+                    # windows-x32.
+                    new_args += f' --bt {b_mupdf}pymupdf_lite --remote-github-runners windows -e CIBW_ARCHS_WINDOWS=x86 --cibw-skip-add-defaults=0'
                 
                 elif arg == '--release-4':
-                    # Build for linux-musllinux.
-                    new_args += f' -b {b_mupdf}pymupdf_core,pymupdf --remote-github-runners linux -e "CIBW_BUILD=cp310-musllinux_x86_64" --cibw-skip-add-defaults=0'
+                    # linux-musllinux-x64.
+                    new_args += f' --bt {b_mupdf}pymupdf_lite --remote-github-runners linux -e "CIBW_BUILD=cp311-musllinux_x86_64" --cibw-skip-add-defaults=0'
                 
                 elif arg == '--release-5':
                     # Build for Pyodide.
-                    new_args += f' -b {b_mupdf}pymupdf_core,pymupdf --cibw-pyodide --remote-github-runners linux'
+                    new_args += f' --bt {b_mupdf}pymupdf_lite --cibw-pyodide --remote-github-runners linux'
                 
                 elif arg == '--release-6':
                     # Build for cp314t.
@@ -1211,11 +1208,15 @@ def get_args(state, argv):
                     # py_limited_api and Py_GIL_DISABLED are not supported
                     # together as of 2026-02-20, e.g. see PEP 803 and PEP 809.
                     #
-                    new_args += f' -b {b_mupdf}pymupdf_core,pymupdf --remote-github-runners linux --cibw-skip-add-defaults=0 -e CIBW_BUILD="cp314t*" -e CIBW_SKIP="*musllinux*" -e PYMUPDF_SETUP_PY_LIMITED_API=0'
+                    new_args += f' --bt {b_mupdf}pymupdf_lite --remote-github-runners linux --cibw-skip-add-defaults=0 -e CIBW_BUILD="cp314t*" -e CIBW_SKIP="*musllinux*" -e PYMUPDF_SETUP_PY_LIMITED_API=0'
                 
                 elif arg == '--release-7':
-                    # Build pymupdf for windows-arm64.
-                    new_args += f' -b {b_mupdf}pymupdf_core,pymupdf -e PYMUPDF_SETUP_MUPDF_VS_UPGRADE=1 --remote-github-runners windows-arm64'
+                    # windows-arm64.
+                    new_args += f' --bt {b_mupdf}pymupdf_lite -e PYMUPDF_SETUP_MUPDF_VS_UPGRADE=1 --remote-github-runners windows-arm64'
+                
+                elif arg == '--release-8':
+                    # Macos-intel (onnxruntime not available).
+                    new_args += f' --bt {b_mupdf}pymupdf_lite --remote-github-runners macos-intel'
                 
                 else:
                     Assert(0, f'Unrecognised {arg=}.')
