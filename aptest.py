@@ -2365,6 +2365,22 @@ def do_cibw_single(state, package, CIBW_BUILD, cibw_pyodide_args, *, do_test=1):
                 st = os.stat(path_dir)
                 pipcl.log(f'{st=}: {path_dir=}')
 
+    build_sdist(state, package, directory)
+
+
+def abspath(state, path, cibw):
+    '''
+    Like os.path.abspath() but if <cibw> is true and we are on linux, prefix
+    with `/host` so that the path works from within manylinux docker.
+    '''
+    path = os.path.abspath(path)
+    if platform.system() == 'Linux':
+        if cibw:
+            if not state.cibw_pyodide:
+                # We will be inside a manylinux docker.
+                path = f'/host{path}'
+    return path
+
 
 def do_cibw(state):
     '''
