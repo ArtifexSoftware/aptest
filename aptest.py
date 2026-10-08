@@ -808,8 +808,6 @@ def make_state():
     if GITHUB_ACTIONS == 'true':
         state.verbose = True
     
-    state.v1 = False
-    
     state.wheelhouse = 'aptest-wheelhouse'
     state.wheelhouse_release = None
     
@@ -931,13 +929,6 @@ def get_args(state, argv):
             if 0:
                 pass
             
-            elif arg == '--v1':
-                del g_package_info['pymupdf_core']
-                del g_package_info['pymupdf']['directory']
-                g_package_info['pymupdf']['pure'] = False
-                g_package_info['pymupdf']['aliases'] = ['p']
-                state.v1 = True
-
             elif arg == '-a':
                 pos1 = args.pos
                 pipcl.log(f'{pos0=}')
