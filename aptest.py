@@ -770,7 +770,7 @@ def make_state():
     state.remote_do = True
     state.remote_github_workflow_id = None
     state.remote_github_runners = [
-            'macos-14',
+            'macos-15',
             #'macos-15-intel',
             'ubuntu-latest',
             'windows-2022',
