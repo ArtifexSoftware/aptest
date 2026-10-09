@@ -18,8 +18,8 @@ jobs:
       matrix:
         os: [
                 ubuntu-latest,
-                #windows-latest,
-                #macos-latest,
+                #windows-latest,    # python3.15 not visible. (but python3.15t is.)
+                #macos-latest,  # Director errors.
                 ]
         
         args: [
