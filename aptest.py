@@ -297,7 +297,7 @@ g_package_info = {
             },
         'mupdf':
             {
-                'git_remote': 'git@github.com:ArtifexSoftware/mupdf.git',
+                'git_remote': 'https://github.com/ArtifexSoftware/mupdf.git',
                 'git_branch': 'master',
                 'aliases':  ['m'],
                 'order': 0,
@@ -326,7 +326,7 @@ g_package_info = {
             },
         'pymupdf4llm':
             {
-                'git_remote': 'git@github.com:pymupdf/pymupdf4llm.git',
+                'git_remote': 'https://github.com/pymupdf/pymupdf4llm.git',
                 'git_branch': 'main',
                 'aliases':  ['4llm'],
                 'order': 2, # Need to be higher than pymupdf_layout.
@@ -350,7 +350,7 @@ g_package_info = {
             },
         'pymupdf_layout':
             {
-                'git_remote': 'git@github.com:ArtifexSoftware/pymupdf_layout.git',
+                'git_remote': 'https://github.com/ArtifexSoftware/pymupdf_layout.git',
                 'git_branch': 'main',
                 'aliases':  ['layout'],
                 'submodules': False,
