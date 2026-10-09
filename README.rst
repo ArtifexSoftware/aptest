@@ -91,27 +91,24 @@ Supported packages
 * ``mupdf``
 * ``parse_bench``
 * ``pdf2docx``
-* ``pdf_feature_inspector``
 * ``pipcl``
 * ``pymupdf``
 * ``pymupdf4llm``
-* ``pymupdf_core``
 * ``pymupdf_layout``
+* ``pymupdf_lite``
+* ``pymupdf_mid``
 * ``pymupdf_office``
-* ``pymupdfpro``
-* ``smartoffice``
 * ``smartoffice-marina``
-* ``smartoffice-neo``
+* ``swig``
 
 Notes:
 
-* Only one of ``smartoffice``, ``smartoffice-marina`` and ``smartoffice-neo`` can be specified.
-* ``mupdf``, ``smartoffice``, ``smartoffice-marina`` and ``smartoffice-neo`` are pseudo packages.
+* ``mupdf`` and ``smartoffice-marina`` are pseudo packages.
 
   They are not built into python wheels, instead:
 
-  * ``mupdf`` is built into ``pymupdf_core``.
-  * ``smartoffice``, ``smartoffice-marina`` and ``smartoffice-neo`` are built into ``pymupdfpro`` or ``pymupdf_office``.
+  * ``mupdf`` is built into ``pymupdf`` or ``pymupdf_lite``.
+  * ``smartoffice-marina`` is built into ``pymupdf_office``.
 
 See the `-i`_ option.
 
@@ -124,39 +121,6 @@ Package locations
 * https://pypi.org.
 
 See the `-i`_ option.
-
-
-Usage with v2 packages
-----------------------
-
-As of 2026-09, Pymupdf 2.x defaults to requiring the same version of layout and 4llm.
-
-* This means that instead of specifying package ``pymupdf``,
-  it is usually necessary to specify locations for packages ``pymupdf-core``, ``pymupdf4llm`` and ``pymupdf_layout``.
-
-  For example:
-
-  ``aptest/aptest.py -p PyMuPDF --layout pymupdf_layout --4llm pymupdf4llm build test``
-
-Otherwise things can go wrong in various ways, for example:
-
-* ``aptest/aptest.py -p PyMuPDF build test``
-  
-  * This will build and install ``pymupdf-core``, the main Pymupdf code.
-  * But it will not build or install layout or 4llm.
-  * So tests could fail depending on what versions (if any) of layout and 4llm are already installed in the venv.
-
-This situation is not ideal
-- the use of multiple core packages makes routine development more complicated than it needs to be.
-
-* To make things slightly easier,
-  one can preset locations of packages in `~/.aptest`_ using upper-case names,
-  and activate them with special location ``@``:
-
-  * In `~/.aptest`_, add a line ``-P PyMuPDF --LAYOUT pymupdf_layout --4LLM pymupdf4llm``.
-  * Then run ``aptest/aptest.py -p @ --layout @ --4llm @ ...``
-
-* Other ways of simplifying usage will hopefully be added in future.
 
 
 Building packages
@@ -187,6 +151,41 @@ For each package:
 * We use pip's ``--extra-index-url`` option to refer to our internal package
   repository.
 * Thus pip will use previously built package wheels as prerequisites, as required.
+
+
+Building pymupdf vs pymupdf_lite
+--------------------------------
+
+As of 2026-10, package ``pymupdf`` requires layout and 4llm checkouts/installs at build/run time.
+
+* This means that when specifying package ``pymupdf``,
+  one should also specify ``pymupdf4llm`` and ``pymupdf_layout``.
+
+  For example:
+
+  ``aptest/aptest.py -p PyMuPDF --layout pymupdf_layout --4llm pymupdf4llm build test``
+
+One can instead build ``pymupdf_lite``.
+
+* This builds without layout and 4llm.
+
+  For example:
+
+    ``aptest/aptest.py --plite PyMuPDF build test``
+
+Aptest will fail if asked to build inconsistent or contradictory packages:
+
+* ``pymupdf`` without layout or 4llm.
+* ``pymupdf-lite`` with layout or 4llm.
+* ``pymupdf`` and ``pymupdf-lite``.
+
+
+* To make things slightly easier to specify,
+  one can preset default locations of packages in `~/.aptest`_ using upper-case names,
+  and activate them with special location ``@``:
+
+  * In `~/.aptest`_, add a line ``-P PyMuPDF --LAYOUT pymupdf_layout --4LLM pymupdf4llm``.
+  * Then run ``aptest/aptest.py -p @ --layout @ --4llm @ ...``
 
 See the `build`_ command.
 
@@ -236,14 +235,9 @@ by default,
 it will remove the contents of the wheelhouse before building anything,
 so don't assume previous builds will be available.
   
-* So for example when building pymupdf4llm,
-  if one intends to use the new build of pymupdf4llm with a similar new build of pymupdf
-  (instead of pymupdf from pypi.org),
-  then one should also build pymupdf, for example with:
-  
-  ``aptest/aptest.py -m=git: -p=git: --4llm pymupdf4llm build``
-  
-  Usually rebuilding pypmupdf like this will be faily quick.
+* Usually rebuilding doesn't do unnecessary work, so will be faily quick.
+* One can use ``-b -m`` to disable rebuilds of ``mupdf`` (see `-b`_).
+
 
 Forcing a rebuild of MuPDF on Windows
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -262,12 +256,12 @@ generated/installed.]
 Basic build and test
 ^^^^^^^^^^^^^^^^^^^^
 
-Using local checkouts, build packages ``pymupdf``, ``office`` and ``pymupdf_layout``
+Using local checkouts, build packages ``pymupdf`` and ``office``
 (putting wheels into directory ``aptest-wheelhouse/``),
 install (into current venv or ``venv-aptest-<pthonversion>-<wordsize>``)
 and test:
 
-    ``aptest/aptest.py -p PyMuPDF --office PyMuPDFPro -m mupdf --layout pymupdf_layout build test``
+    ``aptest/aptest.py -m mupdf -p PyMuPDF --layout pymupdf_layout --4llm pymupdf4llm --office PyMuPDFPro build test``
 
 Similarly build, install and test ``pymupdf``, ``pymupdf_office`` and ``pymupdf_layout`` using
 central git repositories:
@@ -287,6 +281,9 @@ and uploading to https://pypi.org (also see `Release procedure`_)::
     aptest/aptest.py --release-5
     aptest/aptest.py --release-6
     aptest/aptest.py --release-7
+    aptest/aptest.py --release-8
+
+(See `Release procedure`_ for details.)
 
 Build and test using cibuildwheel
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -294,12 +291,12 @@ Build and test using cibuildwheel
 Build/test ``pymupdf``, ``office`` and ``pymupdf-layout`` using cibuildwheel,
 getting packages from different locations:
 
-    ``aptest/aptest.py -r @github -p pip: --office PyMuPDFPlus --layout git: cibw``
+    ``aptest/aptest.py -p pip: --layout git: --4llm git: --office PyMuPDFPro cibw``
 
 Test current release
 ^^^^^^^^^^^^^^^^^^^^
 
-Test current ``pymupdf`` release with latest test suite in central git:
+Test current ``pymupdf`` release on pypi.org with latest test suite in central git:
 
     ``aptest/aptest.py -p pip: -p git: build test``
 
@@ -309,14 +306,14 @@ Test current ``pymupdf`` release with test suite in local checkout:
 
 Running on Github
 ^^^^^^^^^^^^^^^^^^
-Runs specific Github workflow ``PyMuPDFPlus/.github/workflows/test_multiple.yml``, on windows only:
+Runs specific Github workflow ``PyMuPDFPro/.github/workflows/test_multiple.yml``, on windows only:
 
-    ``aptest/aptest.py -r @github --remote-github-yml test_multiple.yml --office PyMuPDFPlus --remote-github-yml-inputs --remote-github-runners windows``
+    ``aptest/aptest.py -r @github --office PyMuPDFPro --remote-github-yml test_multiple.yml --remote-github-runners windows``
 
-Test `<https://pypi.org>`_'s ``pymupdf``, ``pymupdf_office`` and ``pymupdf_layout`` with the test
-suites on central git:
+Test `<https://pypi.org>`_'s ``pymupdf``, ``pymupdf_office``, ``pymupdf_layout`` and ``pymupdf4llm``
+with the test suites on central git:
 
-    ``aptest/aptest.py -r @github -p pip: --office pip: --layout pip: -p git: --office git: --layout git: build test``
+    ``aptest/aptest.py -r @github -p pip: --office pip: -p git: --layout pip: --4llm pip: --office git: --layout git: --4llm git: build test``
 
 Download wheels from a previous Aptest Github workflow run:
 
@@ -325,21 +322,13 @@ Download wheels from a previous Aptest Github workflow run:
 Running parse_bench
 ^^^^^^^^^^^^^^^^^^^
 
-    ``aptest/aptest.py -m mupdf -p PyMuPDF --4llm pymupdf4llm --layout pymupdf_layout --pb ParseBench-Version-Lab build run --run pb 'parse-bench run pymupdf4llm_markdown_150dpi --group table --max_concurrent 1'``
+    ``aptest/aptest.py -m mupdf -p PyMuPDF --layout pymupdf_layout --4llm pymupdf4llm --pb ParseBench-Version-Lab build run --run pb 'parse-bench run pymupdf4llm_markdown_150dpi --group table --max_concurrent 1'``
 
 Other
 ^^^^^
 Test Aptest itself:
 
     ``aptest/aptest.py --aptest aptest test``
-
-Build/test ``pymupdf_office`` with alternative ``smartoffice-neo``:
-
-    ``aptest/aptest.py --smartoffice-neo git: --office git: build test``
-
-Build/test ``pymupdf_office`` with alternative ``smartoffice-marina``:
-
-    ``aptest/aptest.py --smartoffice-marina git: --office git: build test``
 
 Run ``pymupdf_layout`` gnn tests with ``mupdf`` version 1.27.2, current ``pymupdf`` in git, and local checkout ``pymupdf_layout/`` of ``pymupdf_layout`` (this assumes that the DocLayNet dataset has been downloaded, see `Using DocLayNet dataset`_):
 
@@ -380,8 +369,9 @@ View wheels on web server at:
 
 Install wheels from the web server with one of:
 
-* ``pip install --pre --upgrade --extra-index-url https://ghostscript.com/~julian/wheels-test/simple pymupdf4llm``
+* ``pip install --extra-index-url https://ghostscript.com/~julian/wheels-test/simple pymupdf4llm``
 * ``pip install --extra-index-url https://ghostscript.com/~julian/wheels-test/simple pymupdf4llm==1.28.0a1``
+
 
 Release procedure
 -----------------
@@ -422,11 +412,9 @@ Instructions for releasing wheels for:
   * For all issues mentioned as fixed in ``changes.txt``, ensure that
     the corresponding Github issue is labelled as ``Fixed in next release``.
 
-* Ensure that ``pymupdf4llm``'s ``CHANGES.md`` is up to date.
-
 * Test local checkouts of all packages on Github machines:
 
-    ``aptest/aptest.py -r @github -p PyMuPDF --office PyMuPDFPro --layout pymupdf_layout --4llm pymupdf4llm --pdf4llm pymupdf4llm cibw``
+    ``aptest/aptest.py -r @github -p PyMuPDF --layout pymupdf_layout --4llm pymupdf4llm --pdf4llm pymupdf4llm --office PyMuPDFPro cibw``
 
 * In `~/.aptest`_, specify package sources for releases.
 
@@ -436,15 +424,15 @@ Instructions for releasing wheels for:
   
   To use local checkouts:
 
-      ``-P PyMuPDF --OFFICE PyMuPDFPlus --LAYOUT pymupdf_layout --4LLM pymupdf4llm --PDF4LLM pymupdf4llm``
+      ``-P PyMuPDF --LAYOUT pymupdf_layout --4LLM pymupdf4llm --PDF4LLM pymupdf4llm --OFFICE PyMuPDFPro``
   
   Or to use specific sha's for each package:
 
-      ``-P 'git:--sha ...' --OFFICE 'git:--sha ...' --LAYOUT 'git:--sha ...' --4LLM 'git:--sha ...' --PDF4LLM 'git:--sha ...'``
+      ``-P 'git:--sha ...' --LAYOUT 'git:--sha ...' --4LLM 'git:--sha ...' --PDF4LLM 'git:--sha ...' --OFFICE 'git:--sha ...'``
 
   Or to use the latest remote versions in git:
   
-      ``-P git: --OFFICE git: --LAYOUT git: --4LLM git: --PDF4LLM git:``
+      ``-P git: --LAYOUT git: --4LLM git: --PDF4LLM git: --OFFICE git:``
   
 * In `~/.aptest`_, specify an empty release wheelhouse directory, for example:
   
@@ -452,14 +440,6 @@ Instructions for releasing wheels for:
 
   This will eventually hold all release wheels and sdists prior to them being
   uploaded to https://pypi.org.
-
-* Remove any ``--git-local-detailed`` in `~/.aptest`_.
-  
-  Otherwise package checkout directories on Github machines can be very long, for example::
-  
-      aptest-git-pymupdf4llm--b_aptest-jules_git@github.com_pymupdf_pymupdf4llm.git
-    
-  This can break the test of PyMuPDF's ``docs/samples/code-printer.py``.
 
 * Build wheels for all packages:
 
@@ -476,6 +456,8 @@ Instructions for releasing wheels for:
     ``aptest/aptest.py --release-6``
 
     ``aptest/aptest.py --release-7``
+
+    ``aptest/aptest.py --release-8``
 
   * These commands use `--check-unchanged`_ internally,
     so will fail if local checkouts contain uncommitted changes.
@@ -500,7 +482,7 @@ Instructions for releasing wheels for:
   Or upload to, and install from, a web server:
   
   * ``aptest/aptest.py draft --draft-location julian@ghostscript.com:public_html/wheels-1.27.2/ --wheelhouse release-1.27.2``
-  * Enter a venv
+  * Enter a venv.
   * ``pip install --extra-index-url https://ghostscript.com/~julian/wheels-1.27.2/simple pdf4llm pymupdf_office``
   
   Test the wheels:
@@ -621,7 +603,7 @@ Use of Python venv virtual environments
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Aptest automatically creates a venv and re-runs itself inside it
-(disable this by setting ``APTEST=0`` in the environment).
+(disable this by setting ``APTEST_VENV=0`` in the environment).
 
 * The `build`_ command builds and installs into the current venv.
 * The `test`_ command tests packages that are installed in the current venv.
@@ -988,7 +970,8 @@ Make Aptest itself use local pipcl
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 By default Aptest itself will use pipcl from pypi.org,
-regardless of any ``--pipcl`` option.
+regardless of any ``--pipcl`` option,
+because it installs+imports pipcl before looking at args.
 
 Environment variable ``APTEST_PIPCL`` can be used to force Aptest to use a
 local pipcl checkout directory, for example:
@@ -1001,9 +984,42 @@ Note that this is very unlikely to be required.
 Building pymupdf_office libraries for .net
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Use Aptest to build pymupdfpro libraries. Example command:
+One can use Aptest to build pymupdfpro libraries.
 
-``python aptest\aptest.py --key git@github.com: ARTIFEX_SOFTWARE_SSH_KEY -m "git:-t 1.28.2" -p "git:-t 1.28.2" --office "git:-t 1.28.2" --run office "python setup.py --rawbuild ..\csharp_devel" build run``
+Example command:
+
+``python aptest\aptest.py --key git@github.com: KEYFILE -m "git:-t 1.28.2" -p "git:-t 1.28.2" --office "git:-t 1.28.2" --run office "python setup.py --rawbuild ..\csharp_devel" build run``
+
+This:
+
+* Clones/updates the specified repositories.
+* Runs: ``cd aptest-git-pymupdf_office && python setup.py --rawbuild ..\csharp_devel``
+
+
+..
+    Environment variables
+    ^^^^^^^^^^^^^^^^^^^^^
+
+    APTEST_COMPLETION_DEBUG
+    APTEST_DOT_APTEST 
+    APTEST_PIPCL
+    APTEST_VENV
+    AUTOVENV_DOIT
+    CIBW_ARCHS
+    CIBW_ARCHS_WINDOWS``, ``CIBW_ARCHS_MACOS`` and ``CIBW_ARCHS_LINUX
+    CIBW_BUILD
+    CIBW_ENABLE
+    CIBW_PYODIDE_VERSION
+    CIBW_REPAIR_WHEEL_COMMAND_WINDOWS
+    CIBW_SKIP
+    CIBW_TEST_COMMAND
+    COMP_LINE
+    GITHUB_ACTIONS
+    PIPCL_CHANGE_VERSIONS
+    PIP_EXTRA_INDEX_URL
+    PIP_NO_CLEAN
+    PYMUPDF_SETUP_MUPDF_REBUILD
+    PYMUPDF_SETUP_VERSION
 
 
 Command-line arguments
@@ -3136,6 +3152,16 @@ completion
 Changelog
 ---------
 
+**2026-10-14**
+
+* Removed support for legacy packages: ``smartoffice``, ``smartoffice_neo``, ``pdf_feature_inspector`` ``presidio``.
+* Changed default git remotes for ``mupdf``, ``pymupdf_layout`` and ``pymupdf4llm`` to use ``https://`` instead of ``git@``.
+  This allows use from non-privileged PyMuPDF test_quick.yml, e.g. in PRs.
+* Added experimental pymupdf_mid package containing 4llm code but not layout code.
+* Added `--release-8`_.
+* Increased maximum python version to 3.15 (which has recently been released).
+
+
 **2026-10-08**
 
 * Added `--bt`_, to simultaneously change build and test lists.
@@ -3162,8 +3188,6 @@ Changelog
 **2026-09-28**
 
 * Updated to use new version 2.0 package names and dependencies etc.
-  
-  See new README section `Usage with v2 packages`_.
 
 * Changes to usage:
 
@@ -3217,7 +3241,7 @@ Changelog
 
 * Added autovenv tests.
 * Added package ``pymupdf_office`` (with alias ``office``) for renamed pymupdfpro package.
-* Added control over whether we enter a venv with environment variable ``APTEST``,
+* Added control over whether we enter a venv with environment variable ``APTEST_VENV``,
   see `Use of Python venv virtual environments`_.
 * Fixed `--run`_'s handling of empty package name.
 * Don't show output of ``git diff`` on Windows because can have spurious output from newline diffs.
