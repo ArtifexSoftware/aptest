@@ -364,14 +364,14 @@ g_package_info = {
                 'aliases':  ['langchain'],
                 'order': 4,
             },
-        'smartoffice':
-            {
-                'git_remote': 'git@gitlab.artifex.com:smartoffice/sot.git',
-                'git_branch': 'master',
-                'aliases':  ['sot'],
-                'submodules': False,
-                'order': 1, # Fetch before Layout
-            },
+        #'smartoffice':
+        #    {
+        #        'git_remote': 'git@gitlab.artifex.com:smartoffice/sot.git',
+        #        'git_branch': 'master',
+        #        'aliases':  ['sot'],
+        #        'submodules': False,
+        #        'order': 1, # Fetch before Layout
+        #    },
         'smartoffice_marina':
             {
                 'git_remote': 'git@github.com:epapyrusinc/marina.git',
@@ -380,21 +380,21 @@ g_package_info = {
                 'submodules': True,
                 'order': 1, # Fetch before Layout
             },
-        'smartoffice_neo':
-            {
-                'git_remote': 'git@gitlab.artifex.com:smartoffice/smartoffice.git',
-                'git_branch': 'master',
-                'aliases':  ['sot-neo', '--neoso'],
-                'submodules': True,
-                'order': 1, # Fetch before Layout
-            },
-        'pdf_feature_inspector':
-            {
-                'git_remote': 'git@github.com:ArtifexSoftware/pdf_feature_inspector.git',
-                'git_branch': 'main',
-                'aliases':  ['pfi'],
-                'order': 5,
-            },
+        #'smartoffice_neo':
+        #    {
+        #        'git_remote': 'git@gitlab.artifex.com:smartoffice/smartoffice.git',
+        #        'git_branch': 'master',
+        #        'aliases':  ['sot-neo', '--neoso'],
+        #        'submodules': True,
+        #        'order': 1, # Fetch before Layout
+        #    },
+        #'pdf_feature_inspector':
+        #    {
+        #        'git_remote': 'git@github.com:ArtifexSoftware/pdf_feature_inspector.git',
+        #        'git_branch': 'main',
+        #        'aliases':  ['pfi'],
+        #        'order': 5,
+        #    },
         
         'pipcl':
             {
@@ -406,13 +406,13 @@ g_package_info = {
             },
         
         # Experimental, doesn't work.
-        'presidio':
-            {
-                'git_remote': 'git@github.com:ArtifexSoftware/presidio.git',
-                'git_branch': 'main',
-                'aliases':  list(),
-                'order': 4,
-            },
+        #'presidio':
+        #    {
+        #        'git_remote': 'git@github.com:ArtifexSoftware/presidio.git',
+        #        'git_branch': 'main',
+        #        'aliases':  list(),
+        #        'order': 4,
+        #    },
         
         'swig':
             {
@@ -1792,8 +1792,6 @@ def _modify_build_env(state, package, cibw=False):
     PYMUPDFPRO_SETUP_SOT_KEY if required.
     '''
     if (package in ('pymupdfpro', 'pymupdf_office')
-            and 'smartoffice' not in state.packages
-            and 'smartoffice-neo' not in state.packages
             and 'smartoffice-marina' not in state.packages
             ):
         # Pro's setup.py needs PYMUPDFPRO_SETUP_SOT_KEY or
@@ -1807,13 +1805,18 @@ def _modify_build_env(state, package, cibw=False):
             state.env_extra['PYMUPDFPRO_SETUP_SOT_KEY'] = os.environ[key_env]
     
     if package == 'pymupdf':
-        assert 'pymupdf_layout' in state.packages and 'pymupdf4llm' in state.packages, (
-                'Package pymupdf requires pymupdf_layout and pymupdf4llm'
+        Assert(
+                'pymupdf_layout' in state.packages and 'pymupdf4llm' in state.packages,
+                'Package pymupdf requires pymupdf_layout and pymupdf4llm.',
                 )
         state.env_extra['PYMUPDF_SETUP_PATH_LAYOUT'] = abspath(state, _get_local('pymupdf_layout', state), cibw=cibw)
         state.env_extra['PYMUPDF_SETUP_PATH_4LLM'] = abspath(state, _get_local('pymupdf4llm', state), cibw=cibw)
 
     if package == 'pymupdf_lite':
+        Assert(
+                'pymupdf_layout' not in state.packages and 'pymupdf4llm' not in state.packages,
+                'Packages pymupdf_layout or pymupdf4llm must not be specified with pymupdf-lite.',
+                )
         state.env_extra.pop('PYMUPDF_SETUP_PATH_LAYOUT', None)
         state.env_extra.pop('PYMUPDF_SETUP_PATH_4LLM', None)
 
