@@ -1548,7 +1548,12 @@ def do_remote_github(state, args):
                 info = name_info(state, package_name)
                 pipcl.log(f'{package_name=}.')
                 pipcl.log(f'{info["git_remote"]=}.')
-                git_push(package_location, info["git_remote"], branch, state, doit=state.remote_do)
+                remote = info['git_remote']
+                init = 'https://github.com/'
+                if remote.startswith(init):
+                    # Convert https://github.com/... to git@github.com:... so we can push.
+                    remote = f'git@github.com:{remote[len(init):]}'
+                git_push(package_location, remote, branch, state, doit=state.remote_do)
                 args.args_eq.set(args_pos, f'git:-b {branch} {info["git_remote"]}')
 
         if state.remote_github_yml:
