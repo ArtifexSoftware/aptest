@@ -2075,7 +2075,10 @@ def do_build(state):
         #
         pipcl.run(f'pip uninstall -y {package}', prefix='    ')
         wheel = package_to_wheel[package]
-        pipcl.run(f'pip install --extra-index-url {pip_index_url} {wheel}', prefix='    ')
+        pipcl.run(f'pip install --extra-index-url {pip_index_url} {wheel}',
+                env_extra=state.env_extra,
+                prefix='    ',
+                )
     
 
 def read_pytest_junit(path):
