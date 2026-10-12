@@ -317,6 +317,13 @@ g_package_info = {
                 'aliases':  ['p'],
                 'order': 1,
             },
+        'pymupdf_mid':
+            {
+                'git_remote': 'git@github.com:pymupdf/PyMuPDF.git',
+                'git_branch': 'main',
+                'aliases':  ['pmid'],
+                'order': 1,
+            },
         'pymupdf_lite':
             {
                 'git_remote': 'git@github.com:pymupdf/PyMuPDF.git',
@@ -626,7 +633,10 @@ def add_package(state, name, location):
     
     if location == '@':
         # Use upper-case specification, e.g. from ~/.aptest.
-        location = state.packages_for_release[name]
+        try:
+            location = state.packages_for_release[name]
+        except Exception as e:
+            raise AptestUserError(f'Unable to find upper-case specification for {name=}.') from e
         
     if name.lower() != name:
         # Upper case names are defaults for making releases, for which we use
@@ -1812,10 +1822,18 @@ def _modify_build_env(state, package, cibw=False):
         state.env_extra['PYMUPDF_SETUP_PATH_LAYOUT'] = abspath(state, _get_local('pymupdf_layout', state), cibw=cibw)
         state.env_extra['PYMUPDF_SETUP_PATH_4LLM'] = abspath(state, _get_local('pymupdf4llm', state), cibw=cibw)
 
-    if package == 'pymupdf_lite':
+    elif package == 'pymupdf_mid':
         Assert(
-                'pymupdf_layout' not in state.packages and 'pymupdf4llm' not in state.packages,
-                'Packages pymupdf_layout or pymupdf4llm must not be specified with pymupdf-lite.',
+                'pymupdf4llm' in state.packages and 'pymupdf_layout' not in state.packages,
+                'Package pymupdf_mid requires pymupdf4llm and not pymupdf_layout.',
+                )
+        state.env_extra.pop('PYMUPDF_SETUP_PATH_LAYOUT', None)
+        state.env_extra['PYMUPDF_SETUP_PATH_4LLM'] = abspath(state, _get_local('pymupdf4llm', state), cibw=cibw)
+
+    elif package == 'pymupdf_lite':
+        Assert(
+                'pymupdf4llm' not in state.packages and 'pymupdf_layout' not in state.packages,
+                'Package pymupdf_lite requires not pymupdf_layout and not pymupdf4llm.',
                 )
         state.env_extra.pop('PYMUPDF_SETUP_PATH_LAYOUT', None)
         state.env_extra.pop('PYMUPDF_SETUP_PATH_4LLM', None)
@@ -1907,21 +1925,25 @@ def do_build_single(state, package):
                     )
         elif package in ('pymupdf_layout', 'pymupdf4llm'):
             if 'pymupdf' in state.packages:
-                # Create empty wheel directly.
                 paths = glob.glob(f'{state.wheelhouse}/pymupdf-*.whl')
-                assert len(paths) == 1, f'Cannot find pymupdf wheel - needed this to build {package} ({paths=}).'
-                path = paths[0]
-                version = os.path.basename(path).split('-')[1]
-                ret_wheel = create_wheel(state, package, version, pure=True)
+            elif 'pymupdf_lite' in state.packages:
+                paths = glob.glob(f'{state.wheelhouse}/pymupdf_lite-*.whl')
+            elif 'pymupdf_mid' in state.packages:
+                paths = glob.glob(f'{state.wheelhouse}/pymupdf_mid-*.whl')
             else:
-                # Do nothing.
-                pass
+                assert 0
+            assert len(paths) == 1, f'Cannot find pymupdf wheel - needed this to build {package} ({paths=}).'
+            path = paths[0]
+            version = os.path.basename(path).split('-')[1]
+            ret_wheel = create_wheel(state, package, version, pure=True)
         else:
             if package:
                 pipcl.run(f'pip uninstall -y {package}')
             if package == 'pymupdf':
-                pipcl.run(f'pip uninstall -y pymupdf_lite')
-            if package == 'pymupdf_lite':
+                pipcl.run(f'pip uninstall -y pymupdf_lite pymupdf_mid')
+            elif package == 'pymupdf_mid':
+                pipcl.run(f'pip uninstall -y pymupdf pymupdf_layout')
+            elif package == 'pymupdf_lite':
                 pipcl.run(f'pip uninstall -y pymupdf pymupdf_layout pymupdf4llm')
 
             if (package == 'pymupdf'    # pylint: disable=too-many-boolean-expressions
@@ -1962,12 +1984,10 @@ def do_build_single(state, package):
             build_sdist(state, package, directory)
 
             if state.build_type:
-                if package in ('pymupdf', 'pymupdf_lite'):
+                if package in ('pymupdf', 'pymupdf_mid', 'pymupdf_lite'):
                     state.env_extra['PYMUPDF_SETUP_MUPDF_BUILD_TYPE'] = state.build_type
                 if package in ('pymupdfpro', 'pymupdf_office'):
                     state.env_extra['PYMUPDFPRO_SETUP_BUILD_TYPE'] = state.build_type
-                #if package == 'pymupdf_layout':
-                #    state.env_extra['PYMUPDF_LAYOUT_SETUP_BUILD_TYPE'] = state.build_type
             
             pipcl.run(
                     f'pip wheel{pip_wheel_no_clean} --no-deps -v --extra-index-url {pip_index_url} -w {state.wheelhouse} {directory_abs}',
@@ -2212,6 +2232,8 @@ def do_cibw_single(state, package, CIBW_BUILD, cibw_pyodide_args, *, do_test=1):
             if package == 'pymupdf_lite':
                 state.env_extra['PYMUPDF_TEST_USE_LAYOUT'] = '0'
                 state.env_extra['PYMUPDF_TEST_USE_4LLM'] = '0'
+            elif package == 'pymupdf_mid':
+                state.env_extra['PYMUPDF_TEST_USE_LAYOUT'] = '0'
             if state.pytest_paths:
                 leafs = state.pytest_paths
             else:
@@ -3003,6 +3025,8 @@ def do_test_single(state, package, failed_packages):
             if package == 'pymupdf_lite':
                 state.env_extra['PYMUPDF_TEST_USE_LAYOUT'] = '0'
                 state.env_extra['PYMUPDF_TEST_USE_4LLM'] = '0'
+            elif package == 'pymupdf_mid':
+                state.env_extra['PYMUPDF_TEST_USE_LAYOUT'] = '0'
 
             if state.pytest_junit_xml:
                 path_junit_xml = f'{os.path.abspath(state.wheelhouse)}/{package}-pytest-junit.xml'
@@ -3188,12 +3212,13 @@ def main(state, argv):
     # string, for example `-r foo` will have been converted to `foo ''`, which
     # avoids recursion when we rerun ourselves on local or remote machine.
     del argv
-    
+    n_pymupdf_packages = 0
+    for p in 'pymupdf', 'pymupdf_mid', 'pymupdf_lite':
+        if p in state.packages_build:
+            n_pymupdf_packages += 1
     Assert(
-            not ('pymupdf' in state.packages_build and 'pymupdf_lite' in state.packages_build)
-                and not ('pymupdf' in state.packages_test and 'pymupdf_lite' in state.packages_test)
-                ,
-            f'Only one of `pymupdf` and `pymupdf_lite` may be specified',
+            n_pymupdf_packages in (0, 1),
+            f'Only one of `pymupdf`, `pymupdf_mid` and `pymupdf_lite` may be specified',
             )
     
     # Update convenience link to venv.
@@ -3387,13 +3412,14 @@ def main(state, argv):
         pipcl.log(f' {MACOSX_DEPLOYMENT_TARGET=}.')
         state.env_extra['MACOSX_DEPLOYMENT_TARGET'] = MACOSX_DEPLOYMENT_TARGET
     
-    if (1
+    if (1   # pylint: disable=too-many-boolean-expressions
             and 'mupdf' in state.packages
             and 'pymupdf' not in state.packages
+            and 'pymupdf_mid' not in state.packages
             and 'pymupdf_lite' not in state.packages
             and 'run' not in state.commands
             ):
-        Assert(0, f'If `mupdf` is specified then pymupdf or pymupdf_lite should also be specified.')
+        Assert(0, f'If `mupdf` is specified then pymupdf, pymupdf_mid or pymupdf_lite should also be specified.')
     
     # Populate state.results with package information.
     state.results['packages'] = dict()
