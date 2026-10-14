@@ -825,6 +825,10 @@ On Macos:
     wget https://www.python.org/ftp/python/3.13.12/python-3.13.12-macos11.pkg && sudo installer -pkg python-3.13.12-macos11.pkg -target /
     wget https://www.python.org/ftp/python/3.14.3/python-3.14.3-macos11.pkg && sudo installer -pkg python-3.14.3-macos11.pkg -target /
 
+  Update 2026-10-14::
+  
+    wget https://www.python.org/ftp/python/3.15.0/python-3.15.0-macos11.pkg && sudo installer -pkg python-3.15.0-macos11.pkg -target /
+
 * To install python-3.14t:
   
   * Run::
@@ -1134,6 +1138,12 @@ cibw
     If ``CIBW_BUILD`` is ``all``:
     
     * We set ``CIBW_BUILD`` to build and test with all supported Python versions.
+    
+    Extra handling for ``CIBW_BUILD``:
+    
+    * We exclude python3.15 when testing ``pymupdf``,
+      because onnxruntime is not currently available.
+    * We also check that ``pymupdf`` wheel metadata ``requires_dist`` omits python3.15.
 
     If ``CIBW_ARCHS`` is unset:
     
@@ -3151,6 +3161,13 @@ completion
 
 Changelog
 ---------
+
+**2026-10-14 b**
+
+* With `cibw`_, restrict python version when testing ``pymupdf`` to exclude 3.15
+  (because onnxruntime not currently available).
+* Added example command to install python3.15 on macos.
+
 
 **2026-10-14**
 
