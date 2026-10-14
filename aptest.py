@@ -18,6 +18,7 @@ import subprocess
 import sys
 import textwrap
 import time
+import zipfile
 
 
 class AptestUserError(Exception):
@@ -46,7 +47,7 @@ autovenv_create = 2
 autovenv_verbose = 1
 
 APTEST_PIPCL = os.environ.get('APTEST_PIPCL')
-autovenv_packages = [APTEST_PIPCL or 'pipcl', 'xmltodict', 'piprepo', 'setuptools<81']
+autovenv_packages = [APTEST_PIPCL or 'pipcl', 'xmltodict', 'piprepo', 'setuptools<81', 'packaging']
 
 if sys.argv[1:] == ['completion'] or COMP_LINE:
     # We don't want autovenv to output debug info because it'll badly mess
@@ -71,6 +72,7 @@ else:
 # We use `pylint disable=wrong-import-position` because these imports need to
 # be after autovenv.enter().
 #
+import packaging.metadata   # pylint:disable=wrong-import-position
 import pipcl    # pylint:disable=wrong-import-position
 import xmltodict    # pylint:disable=wrong-import-position
 
@@ -1482,7 +1484,59 @@ def do_piprepo(state):
             f'piprepo build {state.wheelhouse}',
             prefix='piprepo build: ',
             )
-    
+
+
+def wheel_metadata(wheel_path):
+    '''
+    Extracts metadata from wheel, returning tuple of two dicts as described in
+    https://packaging.pypa.io/en/stable/metadata.html#packaging.metadata.parse_email
+    '''
+    #pipcl.log(f'{wheel_path=}')
+    name = os.path.basename(wheel_path).split('-')[0]
+    #pipcl.log(f'{name=}')
+    with zipfile.ZipFile(wheel_path) as z:
+        metadata_zis = list()
+        for zi in z.infolist():
+            #pipcl.log(f'{zi.filename=}')
+            m = re.match(f'^{name}-.*\\.dist-info/METADATA$', zi.filename)
+            #pipcl.log(f'{m=}')
+            if m:
+                metadata_zis.append(zi)
+        assert len(metadata_zis) == 1, f'{metadata_zis=}'
+        metadata_zi = metadata_zis[0]
+        with z.open(metadata_zi) as f:
+            metadata = f.read()
+        metada2 = packaging.metadata.parse_email(metadata)
+        #pipcl.log(f'{metada2=}')
+        #pipcl.log()
+        #pipcl.log(f'{json.dumps(metada2, indent="    ")}')
+        return metada2
+
+
+def cibw_build_filter(CIBW_BUILD, metadata):
+    '''
+    Filters CIBW_BUILD to conform with metadata, which should be from
+    wheel_metadata().
+
+    Assumes CIBW_BUILD is whitespace-separated list of `cp<integer>*` strings.
+    '''
+    #pipcl.log(f' {CIBW_BUILD=}')
+    assert len(metadata) == 2
+    metadata = packaging.metadata.Metadata.from_raw(metadata[0])
+    CIBW_BUILD2 = list()
+    for v in CIBW_BUILD.split():
+        m = re.match(f'^cp([0-9][0-9]+)[^0-9]', v)
+        assert m, f'{v=}'
+        vv = m.group(1)
+        vvv = vv[0] + '.' + vv[1:]
+        #pipcl.log(f'{type(metadata)=}')
+        if metadata.requires_python.contains(vvv):
+            CIBW_BUILD2.append(v)
+    #pipcl.log(f' {CIBW_BUILD=}')
+    ret = ' '.join(CIBW_BUILD2)
+    #pipcl.log(f'{ret=}')
+    return ret
+        
 
 def github_api_url(info):
     git_remote = info['git_remote']
@@ -2237,6 +2291,36 @@ def do_cibw_single(state, package, CIBW_BUILD, cibw_pyodide_args, *, do_test=1):
                 for p in ('pymupdf_layout', 'pymupdf4llm'):
                     if p in state.packages_test:
                         dirs.append(abspath(state, _get_local(p, state), cibw=True))
+                        
+                # As of 2026-10-14 we expect `pymupdf` to specify requires_python >= 3.11, <3.15.
+                #
+                # We double check that simply removing any `cp315*` from CIBW_BUILD gives the
+                # same result as filtering using the actual metadata in the pymupdf wheel.
+                #
+                CIBW_BUILD_0 = CIBW_BUILD
+                
+                # Use simple string replacement on CIBW_BUILD.
+                CIBW_BUILD_1 = CIBW_BUILD.replace('cp315*', '').strip()
+                
+                # Filter python versions in CIBW_BUILD based on the package's metadata,
+                # using wheel_metadata() and cibw_build_filter().
+                #
+                # (We expect the wheel to be up to date because we are being
+                # run with do_test true.)
+                wheel_paths = glob.glob(f'{state.wheelhouse}/{package}-*.whl')
+                assert len(wheel_paths) == 1, f'{wheel_paths=}'
+                wheel_path = wheel_paths[0]
+                metadata = wheel_metadata(wheel_path)
+                CIBW_BUILD_2 = cibw_build_filter(CIBW_BUILD, metadata)
+                
+                # Check that filtering with the wheel's metadata agrees with CIBW_BUILD_1.
+                pipcl.log(f'    {CIBW_BUILD_0=}')
+                pipcl.log(f'    {CIBW_BUILD_1=}')
+                pipcl.log(f'    {CIBW_BUILD_2=}')
+                assert CIBW_BUILD_2 == CIBW_BUILD_1
+                CIBW_BUILD = CIBW_BUILD_2
+                if CIBW_BUILD != CIBW_BUILD_0:
+                    pipcl.log(f'### Have changed CIBW_BUILD to match requires_python in {wheel_path=}.')
             if package == 'pymupdf_lite':
                 state.env_extra['PYMUPDF_TEST_USE_LAYOUT'] = '0'
                 state.env_extra['PYMUPDF_TEST_USE_4LLM'] = '0'
