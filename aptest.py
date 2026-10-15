@@ -2292,35 +2292,6 @@ def do_cibw_single(state, package, CIBW_BUILD, cibw_pyodide_args, *, do_test=1):
                     if p in state.packages_test:
                         dirs.append(abspath(state, _get_local(p, state), cibw=True))
                         
-                # As of 2026-10-14 we expect `pymupdf` to specify requires_python >= 3.11, <3.15.
-                #
-                # We double check that simply removing any `cp315*` from CIBW_BUILD gives the
-                # same result as filtering using the actual metadata in the pymupdf wheel.
-                #
-                CIBW_BUILD_0 = CIBW_BUILD
-                
-                # Use simple string replacement on CIBW_BUILD.
-                CIBW_BUILD_1 = CIBW_BUILD.replace('cp315*', '').strip()
-                
-                # Filter python versions in CIBW_BUILD based on the package's metadata,
-                # using wheel_metadata() and cibw_build_filter().
-                #
-                # (We expect the wheel to be up to date because we are being
-                # run with do_test true.)
-                wheel_paths = glob.glob(f'{state.wheelhouse}/{package}-*.whl')
-                assert len(wheel_paths) == 1, f'{wheel_paths=}'
-                wheel_path = wheel_paths[0]
-                metadata = wheel_metadata(wheel_path)
-                CIBW_BUILD_2 = cibw_build_filter(CIBW_BUILD, metadata)
-                
-                # Check that filtering with the wheel's metadata agrees with CIBW_BUILD_1.
-                pipcl.log(f'    {CIBW_BUILD_0=}')
-                pipcl.log(f'    {CIBW_BUILD_1=}')
-                pipcl.log(f'    {CIBW_BUILD_2=}')
-                assert CIBW_BUILD_2 == CIBW_BUILD_1
-                CIBW_BUILD = CIBW_BUILD_2
-                if CIBW_BUILD != CIBW_BUILD_0:
-                    pipcl.log(f'### Have changed CIBW_BUILD to match requires_python in {wheel_path=}.')
             if package == 'pymupdf_lite':
                 state.env_extra['PYMUPDF_TEST_USE_LAYOUT'] = '0'
                 state.env_extra['PYMUPDF_TEST_USE_4LLM'] = '0'
@@ -2598,7 +2569,7 @@ def do_cibw(state):
             pipcl.log(f'{v=}')
             CIBW_BUILD = f'cp{"".join(v)}*'
         pipcl.log(f'Defaulting to {CIBW_BUILD=}.')
-
+    
     cibw_pyodide_args = ''
     if state.cibw_pyodide:
         cibw_pyodide_args = ' --platform pyodide'
@@ -2610,6 +2581,22 @@ def do_cibw(state):
         state.env_extra['CIBW_PYODIDE_VERSION'] = state.cibw_pyodide_version
         state.env_extra['CIBW_ENABLE'] = 'pyodide-prerelease'
     
+    if 'pymupdf' in state.packages_test:
+        # As of 2026-10-14 we expect `pymupdf` to specify requires_python >= 3.11, <3.15.
+        #
+        # We double check that simply removing any `cp315*` from CIBW_BUILD gives the
+        # same result as filtering using the actual metadata in the pymupdf wheel.
+        #
+        CIBW_BUILD_0 = CIBW_BUILD
+
+        # Use simple string replacement on CIBW_BUILD.
+        CIBW_BUILD_1 = CIBW_BUILD.replace('cp315*', '').strip()
+        pipcl.log(f'    {CIBW_BUILD_0=}')
+        pipcl.log(f'    {CIBW_BUILD_1=}')
+        CIBW_BUILD = CIBW_BUILD_1
+        if CIBW_BUILD != CIBW_BUILD_0:
+            pipcl.log(f'### Have changed CIBW_BUILD.')
+
     # 2026-09-16:
     #
     # We need to run cibuildwheel on each of the packages twice, so that
@@ -2633,7 +2620,28 @@ def do_cibw(state):
     
     for package in state.packages_build:
         do_cibw_single(state, package, CIBW_BUILD, cibw_pyodide_args, do_test=0)
+    
+    if 0:
+        # Filter python versions in CIBW_BUILD based on the package's metadata,
+        # using wheel_metadata() and cibw_build_filter().
+        #
+        # (We expect the wheel to be up to date because we are being
+        # run with do_test true.)
+        wheel_paths = glob.glob(f'{state.wheelhouse}/{package}-*.whl')
+        assert len(wheel_paths) == 1, f'{wheel_paths=}'
+        wheel_path = wheel_paths[0]
+        metadata = wheel_metadata(wheel_path)
+        CIBW_BUILD_2 = cibw_build_filter(CIBW_BUILD, metadata)
 
+        # Check that filtering with the wheel's metadata agrees with CIBW_BUILD_1.
+        pipcl.log(f'    {CIBW_BUILD_0=}')
+        pipcl.log(f'    {CIBW_BUILD_1=}')
+        pipcl.log(f'    {CIBW_BUILD_2=}')
+        assert CIBW_BUILD_2 == CIBW_BUILD_1
+        CIBW_BUILD = CIBW_BUILD_2
+        if CIBW_BUILD != CIBW_BUILD_0:
+            pipcl.log(f'### Have changed CIBW_BUILD to match requires_python in {wheel_path=}.')
+    
     for package in state.packages_test:
         do_cibw_single(state, package, CIBW_BUILD, cibw_pyodide_args, do_test=1)
     
