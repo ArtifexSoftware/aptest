@@ -725,6 +725,7 @@ def make_state():
     state.atexit_speak = None
     state.build_type = None
     state.build_pip_no_clean = False
+    state.check_pulled = False
     state.check_pushed = False
     state.check_unchanged = False
     state.cibw_ignore_test_failures = False
@@ -740,6 +741,7 @@ def make_state():
     state.devel = False
     state.draft_location = None
     state.env_extra = dict()
+    state.git_compare_remote_directories = list()
     state.git_depth = 1
     state.git_local_detailed = False
     state.git_modify = list()
@@ -989,6 +991,9 @@ def get_args(state, argv):
             elif arg == '--check-pushed':
                 state.check_pushed = args.get_bool()
 
+            elif arg == '--check-pulled':
+                state.check_pulled = args.get_bool()
+
             elif arg == '--check-unchanged':
                 state.check_unchanged = args.get_bool()
 
@@ -1044,6 +1049,12 @@ def get_args(state, argv):
                     pipcl.log(f'Have set state.env_extra[{_name!r}]={state.env_extra[_name]!r}')
                 else:
                     state.env_extra[_name] = _value
+            
+            elif arg == '--git-compare-remote':
+                state.git_compare_remote_directories.append(next(args).as_str())
+            
+            elif arg == '--git-compare-remotes':
+                state.git_compare_remote_directories.append(None)
             
             elif arg == '--git-depth':
                 state.git_depth = next(args).as_int()
@@ -1558,25 +1569,136 @@ def github_api_url(info):
     return f'https://api.github.com/repos/{name}'
 
 
-def check_checkout_unchanged(state, directory):
+def git_compare_remote(directory):
+    '''
+    Compares local git checkout with remote.
+    
+    Returns an object with following members:
+    
+        .branch
+            Current branch name in <directory> or None if detached head.
+        .sha_local
+            Current sha in <directory>.
+        .sha_remote
+            The sha of the remote branch head or None if not available
+            (detached head or branch does not exist on remote).
+        .delta
+            +1
+                <directory> is ahead of remote branch head,
+                i.e. contains remote branch head plus one or more extra commits.
+            0
+                <directory> is at same sha as remote branch head.
+            -1
+                <directory> does not contain remote branch head, i.e. it is
+                behind (or unrelated).
+            None
+                No information available, e.g. detached head or branch does not
+                exist on remote.
+        .delta_str:
+            One of '+1', '0', '-1', 'None'.
+    '''
+    class Ret:
+        def __init__(self, branch, sha_local, sha_remote, delta):
+            self.branch = branch
+            self.sha_local = sha_local
+            self.sha_remote = sha_remote
+            self.delta = delta
+            if isinstance(delta, int) and delta:
+                self.delta_str = f'{delta:+}'
+            else:
+                self.delta_str = str(delta)
+            #pipcl.log(f'{self=}')
+        def __repr__(self):
+            return f'{self.branch=} {self.sha_local=} {self.sha_remote=} {self.delta=}'
+    
+    local_branch_head_sha, _, _, branch_name = pipcl.git_info(directory)
+    detached_head, _ = pipcl.run(
+            f'cd {directory} && git symbolic-ref -q HEAD',
+            check=0,
+            capture=1,
+            verbose=0,
+            )
+    assert detached_head in (0, 1)
+    if detached_head:
+        return Ret(None, local_branch_head_sha, None, None)
+    
+    # Find sha of head of remote branch. We use `git ls-remote` to list sha of
+    # each remote branch, and look for <branch_name>.
+    out = pipcl.run(f'cd {directory} && git ls-remote -q', capture=1, verbose=0)
+    matches = list()
+    for line in out.split('\n'):
+        #pipcl.log(f'{line=}')
+        if not line:
+            continue
+        sha, refname = line.split()
+        if refname == f'refs/heads/{branch_name}':
+            matches.append(sha)
+    if not matches:
+        # Branch not in remote.
+        return Ret(branch_name, local_branch_head_sha, None, None)
+    
+    assert len(matches) == 1, f'{branch_name=} {matches=}'
+    remote_branch_head_sha = matches[0]
+    
+    if 0:
+        pipcl.log(f'    {directory=}')
+        pipcl.log(f'    {branch_name=}')
+        pipcl.log(f'    {remote_branch_head_sha=}')
+        pipcl.log(f'    {local_branch_head_sha=}')
+    
+    if local_branch_head_sha == remote_branch_head_sha:
+        # Our branch is identical to remote.
+        delta = 0
+    else:
+        e, _ = pipcl.run(
+                f'cd {directory} && git merge-base --is-ancestor {remote_branch_head_sha} {local_branch_head_sha}',
+                check=0,
+                capture=1,
+                verbose=0,
+                )
+        if e == 0:
+            # <remote_branch_head_sha> is ancestor of <local_branch_head_sha>,
+            # so local is ahead of remote.
+            delta = +1
+        else:
+            # Local is behind the remote.
+            delta = -1
+    
+    return Ret(branch_name, local_branch_head_sha, remote_branch_head_sha, delta)    
+
+
+def git_assert_pushed(directory):
+    '''
+    Asserts that <directory> current branch has been pushed to remote.
+    '''
+    delta = git_compare_remote(directory).delta
+    Assert(
+            delta is not None and delta <= 0,
+            f'Checkout has not been pushed: {directory!r}.',
+            )
+
+
+def git_assert_pulled(directory):
+    '''
+    Asserts that <directory> current branch has pulled latest remote.
+    '''
+    delta = git_compare_remote(directory).delta
+    Assert(
+            delta is not None and delta >= 0,
+            f'Checkout has not pulled latest remote: {directory!r}.',
+            )
+
+
+def git_assert_unchanged(directory):
+    '''
+    Asserts that `git diff` is empty.
+    '''
     _, _, diff, _ = pipcl.git_info(directory)
     Assert(
             not diff,
-            f'{state.check_unchanged=} but checkout has uncommitted changes: {directory!r}.',
+            f'Checkout has uncommitted changes: {directory!r}.',
             )
-    pipcl.log(f'{state.check_unchanged=}, local checkout ok: {directory!r}')
 
-
-def check_checkout_pushed(state, directory):
-    Assert(os.path.isdir(f'{directory}/.git'), f'Not a git checkout: {directory}')
-    out = pipcl.run(f'cd {directory} && git branch -r --contains', capture=1)
-    assert isinstance(out, str)
-    Assert(
-            out.strip(),
-            f'{state.check_pushed=} but local checkout has un-pushed commits: {directory!r}',
-            )
-    pipcl.log(f'{state.check_pushed=}, local checkout ok ({out=}): {directory!r}')
-    
 
 def do_remote_github(state, args):
     assert isinstance(args, cli.Args)
@@ -1607,9 +1729,11 @@ def do_remote_github(state, args):
                 # Push to a Github branch and update argv[] to refer to this
                 # Github branch.
                 if state.check_unchanged:
-                    check_checkout_unchanged(state, package_location)
+                    git_assert_unchanged(package_location)
+                if state.check_pulled:
+                    git_assert_pulled(package_location)
                 if state.check_pushed:
-                    check_checkout_pushed(state, package_location)
+                    git_assert_pushed(package_location)
                 
                 info = name_info(state, package_name)
                 pipcl.log(f'{package_name=}.')
@@ -3355,6 +3479,26 @@ def main(state, argv):
         metadata_raw, _ = wheel_metadata(wheel_path)
         pipcl.log(textwrap.indent(metadata_raw, '    '))
     
+    for directory in state.git_compare_remote_directories:
+        def show(directory, package=None):
+            info = git_compare_remote(directory)
+            if package:
+                pipcl.log(f'Git checkout {directory=} {package=}:')
+            else:
+                pipcl.log(f'Git info for {directory=}:')
+            pipcl.log(f'    branch: {info.branch!r}')
+            pipcl.log(f'    delta: {info.delta_str}')
+            pipcl.log(f'    sha_local:  {info.sha_local}')
+            pipcl.log(f'    sha_remote: {info.sha_remote}')
+        if directory is None:
+            # Show info about all packages.
+            for package, (location, _) in state.packages.items():
+                if not location.startswith('pip:') and not location.startswith('git:'):
+                    # Local checkout.
+                    show(location, package)
+        else:
+            show(directory)
+    
     # Check whether we should run with `-o <osname>`.
     if not state.remote:
         os_self = platform.system().lower()
@@ -3794,9 +3938,9 @@ def _get_local(package, state, test=False):
     else:
         directory = location
         if state.check_unchanged:
-            check_checkout_unchanged(state, directory)
+            git_assert_unchanged(directory)
         if state.check_pushed:
-            check_checkout_pushed(state, directory)
+            check_checkout_pushed(directory)
     if not test:
         if package in state.clean_git:
             pipcl.run(
