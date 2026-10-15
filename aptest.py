@@ -799,6 +799,7 @@ def make_state():
     state.run_commands = list()
     state.sdists = False
     state.show_help = False
+    state.show_metadata = list()
     state.ssh_key_path_abs = None
     state.swig = None
     state.swig_quick = None
@@ -1294,6 +1295,9 @@ def get_args(state, argv):
 
             elif arg == '--set-swig-quick':
                 state.swig_quick = args.get_bool()
+            
+            elif arg == '--show-metadata':
+                state.show_metadata.append(next(args).as_str())
 
             elif arg == '--system-packages':
                 state.system_packages = int(next(args))
@@ -1488,8 +1492,12 @@ def do_piprepo(state):
 
 def wheel_metadata(wheel_path):
     '''
-    Extracts metadata from wheel, returning tuple of two dicts as described in
-    https://packaging.pypa.io/en/stable/metadata.html#packaging.metadata.parse_email
+    Extracts metadata from wheel, returning (raw, (ok, bad)), where:
+        raw:
+            Raw text in the METADATA file.
+        (good, bad):
+            The two dicts as described in
+            https://packaging.pypa.io/en/stable/metadata.html#packaging.metadata.parse_email.
     '''
     #pipcl.log(f'{wheel_path=}')
     name = os.path.basename(wheel_path).split('-')[0]
@@ -1505,12 +1513,12 @@ def wheel_metadata(wheel_path):
         assert len(metadata_zis) == 1, f'{metadata_zis=}'
         metadata_zi = metadata_zis[0]
         with z.open(metadata_zi) as f:
-            metadata = f.read()
+            metadata = f.read().decode()
         metada2 = packaging.metadata.parse_email(metadata)
         #pipcl.log(f'{metada2=}')
         #pipcl.log()
         #pipcl.log(f'{json.dumps(metada2, indent="    ")}')
-        return metada2
+        return metadata, metada2
 
 
 def cibw_build_filter(CIBW_BUILD, metadata):
@@ -3324,6 +3332,11 @@ def main(state, argv):
             text = f.read()
         pipcl.log(text)
         return
+    
+    for wheel_path in state.show_metadata:
+        pipcl.log(f'Metadata in {wheel_path!r}:')
+        metadata_raw, _ = wheel_metadata(wheel_path)
+        pipcl.log(textwrap.indent(metadata_raw, '    '))
     
     # Check whether we should run with `-o <osname>`.
     if not state.remote:
