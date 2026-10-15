@@ -2864,6 +2864,15 @@ Copy ``<path>`` (a file or directory) to remote.
     update/build swig if it is already present.
 
 
+.. _--show-metadata:
+
+--show-metadata <wheel-path>
+............................
+    Shows contents of the METADATA file in specified wheel.
+    
+    * Can be specified multiple times.
+
+
 .. _--smartoffice:
 
 --smartoffice <smartoffice-location>
@@ -3071,6 +3080,24 @@ Copy ``<path>`` (a file or directory) to remote.
     https://github.com/ArtifexSoftware/PyMuPDF-pymupdf-results. Default is false.
 
 
+.. _--test-quick:
+
+--test-quick (bool)
+...................
+    If true (default is false),
+    we avoid running some individual tests that are known to be particularly slow.
+    
+    This is done by setting package-specific hard-coded environment variables:
+    
+    * ``pymupdf`` and ``pymupdf_lite``:
+      
+      ``PYMUPDF_TEST_QUICK=1``
+    
+    * ``aptest``:
+      
+      ``APTEST_TEST_QUICK=1``
+
+
 .. _--ticker:
 
 --ticker <delay>
@@ -3161,6 +3188,14 @@ completion
 
 Changelog
 ---------
+
+
+** 2026-10-15**
+
+* Added `--show-metadata`_, for showing contents of METADATA in a wheel.
+* Added `--test-quick`_.
+* Use pymupdf_layout and pymupdf4llm's README.md when creating empty pymupdf_layout and pymupdf4llm wheels.
+
 
 **2026-10-14 b**
 
