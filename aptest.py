@@ -813,6 +813,7 @@ def make_state():
     state.test_gnn_limit = 0
     state.test_gnn_out = None
     state.test_gnn_push = 0
+    state.test_quick = False
     state.ticker = 0
     state.venv = 2
     state.venv_name = None
@@ -1355,6 +1356,9 @@ def get_args(state, argv):
 
             elif arg == '--test-gnn-push':
                 state.test_gnn_push = args.get_bool()
+            
+            elif arg == '--test-quick':
+                state.test_quick = args.get_bool()
             
             elif arg == '--ticker':
                 _ticker = next(args).as_float()
@@ -1906,6 +1910,14 @@ def _modify_build_env(state, package, cibw=False):
         state.env_extra.pop('PYMUPDF_SETUP_PATH_4LLM', None)
 
 
+def  _modify_test_env(state, package, cibw=False):  # pylint: disable=unused-argument
+    if state.test_quick:
+        if package in ('pymupdf', 'pymupdf_lite'):
+            state.env_extra['PYMUPDF_TEST_QUICK'] = '1'
+        if package == 'aptest':
+            state.env_extra['APTEST_TEST_QUICK'] = '1'
+
+
 def _4llm_new_layout(directory):
     '''
     Returns true if pymupdf4llm checkout <directory> has new layout from 2026-3, with
@@ -2304,6 +2316,9 @@ def do_cibw_single(state, package, CIBW_BUILD, cibw_pyodide_args, *, do_test=1):
                 state.env_extra['PYMUPDF_TEST_USE_4LLM'] = '0'
             elif package == 'pymupdf_mid':
                 state.env_extra['PYMUPDF_TEST_USE_LAYOUT'] = '0'
+            
+            _modify_test_env(state, package, cibw=True)
+            
             if state.pytest_paths:
                 leafs = state.pytest_paths
             else:
@@ -3122,6 +3137,9 @@ def do_test_single(state, package, failed_packages):
             if state.pytest_junit_xml:
                 command += f' --junit-xml={path_junit_xml}'
             #command += f' --durations=10'
+            
+            _modify_test_env(state, package, cibw=True)
+            
             if state.pytest_options:
                 command += f' {state.pytest_options}'
             if state.pytest_paths:
