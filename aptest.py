@@ -2733,7 +2733,6 @@ def do_gnn_download(state):
             marker = f'{directory}/_marker_{path_zip}'
             if marker_ok(marker, path_zip):
                 return
-            import zipfile
             pipcl.log(f'Opening {path_zip=}')
             with zipfile.ZipFile(path_zip) as z:
                 pipcl.log(f'Extacting {path_zip=} into {directory=}.')
