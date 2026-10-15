@@ -2014,7 +2014,7 @@ def do_build_single(state, package):
             assert len(paths) == 1, f'Cannot find pymupdf wheel - needed this to build {package} ({paths=}).'
             path = paths[0]
             version = os.path.basename(path).split('-')[1]
-            ret_wheel = create_wheel(state, package, version, pure=True)
+            ret_wheel = create_wheel(state, package, version, pure=True, description=f'{directory}/README.md')
         else:
             if package:
                 pipcl.run(f'pip uninstall -y {package}')
