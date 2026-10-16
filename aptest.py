@@ -1228,13 +1228,13 @@ def get_args(state, argv):
                     new_args += f' --bt {b_mupdf}pymupdf_lite --cibw-pyodide --remote-github-runners linux'
                 
                 elif arg == '--release-6':
-                    # Build for cp314t.
+                    # Build for cp314t and cp315t
                     #
                     # We use PYMUPDF_SETUP_PY_LIMITED_API=0 because
                     # py_limited_api and Py_GIL_DISABLED are not supported
                     # together as of 2026-02-20, e.g. see PEP 803 and PEP 809.
                     #
-                    new_args += f' --bt {b_mupdf}pymupdf_lite --remote-github-runners linux --cibw-skip-add-defaults=0 -e CIBW_BUILD="cp314t* cp3.15t*" -e CIBW_SKIP="*musllinux*" -e PYMUPDF_SETUP_PY_LIMITED_API=0'
+                    new_args += f' --bt {b_mupdf}pymupdf_lite --remote-github-runners linux --cibw-skip-add-defaults=0 -e CIBW_BUILD="cp314t* cp315t*" -e CIBW_SKIP="*musllinux*" -e PYMUPDF_SETUP_PY_LIMITED_API=0'
                 
                 elif arg == '--release-7':
                     # windows-arm64.
