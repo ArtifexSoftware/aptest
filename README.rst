@@ -282,6 +282,7 @@ and uploading to https://pypi.org (also see `Release procedure`_)::
     aptest/aptest.py --release-6
     aptest/aptest.py --release-7
     aptest/aptest.py --release-8
+    aptest/aptest.py --release-9
 
 (See `Release procedure`_ for details.)
 
@@ -386,6 +387,7 @@ Instructions for releasing wheels for:
     * ``pymupdf``
     * ``pymupdf4llm``
     * ``pymupdf_layout``
+    * ``pymupdf_lite``
     * ``pymupdf_office``
 
 
@@ -459,8 +461,9 @@ Instructions for releasing wheels for:
 
     ``aptest/aptest.py --release-8``
 
-  * These commands use `--check-unchanged`_ internally,
-    so will fail if local checkouts contain uncommitted changes.
+  * These commands use `--check-unchanged`_ and `--check-pulled`_ internally,
+    so will fail if local checkouts contain uncommitted changes or do not
+    contain the latest remote commits.
 
   * These commands can be manually run in parallel using individual terminals.
     
@@ -1205,7 +1208,7 @@ docs
 
 draft
 .....
-    Rsync the wheelhouse directory to the location specified by `--draft-location`_.
+    Rsync the release wheelhouse directory to the location specified by `--draft-location`_.
     
     * The wheelhouse will contain a ``simple/`` directory created by ``piprepo``,
       so one can pip install with:
@@ -1856,6 +1859,13 @@ Options
     Set build type. Default is ``release``.
 
 
+.. _--check-pulled:
+
+--check-pulled (bool)
+........................
+    If true, fail if local checkout has not pulled latest remote.
+
+
 .. _--check-pushed:
 
 --check-pushed (bool)
@@ -2007,6 +2017,34 @@ Options
         ``pip install --extra-index-url https://ghostscript.com/~julian/wheels-1.27.2/simple pymupdf ...``
     
     [Note the trailing ``/simple``.]
+
+
+.. _--git-compare-remote:
+
+--git-compare-remote <directory>
+................................
+    Show information about git checkout ``<directory>``.
+    
+    * ``branch`` - current branch or None if detached head.
+    * ``delta`` - one of:
+    
+      * ``0`` - directory is identical to remote branch head.
+      * ``+1`` - directory is ahead of remote branch head.
+      * ``-1`` - directory is behind (or unrelated to) the remote branch head.
+      * ``None`` - no information available, e.g. detached head or branch does not exist on remote.
+    
+    * ``sha_local`` - sha of local branch head.
+    * ``sha_remote`` - sha of remote branch head.
+      
+    
+    Also see `--git-compare-remotes`_.
+
+
+--git-compare-remotes
+.....................
+    Show information about all packages that are specified as local checkouts.
+    
+    See `--git-compare-remote`_ for the output format.
 
 
 .. _--git-depth:
@@ -3189,8 +3227,15 @@ completion
 Changelog
 ---------
 
+**2026-10-16**
 
-** 2026-10-15**
+* Added `--check-pulled`_.
+* Added `--git-compare-remote`_.
+* Added `--git-compare-remotes`_.
+* Build pymupdf-lite for core architectures.
+
+
+**2026-10-15**
 
 * Added `--show-metadata`_, for showing contents of METADATA in a wheel.
 * Added `--test-quick`_.
