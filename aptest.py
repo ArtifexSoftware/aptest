@@ -1217,7 +1217,7 @@ def get_args(state, argv):
                 
                 elif arg == '--release-3':
                     # windows-x32.
-                    new_args += f' --bt {b_mupdf}pymupdf_lite --remote-github-runners windows -e CIBW_ARCHS_WINDOWS=x86 --cibw-skip-add-defaults=0'
+                    new_args += f' --bt {b_mupdf}pymupdf_lite'
                 
                 elif arg == '--release-4':
                     # linux-musllinux-x64.
@@ -1228,13 +1228,13 @@ def get_args(state, argv):
                     new_args += f' --bt {b_mupdf}pymupdf_lite --cibw-pyodide --remote-github-runners linux'
                 
                 elif arg == '--release-6':
-                    # Build for cp314t.
+                    # Build for cp314t and cp315t
                     #
                     # We use PYMUPDF_SETUP_PY_LIMITED_API=0 because
                     # py_limited_api and Py_GIL_DISABLED are not supported
                     # together as of 2026-02-20, e.g. see PEP 803 and PEP 809.
                     #
-                    new_args += f' --bt {b_mupdf}pymupdf_lite --remote-github-runners linux --cibw-skip-add-defaults=0 -e CIBW_BUILD="cp314t*" -e CIBW_SKIP="*musllinux*" -e PYMUPDF_SETUP_PY_LIMITED_API=0'
+                    new_args += f' --bt {b_mupdf}pymupdf_lite --remote-github-runners linux --cibw-skip-add-defaults=0 -e CIBW_BUILD="cp314t* cp315t*" -e CIBW_SKIP="*musllinux*" -e PYMUPDF_SETUP_PY_LIMITED_API=0'
                 
                 elif arg == '--release-7':
                     # windows-arm64.
@@ -1243,6 +1243,10 @@ def get_args(state, argv):
                 elif arg == '--release-8':
                     # Macos-intel (onnxruntime not available).
                     new_args += f' --bt {b_mupdf}pymupdf_lite --remote-github-runners macos-intel'
+                
+                elif arg == '--release-9':
+                    # windows-x32.
+                    new_args += f' --bt {b_mupdf}pymupdf_lite --remote-github-runners windows -e CIBW_ARCHS_WINDOWS=x86 -e "CIBW_SKIP=cp3??t-*" --cibw-skip-add-defaults=0'
                 
                 else:
                     Assert(0, f'Unrecognised {arg=}.')
@@ -1486,22 +1490,23 @@ def _get_key_pypi(state, on_error='raise'):
     return _get_key2(state, 'https://upload.pypi.org/', on_error).strip()
 
 
-def do_piprepo(state):
-    # Uses piprepo to create {state.wheelhouse}/simple so it functions as a pypi-style
-    # repository.
-    
+def do_piprepo(wheelhouse):
+    '''
+    Uses piprepo to create <wheelhouse>/simple so it functions as a pypi-style
+    repository.
+    '''
     # Cleanup wheelhouse - remove all wheels that we don't support (which can
     # have been pulled in by pip), and run piprep.
-    for p in glob.glob(f'{state.wheelhouse}/*.whl'):
+    for p in glob.glob(f'{wheelhouse}/*.whl'):
         name = os.path.basename(p)
         name, _ = name.split('-', 1)
         if name not in g_package_info:
             pipcl.log(f'Deleting: {p}')
             pipcl.fs_remove(p)
     # We want to completely recreate.
-    pipcl.fs_remove(f'{state.wheelhouse}/simple')
+    pipcl.fs_remove(f'{wheelhouse}/simple')
     pipcl.run(
-            f'piprepo build {state.wheelhouse}',
+            f'piprepo build {wheelhouse}',
             prefix='piprepo build: ',
             )
 
@@ -1628,7 +1633,7 @@ def git_compare_remote(directory):
     out = pipcl.run(f'cd {directory} && git ls-remote -q', capture=1, verbose=0)
     matches = list()
     for line in out.split('\n'):
-        #pipcl.log(f'{line=}')
+        pipcl.log(f'{line=}')
         if not line:
             continue
         sha, refname = line.split()
@@ -2015,24 +2020,30 @@ def _modify_build_env(state, package, cibw=False):
             state.env_extra['PYMUPDFPRO_SETUP_SOT_KEY'] = os.environ[key_env]
     
     if package == 'pymupdf':
-        Assert(
-                'pymupdf_layout' in state.packages and 'pymupdf4llm' in state.packages,
-                'Package pymupdf requires pymupdf_layout and pymupdf4llm.',
+        Assert(1
+                and 'pymupdf_layout' in state.packages_build
+                and 'pymupdf4llm' in state.packages_build
+                ,
+                'Package pymupdf requires pymupdf_ayout and pymupdf4llm.',
                 )
         state.env_extra['PYMUPDF_SETUP_PATH_LAYOUT'] = abspath(state, _get_local('pymupdf_layout', state), cibw=cibw)
         state.env_extra['PYMUPDF_SETUP_PATH_4LLM'] = abspath(state, _get_local('pymupdf4llm', state), cibw=cibw)
 
     elif package == 'pymupdf_mid':
-        Assert(
-                'pymupdf4llm' in state.packages and 'pymupdf_layout' not in state.packages,
+        Assert(1
+                and 'pymupdf4llm' in state.packages_build
+                and 'pymupdf_layout' not in state.packages_build
+                ,
                 'Package pymupdf_mid requires pymupdf4llm and not pymupdf_layout.',
                 )
         state.env_extra.pop('PYMUPDF_SETUP_PATH_LAYOUT', None)
         state.env_extra['PYMUPDF_SETUP_PATH_4LLM'] = abspath(state, _get_local('pymupdf4llm', state), cibw=cibw)
 
     elif package == 'pymupdf_lite':
-        Assert(
-                'pymupdf4llm' not in state.packages and 'pymupdf_layout' not in state.packages,
+        Assert(1
+                and 'pymupdf4llm' not in state.packages_build
+                and 'pymupdf_layout' not in state.packages_build
+                ,
                 'Package pymupdf_lite requires not pymupdf_layout and not pymupdf4llm.',
                 )
         state.env_extra.pop('PYMUPDF_SETUP_PATH_LAYOUT', None)
@@ -3748,8 +3759,9 @@ def main(state, argv):
                                     
                 elif command == 'draft':
                     Assert(state.draft_location, f'<draft_location> unset')
-                    do_piprepo(state)
-                    command = f'rsync -ai {state.wheelhouse}/ {state.draft_location}/'
+                    wheelhouse = state.wheelhouse_release
+                    do_piprepo(wheelhouse)
+                    command = f'rsync -ai {wheelhouse}/ {state.draft_location}/'
                     pipcl.run(command)
 
                 elif command == 'gnn-download':
@@ -3850,7 +3862,7 @@ def main(state, argv):
         except Exception:
             pass
 
-    do_piprepo(state)
+    do_piprepo(state.wheelhouse)
 
 
 def _get_local(package, state, test=False):
