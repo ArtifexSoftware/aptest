@@ -1174,6 +1174,7 @@ def get_args(state, argv):
                 new_args += ' -r @github'
                 new_args += ' cibw'
                 new_args += ' --check-unchanged'
+                new_args += ' --check-pulled'
                 new_args += ' --git-local-detailed=0'
                 
                 # We do not allow --MUPDF to be specified when making releases,
@@ -1700,6 +1701,15 @@ def git_assert_unchanged(directory):
             )
 
 
+def _check_checkout(state, directory):
+    if state.check_unchanged:
+        git_assert_unchanged(directory)
+    if state.check_pulled:
+        git_assert_pulled(directory)
+    if state.check_pushed:
+        git_assert_pushed(directory)
+
+
 def do_remote_github(state, args):
     assert isinstance(args, cli.Args)
     pipcl.run('pip install requests')
@@ -1728,12 +1738,7 @@ def do_remote_github(state, args):
             if not package_location.startswith(('git:', 'pip:')):
                 # Push to a Github branch and update argv[] to refer to this
                 # Github branch.
-                if state.check_unchanged:
-                    git_assert_unchanged(package_location)
-                if state.check_pulled:
-                    git_assert_pulled(package_location)
-                if state.check_pushed:
-                    git_assert_pushed(package_location)
+                _check_checkout(state, package_location)
                 
                 info = name_info(state, package_name)
                 pipcl.log(f'{package_name=}.')
@@ -3937,10 +3942,7 @@ def _get_local(package, state, test=False):
                     pipcl.run(f'cd {directory} && {command}')
     else:
         directory = location
-        if state.check_unchanged:
-            git_assert_unchanged(directory)
-        if state.check_pushed:
-            check_checkout_pushed(directory)
+        _check_checkout(state, directory)
     if not test:
         if package in state.clean_git:
             pipcl.run(
@@ -3977,12 +3979,12 @@ def _get_local(package, state, test=False):
                 else:
                     pipcl.log(f'{diff=}')
     
-    if state.check_unchanged:
-        Assert(
-                not diff,
-                f'Checkout is changed but {state.check_unchanged=}: {package=} {directory=}.',
-                )
-        # todo: also check that sha is on remote.
+    #if state.check_unchanged:
+    #    Assert(
+    #            not diff,
+    #            f'Checkout is changed but {state.check_unchanged=}: {package=} {directory=}.',
+    #            )
+    #    # todo: also check that sha is on remote.
     
     if d := info.get('directory'):
         return f'{directory}/{d}'
