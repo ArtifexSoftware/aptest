@@ -1246,7 +1246,7 @@ def get_args(state, argv):
                 
                 elif arg == '--release-9':
                     # windows-x32.
-                    new_args += f' --bt {b_mupdf}pymupdf_lite --remote-github-runners windows -e CIBW_ARCHS_WINDOWS=x86 --cibw-skip-add-defaults=0'
+                    new_args += f' --bt {b_mupdf}pymupdf_lite --remote-github-runners windows -e CIBW_ARCHS_WINDOWS=x86 -e "CIBW_SKIP=cp3??t-*" --cibw-skip-add-defaults=0'
                 
                 else:
                     Assert(0, f'Unrecognised {arg=}.')
