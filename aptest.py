@@ -1633,10 +1633,13 @@ def git_compare_remote(directory):
     out = pipcl.run(f'cd {directory} && git ls-remote -q', capture=1, verbose=0)
     matches = list()
     for line in out.split('\n'):
-        pipcl.log(f'{line=}')
+        #pipcl.log(f'{line=}')
         if not line:
             continue
-        sha, refname = line.split()
+        try:
+            sha, refname = line.split()
+        except Exception as e:
+            raise Exception(f'Unable to parse line from git ls-remote: {line=}') from e
         if refname == f'refs/heads/{branch_name}':
             matches.append(sha)
     if not matches:
