@@ -283,6 +283,7 @@ and uploading to https://pypi.org (also see `Release procedure`_)::
     aptest/aptest.py --release-7
     aptest/aptest.py --release-8
     aptest/aptest.py --release-9
+    aptest/aptest.py --release-10
 
 (See `Release procedure`_ for details.)
 
@@ -461,13 +462,18 @@ Instructions for releasing wheels for:
 
     ``aptest/aptest.py --release-8``
 
-  * These commands use `--check-unchanged`_ and `--check-pulled`_ internally,
-    so will fail if local checkouts contain uncommitted changes or do not
-    contain the latest remote commits.
+    ``aptest/aptest.py --release-9``
 
+  * These commands use `--check-unchanged`_ and `--check-pulled`_ internally.
+  
+    So if the release is using local checkouts, we will fail if:
+
+    * The local checkouts contain uncommitted changes.
+    * The local checkouts do not contain the latest remote commits.
+  
   * These commands can be manually run in parallel using individual terminals.
     
-  On success this will populate the release wheelhouse with all wheels and sdists
+  On success this will populate the release wheelhouse with all wheels and sdists.
   
   Also see:
   
@@ -550,6 +556,12 @@ Instructions for releasing wheels for:
   * For all Github issues that are labeled as ``fixed in next release``,
     close the issue with text ``Fixed in PyMuPDF-<version>``.
   * Check in the release announcement that all fixed issues are now shown as closed.
+
+  * In ``pymupdf``'s ``changes.txt``:
+
+    * Add date of release that was just made.
+    * Push to central repository.
+
   * If the new release uses a new version of MuPDF, optionally
     remove all code that is specific to the previous major release
     of MuPDF. E.g. grep for ``FZ_VERSION`` or ``mupdf_version_tuple``.
@@ -576,9 +588,15 @@ Instructions for releasing wheels for:
       
         See: https://github.com/pymupdf/PyMuPDF/discussions/<announcement-id>
         
-        Also released: pymupdf4llm, pymupdf_layout, pdf4llm, pymupdf_office.
+        Also released:
+            pymupdf-office
+            pymupdf-lite
 
 * Possible post-release changes:
+
+  For Aptest.
+  
+  * Update the release directory in `~/.aptest`_ to next version.
 
   For all projects.
   
@@ -588,7 +606,6 @@ Instructions for releasing wheels for:
 
   * In ``pymupdf``'s ``changes.txt``:
 
-    * Add date of release that was just made.
     * Add title for next release ``**Changes in version <next-version>**``.
 
   * In ``pymupdf``'s ``.github/ISSUE_TEMPLATE/bug_report.yml``:
@@ -1011,6 +1028,7 @@ This:
     APTEST_DOT_APTEST 
     APTEST_PIPCL
     APTEST_VENV
+    APTEST_WHEELHOUSE
     AUTOVENV_DOIT
     CIBW_ARCHS
     CIBW_ARCHS_WINDOWS``, ``CIBW_ARCHS_MACOS`` and ``CIBW_ARCHS_LINUX
@@ -1190,6 +1208,10 @@ cibw
          ``cibuildwheel`` will find required packages in the wheelhouse,
          even for mutually-dependent packages.
 
+    Other:
+    
+    * Environment variable ``APTEST_WHEELHOUSE`` will be set to the absolute path of the wheelhouse.
+    
     Also see:
 
     * `--cibw-ignore-test-failures`_
@@ -1197,6 +1219,7 @@ cibw
     * `--cibw-pyodide`_
     * `--cibw-pyodide-version`_
     * `--cibw-skip-add-defaults`_
+    * `--wheelhouse`_
 
 
 docs
@@ -1217,7 +1240,16 @@ draft
       
       where ``<url>`` is the URL of the draft location.
       
-    * We will also sync a piprepo subdirectory ``simple/`` that will
+    * We also add a README file. containing an example ``pip install --extra-index-url ...`` command.
+      
+      If the remote location is in a recognised form, 
+      we infer the remote URL,
+      and put an exmaple ``pip install --extra-index-url ...`` command into the README.
+      
+      Supported locations forms are:
+      
+      * ``<user>@server>:<directory>`` => ``https://<server>/~<user>/public_html/<directory>``
+      * ``<server>:<directory>`` => ``https://<server>/~$USER/public_html/<directory>``
 
     Also see:
 
@@ -1276,6 +1308,14 @@ populate
     * `--clean-setup`_
     * `--clean-setup-all`_
 
+
+sdist
+.....
+    Build sdist's (packages selected with `-b`_).
+    
+    We only build sdists for selected packages for which we release source.
+    
+
 run
 ...
     Runs commands specified by `--run`_ within checkouts.
@@ -1284,6 +1324,8 @@ run
 test
 ....
     Runs `pytest <https://docs.pytest.org>`_ tests.
+    
+    * Environment variable ``APTEST_WHEELHOUSE`` will be set to the absolute path of the wheelhouse.
 
     Also see:
 
@@ -1295,6 +1337,7 @@ test
     * `--pytest-wrap`_
     * `-t`_
     * `--test-extra-packages`_
+    * `--wheelhouse`_
 
 
 test-gnn
@@ -1442,6 +1485,24 @@ Options
     Also see:
     
     * `--help`_.
+
+
+.. _--history:
+
+--history <history-path>
+........................
+    Append a line of information to file with path ``<history-path>`` on exit.
+    
+    Currently the line consists of these space-separate name=value pairs::
+    
+        g_date_time=<date-time> e=<termination-code> state.log_tee=<log-tee-path> command=<command-line>
+    
+    For example::
+    
+        g_date_time='2026-10-23-16-15-57' e=0 state.log_tee='aptest-out-2026-10-23-16-15-57' command='aptest/aptest.py -m mupdf --plite PyMuPDF build test --test-quick'
+    
+    * Typically one would put ``--history`` in `~/.aptest`_.
+    * File locking is used to avoid corruption from multiple simultaneous invocations of Aptest.
 
 
 .. _-i:
@@ -1864,6 +1925,10 @@ Options
 --check-pulled (bool)
 ........................
     If true, fail if local checkout has not pulled latest remote.
+    
+    Also see:
+    
+    * `--check-pushed`_.
 
 
 .. _--check-pushed:
@@ -1871,6 +1936,10 @@ Options
 --check-pushed (bool)
 ........................
     If true, fail if local checkout is not pushed to remote.
+    
+    Also see:
+    
+    * `--check-pulled`_.
 
 
 .. _--check-unchanged:
@@ -2040,8 +2109,10 @@ Options
     Also see `--git-compare-remotes`_.
 
 
---git-compare-remotes
-.....................
+.. _--git-compare-remotes:
+
+--git-compare-remotes (bool)
+............................
     Show information about all packages that are specified as local checkouts.
     
     See `--git-compare-remote`_ for the output format.
@@ -2859,21 +2930,6 @@ Copy ``<path>`` (a file or directory) to remote.
     If ``<package>`` is empty string, ``<command>`` is run in the current directory.
 
 
-.. _--sdists:
-
---sdists (bool)
-...............
-    If true, the `build`_ and `cibw`_ commands will also build sdists.
-    
-    We only build sdists for these packages:
-    
-    * ``pymupdf``
-    * ``pymupdf4llm``
-    * ``pdf2docx``
-    
-    With `cibw`_, we only build sdists if on Linux.
-
-
 .. _--set-swig:
 
 --set-swig <swig>
@@ -2904,9 +2960,9 @@ Copy ``<path>`` (a file or directory) to remote.
 
 .. _--show-metadata:
 
---show-metadata <wheel-path>
-............................
-    Shows contents of the METADATA file in specified wheel.
+--show-metadata <wheel-path>|<sdist>
+....................................
+    Shows contents of the METADATA file in specified wheel or sdist.
     
     * Can be specified multiple times.
 
@@ -3179,6 +3235,8 @@ Copy ``<path>`` (a file or directory) to remote.
     
     * `--clean-wheelhouse`_.
     * `--wheelhouse-release`_.
+    * `cibw`_.
+    * `test`_.
 
 
 .. _--wheelhouse-release:
@@ -3227,12 +3285,29 @@ completion
 Changelog
 ---------
 
+**2026-10-30**
+
+* Added support for empty package ``pymupdfpro``.
+* Created special failing sdist for ``pymupdfpro``.
+* Fixed errors in autovenv tests.
+* Improved `Release procedure`_.
+* Make generated ``pymupdf_layout`` and ``pymupdf4llm`` wheels require python>=3.11.
+* Make generated ``pymupdf_layout`` and ``pymupdf4llm`` wheels require specific version of ``pymupdf``.
+* Make generated ``pymupdf_layout`` and ``pymupdf4llm`` wheels require specific versions of each other.
+* Set ``APTEST_WHEELHOUSE`` when running tests via `test`_ or `cibw`_.
+* `--git-compare-remotes`_: this is now a bool option.
+* `--history`_: new.
+* `--show-metadata`_: also work with ``.tar.gz`` sdist files, and improved auto-complete.
+* ``--sdist``: removed.
+* `sdist`_: new.
+
+
 **2026-10-16**
 
 * Added `--check-pulled`_.
 * Added `--git-compare-remote`_.
 * Added `--git-compare-remotes`_.
-* Build pymupdf-lite for core architectures.
+* In `--release-*`_, also build ``pymupdf-lite`` for core architectures.
 
 
 **2026-10-15**
