@@ -1054,7 +1054,8 @@ def get_args(state, argv):
                 state.git_compare_remote_directories.append(next(args).as_str())
             
             elif arg == '--git-compare-remotes':
-                state.git_compare_remote_directories.append(None)
+                if args.get_bool():
+                    state.git_compare_remote_directories.append(None)
             
             elif arg == '--git-depth':
                 state.git_depth = next(args).as_int()
