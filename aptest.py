@@ -2027,7 +2027,7 @@ def _modify_build_env(state, package, cibw=False):
                 and 'pymupdf_layout' in state.packages_build
                 and 'pymupdf4llm' in state.packages_build
                 ,
-                'Package pymupdf requires pymupdf_ayout and pymupdf4llm.',
+                'Package pymupdf requires pymupdf_layout and pymupdf4llm.',
                 )
         state.env_extra['PYMUPDF_SETUP_PATH_LAYOUT'] = abspath(state, _get_local('pymupdf_layout', state), cibw=cibw)
         state.env_extra['PYMUPDF_SETUP_PATH_4LLM'] = abspath(state, _get_local('pymupdf4llm', state), cibw=cibw)
