@@ -16,6 +16,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+import tarfile
 import textwrap
 import time
 import zipfile
@@ -1522,33 +1523,36 @@ def do_piprepo(wheelhouse):
 
 def wheel_metadata(wheel_path):
     '''
-    Extracts metadata from wheel, returning (raw, (ok, bad)), where:
+    Extracts metadata from wheel or sdist, returning (raw, (ok, bad)), where:
         raw:
             Raw text in the METADATA file.
         (good, bad):
             The two dicts as described in
             https://packaging.pypa.io/en/stable/metadata.html#packaging.metadata.parse_email.
     '''
-    #pipcl.log(f'{wheel_path=}')
-    name = os.path.basename(wheel_path).split('-')[0]
-    #pipcl.log(f'{name=}')
-    with zipfile.ZipFile(wheel_path) as z:
-        metadata_zis = list()
-        for zi in z.infolist():
-            #pipcl.log(f'{zi.filename=}')
-            m = re.match(f'^{name}-.*\\.dist-info/METADATA$', zi.filename)
-            #pipcl.log(f'{m=}')
-            if m:
-                metadata_zis.append(zi)
-        assert len(metadata_zis) == 1, f'{metadata_zis=}'
-        metadata_zi = metadata_zis[0]
-        with z.open(metadata_zi) as f:
-            metadata = f.read().decode()
-        metada2 = packaging.metadata.parse_email(metadata)
-        #pipcl.log(f'{metada2=}')
-        #pipcl.log()
-        #pipcl.log(f'{json.dumps(metada2, indent="    ")}')
-        return metadata, metada2
+    if wheel_path.endswith('.whl'):
+        name = os.path.basename(wheel_path).split('-')[0]
+        with zipfile.ZipFile(wheel_path) as z:
+            metadata_zis = list()
+            for zi in z.infolist():
+                m = re.match(f'^{name}-.*\\.dist-info/METADATA$', zi.filename)
+                if m:
+                    metadata_zis.append(zi)
+            assert len(metadata_zis) == 1, f'{metadata_zis=}'
+            metadata_zi = metadata_zis[0]
+            with z.open(metadata_zi) as f:
+                metadata = f.read().decode()
+            metada2 = packaging.metadata.parse_email(metadata)
+            return metadata, metada2
+    elif wheel_path.endswith('.tar.gz'):
+        name_version = os.path.basename(wheel_path)[:-len('.tar.gz')]
+        with tarfile.open(wheel_path) as tf:
+            ti = tf.getmember(f'{name_version}/PKG-INFO')
+            metadata = tf.extractfile(ti).read().decode()
+            metadata2 = packaging.metadata.parse_email(metadata)
+        return metadata, metadata2
+    else:
+        Assert(0, f'Not a .whl or .tar.gz: {wheel_path}')
 
 
 def cibw_build_filter(CIBW_BUILD, metadata):
