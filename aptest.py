@@ -2188,15 +2188,19 @@ def do_build_single(state, package):
             version = os.path.basename(path).split('-')[1]
             ret_wheel = create_wheel(state, package, version, pure=True, description=f'{directory}/README.md')
         elif package == 'pymupdfpro':
+            
+            text = textwrap.dedent('''
+                    Package 'pymupdfpro' has been renamed to 'pymupdf-office' from version 2.0 onwards.
+                    Please install 'pymupdf-office' instead.
+                    ''')
             ret_sdist = create_sdist_fail(
                     state,
-                    textwrap.dedent('''
-                        ERROR: package 'pymupdfpro' has been renamed to 'pymupdf-office' from version 2.0 onwards.
-                        Please install 'pymupdf-office' instead.
-                        '''),
+                    f'ERROR: {text}',
                     package,
                     '2.0',
                     pure=True,
+                    description=text,
+                    description_content_type='text/plain',
                     )
         else:
             if package:
@@ -2303,19 +2307,21 @@ def create_wheel(state, name, version, *args, **kwargs):
     return f'{state.wheelhouse}/{leaf}'
 
 
-def create_sdist_fail(state, error_text, name, version, *args, **kwargs):
+def create_sdist_fail(state, build_error_text, name, version, *args, **kwargs):
     '''
     Creates an sdist which will fail with a diagnostic <error_text> if an
     attempt is made to build/install from it.
+    
+    <kwargs> must not contain 'fn_sdist'.
     '''
     setup_text = textwrap.dedent(f'''
             import sys
-            print({error_text!r})
+            print({build_error_text!r})
             sys.exit(1)
             ''')
     pyproject_toml = textwrap.dedent('''
             [build-system]
-            requires = ['pipcl']
+            requires = []
             build-backend = "setup"
             backend-path = ["."]
             ''')
