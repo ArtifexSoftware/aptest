@@ -2168,19 +2168,15 @@ def do_build_single(state, package):
             version = os.path.basename(path).split('-')[1]
             ret_wheel = create_wheel(state, package, version, pure=True, description=f'{directory}/README.md')
         elif package == 'pymupdfpro':
-            ret_wheel = create_wheel(
+            ret_sdist = create_sdist_fail(
                     state,
+                    textwrap.dedent('''
+                        ERROR: package 'pymupdfpro' has been renamed to 'pymupdf-office' from version 2.0 onwards.
+                        Please install 'pymupdf-office' instead.
+                        '''),
                     package,
-                    version='2.0',
+                    '2.0',
                     pure=True,
-                    description=textwrap.dedent('''
-                             This is a placeholder for `Pymupdf-office <https://pypi.org/project/pymupdf-office>`_'s
-                             old package name, `Pymupdfpro`.
-                             
-                             Installing this package will install the latest version of Pymupdf-office.
-                            '''),
-                    description_content_type='text/markdown',
-                    requires_dist='pymupdf-office',
                     )
         else:
             if package:
@@ -2274,14 +2270,45 @@ def set_pseudo_package_env(state):
             state.env_extra['PYMUPDFPRO_SOT_MARINA'] = '1'
 
 
-def create_wheel(state, *args, **kwargs):
+def create_wheel(state, name, version, *args, **kwargs):
     '''
     Creates a wheel by creating an internal pipcl.Package().
+    
+    If `kwargs` contains `build_error`, we create a package whose setup.py
+    immediately prints out kwargs['build_error'] and calls sys.exit(1),
+    and we always
     '''
-    package = pipcl.Package(*args, **kwargs)
+    package = pipcl.Package(name, version, *args, **kwargs)
     leaf = package.build_wheel(state.wheelhouse)
     return f'{state.wheelhouse}/{leaf}'
 
+
+def create_sdist_fail(state, error_text, name, version, *args, **kwargs):
+    '''
+    Creates an sdist which will fail with a diagnostic <error_text> if an
+    attempt is made to build/install from it.
+    '''
+    setup_text = textwrap.dedent(f'''
+            import sys
+            print({error_text!r})
+            sys.exit(1)
+            ''')
+    pyproject_toml = textwrap.dedent('''
+            [build-system]
+            requires = ['pipcl']
+            build-backend = "setup"
+            backend-path = ["."]
+            ''')
+    def sdist():
+        return [
+                (setup_text.encode(), 'setup.py'),
+                (pyproject_toml.encode(), 'pyproject.toml'),
+                ]
+    assert 'fn_sdist' not in kwargs
+    kwargs['fn_sdist'] = sdist
+    package = pipcl.Package(name, version, *args, **kwargs)
+    leaf = package.build_sdist(state.wheelhouse, formats=None)
+    
 
 def do_build(state):
     
