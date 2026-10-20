@@ -357,6 +357,14 @@ g_package_info = {
                 'aliases':  ['office'],
                 'order': 3, # Need to be after layout/4llm.
             },
+        'pymupdfpro':
+            {
+                'git_remote': 'git@github.com:ArtifexSoftware/PyMuPDFPro.git',
+                'git_branch': 'main',
+                'aliases':  ['pro'],
+                'order': 3,
+                'pure': True,
+            },
         'pymupdf_layout':
             {
                 'git_remote': 'https://github.com/ArtifexSoftware/pymupdf_layout.git',
@@ -2159,6 +2167,21 @@ def do_build_single(state, package):
             path = paths[0]
             version = os.path.basename(path).split('-')[1]
             ret_wheel = create_wheel(state, package, version, pure=True, description=f'{directory}/README.md')
+        elif package == 'pymupdfpro':
+            ret_wheel = create_wheel(
+                    state,
+                    package,
+                    version='2.0',
+                    pure=True,
+                    description=textwrap.dedent('''
+                             This is a placeholder for `Pymupdf-office <https://pypi.org/project/pymupdf-office>`_'s
+                             old package name, `Pymupdfpro`.
+                             
+                             Installing this package will install the latest version of Pymupdf-office.
+                            '''),
+                    description_content_type='text/markdown',
+                    requires_dist='pymupdf-office',
+                    )
         else:
             if package:
                 pipcl.run(f'pip uninstall -y {package}')
