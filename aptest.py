@@ -1324,7 +1324,23 @@ def get_args(state, argv):
                 state.swig_quick = args.get_bool()
             
             elif arg == '--show-metadata':
-                state.show_metadata.append(next(args).as_str())
+                p = next(args)
+                if not os.path.isfile(p.as_str()):
+                    # Compare with valid completions so <tab> auto-completes.
+                    # Match any directory.
+                    for p2 in glob.glob(f'{p.as_str()}*/'):
+                        pipcl.log(f'{p2=}')
+                        if p == p2:
+                            break
+                    else:
+                        # Match any *.whl or *.tar.gz.
+                        for p2 in glob.glob(f'{p.as_str()}*.whl') + glob.glob(f'{p.as_str()}*.tar.gz'):
+                            pipcl.log(f'{p2=}')
+                            if p == p2:
+                                break
+                        else:
+                            Assert(0, f'Not a file .whl or .tar.gz file: {p}')
+                state.show_metadata.append(p.as_str())
 
             elif arg == '--system-packages':
                 state.system_packages = int(next(args))
