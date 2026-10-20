@@ -567,13 +567,13 @@ def _test_completion(COMP_LINE):
 
 def dummy_completion1():
     '''
-    >>> _test_completion(f'{__file__} --sdi')
-        --sdists
+    >>> _test_completion(f'{__file__} sdi')
+        sdist
     '''
     
 def dummy_completion2():
     '''
-    >>> _test_completion(f'{__file__} --sdists=')
+    >>> _test_completion(f'{__file__} --check-pushed=')
         0
         false
         False
@@ -817,7 +817,6 @@ def make_state():
     state.remote_sync = list()
     state.results = dict()
     state.run_commands = list()
-    state.sdists = False
     state.show_help = False
     state.show_metadata = list()
     state.ssh_key_path_abs = None
@@ -1231,15 +1230,15 @@ def get_args(state, argv):
                 
                 elif arg == '--release-1':
                     # windows-x64, linux-x64, macos-arm64.
-                    new_args += f' --bt {b_mupdf}pymupdf,pymupdf_office,pymupdf_layout,pymupdf4llm,pdf4llm --sdists'
+                    new_args += f' --bt {b_mupdf}pymupdf,pymupdf_office,pymupdf_layout,pymupdf4llm,pdf4llm sdist'
                 
                 elif arg == '--release-2':
                     # linux-arm64.
                     new_args += f' --bt {b_mupdf}pymupdf,pymupdf_office,pymupdf_layout,pymupdf4llm,pdf4llm --remote-github-runners linux-arm'
                 
                 elif arg == '--release-3':
-                    # windows-x32.
-                    new_args += f' --bt {b_mupdf}pymupdf_lite'
+                    # Core pymupdf_lite wheels and sdist.
+                    new_args += f' --bt {b_mupdf}pymupdf_lite sdist'
                 
                 elif arg == '--release-4':
                     # linux-musllinux-x64.
@@ -1270,9 +1269,14 @@ def get_args(state, argv):
                     # windows-x32.
                     new_args += f' --bt {b_mupdf}pymupdf_lite --remote-github-runners windows -e CIBW_ARCHS_WINDOWS=x86 -e "CIBW_SKIP=cp3??t-*" --cibw-skip-add-defaults=0'
                 
+                elif arg == '--release-10':
+                    # pymupdf_lite linux-arm
+                    new_args += f' --bt {b_mupdf}pymupdf_lite --remote-github-runners linux-arm'
+                
                 else:
                     Assert(0, f'Unrecognised {arg=}.')
                 
+                pipcl.log(f'Replacing {arg=} with {new_args=}.')
                 new_args = shlex.split(new_args)
                 args.args_eq.replace(arg.pos, args.pos, new_args)
                 continue
@@ -1324,9 +1328,6 @@ def get_args(state, argv):
                     package = ''
                 command = next(args)
                 state.run_commands.append((package, command.as_text()))
-
-            elif arg == '--sdists':
-                state.sdists = args.get_bool()
 
             elif arg == '--set-swig':
                 state.swig = next(args).as_text()
@@ -1455,6 +1456,7 @@ def get_args(state, argv):
                     'gnn-train',
                     'run',
                     'populate',
+                    'sdist',
                     'test',
                     'test-gnn',
                     'upload',
@@ -2027,14 +2029,13 @@ def build_sdist(state, package, directory):
     '''
     Build sdist if <package> is allowed to have a sdist.
     '''
-    if not state.sdists:
-        return
     if platform.system() != 'Linux':
         return
     if package in (
             'pdf2docx',
             'pdf4llm',
             'pymupdf',
+            'pymupdf_lite',
             'pipcl',
             ):
         # pymupdf4llm's setup.py requires `-d` is after `sdist`.
@@ -2043,6 +2044,8 @@ def build_sdist(state, package, directory):
                 prefix=f'sdist {package}: ',
                 env_extra=state.env_extra,
                 )
+    else:
+        pipcl.log(f'Not building sdist for {package=}.')
 
 
 def _modify_build_env(state, package, cibw=False):
@@ -3906,6 +3909,11 @@ def main(state, argv):
                     with open(f'{state.wheelhouse}/aptest-run-results.json', 'w') as f:
                         json.dump(run_results, f, indent=4)
 
+                elif command == 'sdist':
+                    for package in state.packages_build:
+                        directory = _get_local(package, state)
+                        build_sdist(state, package, directory)
+                
                 elif command == 'test':
                     do_test(state)
                 
