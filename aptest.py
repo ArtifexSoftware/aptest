@@ -80,7 +80,7 @@ else:
 # We use `pylint disable=wrong-import-position` because these imports need to
 # be after autovenv.enter().
 #
-import filelock
+import filelock # pylint:disable=wrong-import-position
 import packaging.metadata   # pylint:disable=wrong-import-position
 import pipcl    # pylint:disable=wrong-import-position
 import xmltodict    # pylint:disable=wrong-import-position
@@ -950,7 +950,7 @@ def get_args(state, argv):
                 pipcl.log(f'    {i}')
     args = cli.Args(args_list, 1)
     #pipcl.log(f'{args.args_eq.argv=}')
-    try:
+    try:    # pylint: disable=too-many-nested-blocks
         i = 0
         while 1:
             pos0 = args.pos # We sometimes use this below.
@@ -1716,7 +1716,7 @@ def git_compare_remote(directory):
             # Local is behind the remote.
             delta = -1
     
-    return Ret(branch_name, local_branch_head_sha, remote_branch_head_sha, delta)    
+    return Ret(branch_name, local_branch_head_sha, remote_branch_head_sha, delta)
 
 
 def git_assert_pushed(directory):
@@ -2071,7 +2071,7 @@ def _modify_build_env(state, package, cibw=False):
                 and 'pymupdf_layout' in state.packages_build
                 and 'pymupdf4llm' in state.packages_build
                 ,
-                'Package pymupdf requires pymupdf_ayout and pymupdf4llm.',
+                'Package pymupdf requires pymupdf_layout and pymupdf4llm.',
                 )
         state.env_extra['PYMUPDF_SETUP_PATH_LAYOUT'] = abspath(state, _get_local('pymupdf_layout', state), cibw=cibw)
         state.env_extra['PYMUPDF_SETUP_PATH_4LLM'] = abspath(state, _get_local('pymupdf4llm', state), cibw=cibw)
@@ -2208,7 +2208,7 @@ def do_build_single(state, package):
                     Package 'pymupdfpro' has been renamed to 'pymupdf-office' from version 2.0 onwards.
                     Please install 'pymupdf-office' instead.
                     ''')
-            ret_sdist = create_sdist_fail(
+            ret_wheel = create_sdist_fail(
                     state,
                     f'ERROR: {text}',
                     package,
@@ -2349,6 +2349,7 @@ def create_sdist_fail(state, build_error_text, name, version, *args, **kwargs):
     kwargs['fn_sdist'] = sdist
     package = pipcl.Package(name, version, *args, **kwargs)
     leaf = package.build_sdist(state.wheelhouse, formats=None)
+    return f'{state.wheelhouse}/{leaf}'
     
 
 def do_build(state):
