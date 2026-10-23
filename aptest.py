@@ -48,7 +48,14 @@ autovenv_create = 2
 autovenv_verbose = 1
 
 APTEST_PIPCL = os.environ.get('APTEST_PIPCL')
-autovenv_packages = [APTEST_PIPCL or 'pipcl', 'xmltodict', 'piprepo', 'setuptools<81', 'packaging']
+autovenv_packages = [
+        APTEST_PIPCL or 'pipcl',
+        'filelock',
+        'packaging',
+        'piprepo',
+        'setuptools<81',
+        'xmltodict',
+        ]
 
 if sys.argv[1:] == ['completion'] or COMP_LINE:
     # We don't want autovenv to output debug info because it'll badly mess
@@ -73,6 +80,7 @@ else:
 # We use `pylint disable=wrong-import-position` because these imports need to
 # be after autovenv.enter().
 #
+import filelock
 import packaging.metadata   # pylint:disable=wrong-import-position
 import pipcl    # pylint:disable=wrong-import-position
 import xmltodict    # pylint:disable=wrong-import-position
@@ -764,6 +772,7 @@ def make_state():
     state.gnn_show_select = None
     state.gnn_show_select_root = None
     state.graal = False
+    state.history = None
     state.log_tee = None
     
     state.keys = list()
@@ -1105,6 +1114,9 @@ def get_args(state, argv):
             
             elif arg in ('-h', '--help'):
                 state.show_help = True
+            
+            elif arg == '--history':
+                state.history = next(args).as_text()
 
             elif arg == '-i':
                 _name = next(args).as_str()
@@ -4174,12 +4186,13 @@ def main0():
             doctest.testmod(None)
     else:
         state = make_state()
+        e = 1
         try:
             e = main(state, sys.argv)
         except BrokenPipeError:
             # We end up here if our output is being piped into less, then less
             # is killed.
-            e = 1
+            pass
         except Exception as ee:
             backtrace_limit = None
             if state.devel:
@@ -4213,28 +4226,40 @@ def main0():
                     file=str,
                     )
             pipcl.log(text)
-            e = 1
         finally:
             # This is always run, even if we get an exception not derived from
-            # Exception, for example KeyboardInterrupt from ctrl-c.
-            if state.atexit:
-                with pipcl.LogPrefix('atexit: '):
-                    e = pipcl.run(state.atexit, check=0)
-                    if e:
-                        pipcl.log(f'Warning, {state.atexit=} failed: {e=}')
+            e = e or 0
+            if COMP_LINE:
+                pass
+            else:
+                if state.history:
+                    with filelock.FileLock(f'{state.history}.lock'):
+                        with open(state.history, 'a') as f:
+                            command = shlex.join(sys.argv)
+                            line = f'{g_date_time=} {e=} {state.log_tee=} {command=}\n'
+                            f.write(line)
+
+                # Exception, for example KeyboardInterrupt from ctrl-c.
+                if state.atexit:
+                    with pipcl.LogPrefix('atexit: '):
+                        e = pipcl.run(state.atexit, check=0)
+                        if e:
+                            pipcl.log(f'Warning, {state.atexit=} failed: {e=}')
         
         # This is not run if we get an exception not derived from Exception,
         # for example KeyboardInterrupt from ctrl-c.
-        
-        if state.atexit_speak:
-            speak(e)
-
-        if state.log_tee:
-            pipcl.log(f'Aptest: log output is in: {state.log_tee}')
-        if e:
-            pipcl.log(f'Aptest: exiting with error {e}.')
+        if COMP_LINE:
+            pass
         else:
-            pipcl.log(f'Aptest: exiting with success.')
+            if state.atexit_speak:
+                speak(e)
+
+            if state.log_tee:
+                pipcl.log(f'Aptest: log output is in: {state.log_tee}')
+            if e:
+                pipcl.log(f'Aptest: exiting with error {e}.')
+            else:
+                pipcl.log(f'Aptest: exiting with success.')
         sys.exit(e)
 
 
