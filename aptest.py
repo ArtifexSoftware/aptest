@@ -2044,6 +2044,21 @@ def build_sdist(state, package, directory):
                 prefix=f'sdist {package}: ',
                 env_extra=state.env_extra,
                 )
+    elif package == 'pymupdfpro':
+        pipcl.log(f'Creating pymupdfpro sdist.')
+        text = textwrap.dedent('''
+                Package 'pymupdfpro' has been renamed to 'pymupdf-office' from version 2.0 onwards.
+                Please install 'pymupdf-office' instead.
+                ''')
+        ret_wheel = create_sdist_fail(
+                state,
+                f'ERROR: {text}',
+                package,
+                '2.0',
+                pure=True,
+                description=text,
+                description_content_type='text/plain',
+                )
     else:
         pipcl.log(f'Not building sdist for {package=}.')
 
@@ -2201,22 +2216,17 @@ def do_build_single(state, package):
             assert len(paths) == 1, f'Cannot find pymupdf wheel - needed this to build {package} ({paths=}).'
             path = paths[0]
             version = os.path.basename(path).split('-')[1]
-            ret_wheel = create_wheel(state, package, version, pure=True, description=f'{directory}/README.md')
-        elif package == 'pymupdfpro':
-            
-            text = textwrap.dedent('''
-                    Package 'pymupdfpro' has been renamed to 'pymupdf-office' from version 2.0 onwards.
-                    Please install 'pymupdf-office' instead.
-                    ''')
-            ret_wheel = create_sdist_fail(
+            ret_wheel = create_wheel(
                     state,
-                    f'ERROR: {text}',
                     package,
-                    '2.0',
+                    version,
                     pure=True,
-                    description=text,
-                    description_content_type='text/plain',
+                    description=f'{directory}/README.md',
+                    requires_dist=f'pymupdf=={version}',
                     )
+        elif package == 'pymupdfpro':
+            ret_wheel = None
+            pipcl.log(f'{ret_wheel=}')
         else:
             if package:
                 pipcl.run(f'pip uninstall -y {package}')
