@@ -3813,6 +3813,12 @@ def main(state, argv):
         pipcl.log(f'{state.packages_build=}')
         pipcl.log(f'{state.packages_test=}')
     
+    for package in state.packages_build:
+        Assert(package in state.packages, f'Cannot build because location is not specified: {package=}')
+    for package in state.packages_test:
+        Assert(package in state.packages, f'Cannot test because location is not specified: {package=}')
+
+    
     try:    # pylint: disable=too-many-nested-blocks.
         # Handle commands.
         #
