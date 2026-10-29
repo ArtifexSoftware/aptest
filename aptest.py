@@ -1673,7 +1673,7 @@ def git_compare_remote(directory):
     
     # Find sha of head of remote branch. We use `git ls-remote` to list sha of
     # each remote branch, and look for <branch_name>.
-    out = pipcl.run(f'cd {directory} && git ls-remote -q', capture=1, verbose=0)
+    out = pipcl.run(f'cd {directory} && git ls-remote -q', capture=1, verbose=1)
     matches = list()
     for line in out.split('\n'):
         #pipcl.log(f'{line=}')
