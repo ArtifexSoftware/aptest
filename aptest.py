@@ -3548,7 +3548,7 @@ def remote_to_url(remote):
     Attempts to guess URL for rsync-style remote.
     
     >>> remote_to_url('julian@ghostscript.com:public_html/wheels-2.1_a')
-    https://ghostscript.com/~julian/wheels-2.1_a
+    'https://ghostscript.com/~julian/wheels-2.1_a'
     '''
     m = re.match('^(([^@]+)@)?([^:]+):(.*)$', remote)
     if not m:
