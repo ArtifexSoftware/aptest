@@ -2050,7 +2050,7 @@ def build_sdist(state, package, directory):
                 Package 'pymupdfpro' has been renamed to 'pymupdf-office' from version 2.0 onwards.
                 Please install 'pymupdf-office' instead.
                 ''')
-        ret_wheel = create_sdist_fail(
+        create_sdist_fail(
                 state,
                 f'ERROR: {text}',
                 package,
@@ -3582,7 +3582,7 @@ def wheelhouse_remote_to_readme(wheelhouse, remote):
         draft_readme += f'pip install command prefix:\n'
         draft_readme += f'    pip install --extra-index-url {url}/simple\n'
     else:
-        draft_readme += f'[Unable to construct example pip --extra-index-url value from {state.draft_location=}.\n'
+        draft_readme += f'[Unable to construct pip --extra-index-url value from {remote=}.\n'
     pipcl.fs_write(f'{wheelhouse}/README.txt', draft_readme)
     
 
@@ -3861,7 +3861,6 @@ def main(state, argv):
     for package in state.packages_test:
         Assert(package in state.packages, f'Cannot test because location is not specified: {package=}')
 
-    
     try:    # pylint: disable=too-many-nested-blocks.
         # Handle commands.
         #
