@@ -15,5 +15,8 @@ def test_doctest():
         if path.endswith('.py'):
             pipcl.run(
                     f'cd {root} && python -m doctest {path}',
-                    env_extra=dict(APTEST_DOT_APTEST='0'),
+                    env_extra=dict(
+                            APTEST_DOT_APTEST='0',
+                            AUTOVENV_N='0',
+                            ),
                     )

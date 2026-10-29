@@ -22,12 +22,15 @@ def _write_code(code, path):
 # will work.
 #
 # We also unset AUTOVENV_VENV_ENTERED in case pytest itself is being run in an
-# autoenv venv.
+# autovenv venv.
 #
 g_env = os.environ.copy()
 g_env['PYTHONPATH'] = g_root
-g_env.pop('AUTOVENV_VENV_ENTERED', None)
 
+# Remove some environment state in case we are already running in a autovenv
+# venv.
+g_env.pop('AUTOVENV_VENV_ENTERED', None)
+g_env.pop('AUTOVENV_N', None)
 
 def test_autovenv_default():
     '''

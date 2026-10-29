@@ -18,7 +18,10 @@ def test_dirname():
     print(f'{root_relative=}')
     print(f'{os.getcwd()=}')
     leaf = os.path.basename(root)   # Typically 'aptest'.
-    env_extra = dict(APTEST_DOT_APTEST='0')
+    env_extra = dict(
+            APTEST_DOT_APTEST='0',
+            AUTOVENV_N='0',
+            )
     pipcl.run(f'cd {root}/.. && {sys.executable} {leaf}/aptest.py -V=0 --aptest {leaf}', env_extra=env_extra)
     pipcl.run(f'cd {root}/.. && {sys.executable} {leaf}/aptest.py -V=0 --aptest {leaf}/', env_extra=env_extra)
     pipcl.run(f'cd {root} && {sys.executable} ./aptest.py -V=0 --aptest ../{leaf}', env_extra=env_extra)
