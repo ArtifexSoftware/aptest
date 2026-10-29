@@ -3543,6 +3543,49 @@ def get_self_gitinfo():
                 )
 
 
+def remote_to_url(remote):
+    '''
+    Attempts to guess URL for rsync-style remote.
+    
+    >>> remote_to_url('julian@ghostscript.com:public_html/wheels-2.1_a')
+    https://ghostscript.com/~julian/wheels-2.1_a
+    '''
+    m = re.match('^(([^@]+)@)?([^:]+):(.*)$', remote)
+    if not m:
+        pipcl.log(f'Failed to parse {remote=}.')
+        return
+    username = m.group(2) or os.environ['USER']
+    server = m.group(3)
+    directory = m.group(4)
+    #pipcl.log(f'{username=}')
+    #pipcl.log(f'{server=}')
+    #pipcl.log(f'{directory=}')
+    if not directory.startswith('public_html/'):
+        pipcl.log(f'Not `:public_html/`, {remote=}.')
+        return
+    directory2 = directory[len('public_html/'):]
+    url = f'https://{server}/~{username}/{directory2}'
+    #pipcl.log(f'{url=}')
+    return url
+
+
+def wheelhouse_remote_to_readme(wheelhouse, remote):
+    '''
+    Create README in <wheelhouse>.
+    
+    The README contains example `pip install --extra-index-url ...` command.
+    '''
+    draft_readme = textwrap.dedent(f'''
+            Date/time: {g_date_time}
+            ''')
+    if url := remote_to_url(remote):
+        draft_readme += f'pip install command prefix:\n'
+        draft_readme += f'    pip install --extra-index-url {url}/simple\n'
+    else:
+        draft_readme += f'[Unable to construct example pip --extra-index-url value from {state.draft_location=}.\n'
+    pipcl.fs_write(f'{wheelhouse}/README.txt', draft_readme)
+    
+
 def main(state, argv):
     if github_workflow_unimportant():
         return
@@ -3879,6 +3922,8 @@ def main(state, argv):
                     Assert(state.draft_location, f'<draft_location> unset')
                     wheelhouse = state.wheelhouse_release
                     do_piprepo(wheelhouse)
+                    # Create README in wheelhouse.
+                    wheelhouse_remote_to_readme(wheelhouse, state.draft_location)
                     command = f'rsync -ai {wheelhouse}/ {state.draft_location}/'
                     pipcl.run(command)
 
