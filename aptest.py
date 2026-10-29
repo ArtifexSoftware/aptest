@@ -2611,13 +2611,13 @@ def do_cibw_single(state, package, CIBW_BUILD, cibw_pyodide_args, *, do_test=1):
         CIBW_ENVIRONMENT_PASS_LINUX = list(env_extra.keys())
 
         if platform.system() == 'Linux':
-            prefix = '/host'
-            # Update key files to be within /host in manylinux
+            # Update key files etc to be within /host in manylinux
             # docker. Otherwise for example tests that access remote git
             # repositories will not use the appropriate key.
             #
             # Also add key environment variables to CIBW_ENVIRONMENT_PASS_LINUX.
             #
+            prefix = '/host'
             new_keys = list()
             for url_prefix, path, env, pos in state.keys:
                 if path or env:
@@ -2628,6 +2628,7 @@ def do_cibw_single(state, package, CIBW_BUILD, cibw_pyodide_args, *, do_test=1):
                     new_keys.append((url_prefix, path, env, pos))
             state.keys += new_keys
             state.keys.sort(reverse=True)
+            state.env_extra['APTEST_WHEELHOUSE'] = f'{prefix}{os.path.abspath(state.wheelhouse)}'
 
         else:
             prefix = ''
@@ -3550,6 +3551,11 @@ def main(state, argv):
     if args is None:
         # COMP_LINE.
         return 0
+    
+    # Set APTEST_WHEELHOUSE. Note that do_cibw_single() prefixes with `/host`
+    # if running on linux so that it works from within the manylinux docker.
+    #
+    state.env_extra['APTEST_WHEELHOUSE'] = os.path.abspath(state.wheelhouse)
     
     # It's important that we do not use <argv> any more - we need to use
     # args.argv instead, because this contains any args from ~/.aptest and
