@@ -1680,11 +1680,13 @@ def git_compare_remote(directory):
         if not line:
             continue
         try:
-            sha, refname = line.split()
+            sha, refnames = line.split(maxsplit=1)
         except Exception as e:
             raise Exception(f'Unable to parse line from git ls-remote: {line=}') from e
-        if refname == f'refs/heads/{branch_name}':
-            matches.append(sha)
+        for refname in refnames.split():
+            if refname == f'refs/heads/{branch_name}':
+                matches.append(sha)
+                break
     if not matches:
         # Branch not in remote.
         return Ret(branch_name, local_branch_head_sha, None, None)
