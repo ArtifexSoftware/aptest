@@ -1229,27 +1229,27 @@ def get_args(state, argv):
                     new_args += ' --bt -'
                 
                 elif arg == '--release-1':
-                    # windows-x64, linux-x64, macos-arm64.
+                    # pymupdf: windows-x64, linux-x64, macos-arm64.
                     new_args += f' --bt {b_mupdf}pymupdf,pymupdf_office,pymupdf_layout,pymupdf4llm,pdf4llm sdist'
                 
                 elif arg == '--release-2':
-                    # linux-arm64.
+                    # pymupdf: linux-arm64.
                     new_args += f' --bt {b_mupdf}pymupdf,pymupdf_office,pymupdf_layout,pymupdf4llm,pdf4llm --remote-github-runners linux-arm'
                 
                 elif arg == '--release-3':
-                    # Core pymupdf_lite wheels and sdist.
+                    # pymupdf_lite: windows-x64, linux-x64, macos-arm64.
                     new_args += f' --bt {b_mupdf}pymupdf_lite sdist'
                 
                 elif arg == '--release-4':
-                    # linux-musllinux-x64.
+                    # pymupdf_lite: linux-musllinux-x64.
                     new_args += f' --bt {b_mupdf}pymupdf_lite --remote-github-runners linux -e "CIBW_BUILD=cp311-musllinux_x86_64" --cibw-skip-add-defaults=0'
                 
                 elif arg == '--release-5':
-                    # Build for Pyodide.
+                    # pymupdf_lite: pyodide.
                     new_args += f' --bt {b_mupdf}pymupdf_lite --cibw-pyodide --remote-github-runners linux'
                 
                 elif arg == '--release-6':
-                    # Build for cp314t and cp315t
+                    # pymupdf_lite: linux-cp314t linux-cp315t
                     #
                     # We use PYMUPDF_SETUP_PY_LIMITED_API=0 because
                     # py_limited_api and Py_GIL_DISABLED are not supported
@@ -1258,19 +1258,19 @@ def get_args(state, argv):
                     new_args += f' --bt {b_mupdf}pymupdf_lite --remote-github-runners linux --cibw-skip-add-defaults=0 -e CIBW_BUILD="cp314t* cp315t*" -e CIBW_SKIP="*musllinux*" -e PYMUPDF_SETUP_PY_LIMITED_API=0'
                 
                 elif arg == '--release-7':
-                    # windows-arm64.
+                    # pymupdf_lite: windows-arm64.
                     new_args += f' --bt {b_mupdf}pymupdf_lite -e PYMUPDF_SETUP_MUPDF_VS_UPGRADE=1 --remote-github-runners windows-arm64'
                 
                 elif arg == '--release-8':
-                    # Macos-intel (onnxruntime not available).
+                    # pymupdf_lite: macos-intel (onnxruntime not available).
                     new_args += f' --bt {b_mupdf}pymupdf_lite --remote-github-runners macos-intel'
                 
                 elif arg == '--release-9':
-                    # windows-x32.
+                    # pymupdf_lite: windows-x32.
                     new_args += f' --bt {b_mupdf}pymupdf_lite --remote-github-runners windows -e CIBW_ARCHS_WINDOWS=x86 -e "CIBW_SKIP=cp3??t-*" --cibw-skip-add-defaults=0'
                 
                 elif arg == '--release-10':
-                    # pymupdf_lite linux-arm
+                    # pymupdf_lite: linux-arm
                     new_args += f' --bt {b_mupdf}pymupdf_lite --remote-github-runners linux-arm'
                 
                 else:
