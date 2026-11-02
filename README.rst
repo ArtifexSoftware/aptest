@@ -444,6 +444,11 @@ Instructions for releasing wheels for:
   This will eventually hold all release wheels and sdists prior to them being
   uploaded to https://pypi.org.
 
+* Lock Github Pymupdf branch ``main``
+
+    https://github.com/pymupdf/PyMuPDF
+        Settings / Branches / main / ... / Edit / Lock branch
+
 * Build wheels for all packages:
 
     ``aptest/aptest.py --release-1``
@@ -463,6 +468,8 @@ Instructions for releasing wheels for:
     ``aptest/aptest.py --release-8``
 
     ``aptest/aptest.py --release-9``
+
+    ``aptest/aptest.py --release-10``
 
   * These commands use `--check-unchanged`_ and `--check-pulled`_ internally.
   
@@ -486,7 +493,7 @@ Instructions for releasing wheels for:
   * Use the location specified by `--wheelhouse-release`_ in `~/.aptest`_,
     with ``pip install``'s ``--extra-index-url``, for example:
 
-      ``pip install --extra-index-url release-1.27.2 pdf4llm pymupdf_office``
+      ``pip install --extra-index-url file://`pwd`/release-1.27.2/simple pdf4llm pymupdf_office``
 
   Or upload to, and install from, a web server:
   
@@ -499,6 +506,10 @@ Instructions for releasing wheels for:
   * ``pip install pytest``
   * ``pytest PyMuPDF/tests`` etc.
 
+* Unlock Github Pymupdf branch ``main``.
+
+    https://github.com/pymupdf/PyMuPDF
+        Settings / Branches / main / ... / Edit / Lock branch
 
 * Make the release by uploading all wheels and sdists to https://pypi.org/:
 
@@ -2728,7 +2739,10 @@ Also see:
 
 --release-3
 ...........
-    Build release ``pymupdf_lite`` wheel for ``windows-x32``.
+    Build release ``pymupdf_lite`` wheel
+    for ``linux-x64``, ``windows-x64`` and ``macos-arm64``.
+    
+    Also builds sdists.
     
     Also see `Release procedure`_.
 
@@ -2749,7 +2763,7 @@ Also see:
 
 --release-6
 ...........
-    Build release ``pymupdf_lite`` wheel for ``linux-x64`` and python-3.14t (free-threading).
+    Build  release ``pymupdf_lite`` wheel for ``linux-x64`` and python-3.14t and python-3.15t (free-threading).
     
     Also see `Release procedure`_.
 
@@ -2764,6 +2778,20 @@ Also see:
 --release-8
 ...........
     Build release ``pymupdf_lite`` wheel for ``macos-intel``.
+    
+    Also see `Release procedure`_.
+
+
+--release-9
+...........
+    Build release ``pymupdf_lite`` wheel for ``windows-x32``.
+    
+    Also see `Release procedure`_.
+
+
+--release-10
+............
+    Build release ``pymupdf_lite`` wheel for ``linux-arm64``.
     
     Also see `Release procedure`_.
 
@@ -3284,6 +3312,13 @@ completion
 
 Changelog
 ---------
+
+**2026-11-02**
+
+* `Release procedure`_: - added lock/unlock of Pymupdf branch ``main``.
+* Avoid error when parsing output of ``git ls-remote``,
+  for `--check-pulled`_ and `--check-pushed`_.
+
 
 **2026-10-30**
 
