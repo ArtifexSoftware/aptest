@@ -2280,8 +2280,6 @@ def do_build_single(state, package):
             
             _modify_build_env(state, package)
             
-            build_sdist(state, package, directory)
-
             if state.build_type:
                 if package in ('pymupdf', 'pymupdf_mid', 'pymupdf_lite'):
                     state.env_extra['PYMUPDF_SETUP_MUPDF_BUILD_TYPE'] = state.build_type
@@ -2729,8 +2727,6 @@ def do_cibw_single(state, package, CIBW_BUILD, cibw_pyodide_args, *, do_test=1):
                 path_dir = os.path.join(dirpath, dirname)
                 st = os.stat(path_dir)
                 pipcl.log(f'{st=}: {path_dir=}')
-
-    build_sdist(state, package, directory)
 
 
 def abspath(state, path, cibw):
