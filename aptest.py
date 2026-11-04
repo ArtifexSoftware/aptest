@@ -2442,23 +2442,19 @@ def do_cibw_single(state, package, CIBW_BUILD, cibw_pyodide_args, *, do_test=1):
     directory = _get_local(package, state)
     
     if not directory:
-        # location is pip.
-        pipcl.log(f'Unable to process with cibuildwheel because location is pip: {package=} and no second location')
-        return
-
-        # Experimental code to try to get cibw to test an existing wheel.
-        #directory = _get_local(package, state, test=1)
-        #if not directory:
-        #    pipcl.log(f'Unable to process with cibuildwheel because location is pip: {package=} and now second location')
-        #    continue
+        directory = _get_local(package, state, test=1)
+        if not directory:
+            pipcl.log(f'Unable to process with cibuildwheel because location is pip: {package=} and no second location')
+            return
+        
+        # If a packages uses pipcl, we can make its build() method
+        # use a pre-existing wheel by setting environment variable
+        # `PIPCL_PREBUILT_WHEEL_<package-name>`.
         #
-        #location, _args_pos = state.packages[package]
-        #assert location.startswith('pip:')
-        #if location.endswith(('.whl', '.tar.gz')):
-        #    pipcl.log(f'Unable to process with cibuildwheel because location is pip: .whl/.tar.gz. {package=} {location=}')
-        #    continue
-        #name = f'{package}{location[4:]}'
-        #state.env_extra['CIBW_BUILD_FRONTEND'] = f'pip wheel {name}'
+        pip_location, _ = state.packages[package]
+        assert pip_location.startswith('pip:')
+        pip_location2 = f'{package}{pip_location[4:]}'
+        state.env_extra[f'PIPCL_PREBUILT_WHEEL_{package}'] = pip_location2
 
     pipcl.log(f'{package} _get_local() => {directory=}')
     directory_abs = os.path.abspath(directory)
