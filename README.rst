@@ -53,7 +53,8 @@ Aptest can be run in various ways:
     git clone git@github.com:ArtifexSoftware/aptest.git
     pipx run ./aptest ...
 
-* Use `pipx <https://pypi.org/project/pipx/>`_ with remote Aptest Git repository::
+* Use `pipx <https://pypi.org/project/pipx/>`_ with remote Aptest Git repository
+  (Aptest's package name is ``artifex_aptest``)::
 
     pipx run artifex_aptest@git+ssh://git@github.com/ArtifexSoftware/aptest.git ...
 
@@ -1150,6 +1151,7 @@ build
     * `-b`_
     * `--build-pip-no-clean`_
     * `--build-type`_
+    * `--check-identical-versions`_
     * `--clean-git`_
     * `--clean-setup`_
     * `--clean-setup-all`_
@@ -1225,6 +1227,7 @@ cibw
     
     Also see:
 
+    * `--check-identical-versions`_
     * `--cibw-ignore-test-failures`_
     * `--cibw-name`_
     * `--cibw-pyodide`_
@@ -1255,7 +1258,7 @@ draft
       
       If the remote location is in a recognised form, 
       we infer the remote URL,
-      and put an exmaple ``pip install --extra-index-url ...`` command into the README.
+      and put an example ``pip install --extra-index-url ...`` command into the README.
       
       Supported locations forms are:
       
@@ -1594,6 +1597,11 @@ Options
 
         ``aptest.py -i pymupdf_core pip: -i pymupdf_core git: build test``
             Test current pymupdf-core release with testsuite in current PyMuPDF git.
+    
+    This also works with `cibw`_, but only if the package uses pipcl - Aptest
+    sets ``PIPCL_PREBUILT_WHEEL_<package-name>`` which makes the package
+    setup.py's ``build()`` function run ``pip`` internally to create the wheel
+    instead of building it locally.
 
 .. _upper-case-package names:
 
@@ -1929,6 +1937,14 @@ Options
 --build-type debug | memento | release
 ......................................
     Set build type. Default is ``release``.
+
+
+.. _--check-identical-versions:
+
+--check-identical-versions (bool)
+.................................
+
+    Require that all wheels have identical versions, in `build`_ and `cibw`_.
 
 
 .. _--check-pulled:
@@ -3312,6 +3328,12 @@ completion
 
 Changelog
 ---------
+
+**2026-11-06**
+
+* Fixed use of separate build and test locations with `cibw`_ - see `-i`_.
+* Added `--check-identical-versions`_ and use with `--release-*`_.
+
 
 **2026-11-02**
 
