@@ -390,14 +390,7 @@ g_package_info = {
                 'aliases':  ['langchain'],
                 'order': 4,
             },
-        #'smartoffice':
-        #    {
-        #        'git_remote': 'git@gitlab.artifex.com:smartoffice/sot.git',
-        #        'git_branch': 'master',
-        #        'aliases':  ['sot'],
-        #        'submodules': False,
-        #        'order': 1, # Fetch before Layout
-        #    },
+            
         'smartoffice_marina':
             {
                 'git_remote': 'git@github.com:epapyrusinc/marina.git',
@@ -406,21 +399,6 @@ g_package_info = {
                 'submodules': True,
                 'order': 1, # Fetch before Layout
             },
-        #'smartoffice_neo':
-        #    {
-        #        'git_remote': 'git@gitlab.artifex.com:smartoffice/smartoffice.git',
-        #        'git_branch': 'master',
-        #        'aliases':  ['sot-neo', '--neoso'],
-        #        'submodules': True,
-        #        'order': 1, # Fetch before Layout
-        #    },
-        #'pdf_feature_inspector':
-        #    {
-        #        'git_remote': 'git@github.com:ArtifexSoftware/pdf_feature_inspector.git',
-        #        'git_branch': 'main',
-        #        'aliases':  ['pfi'],
-        #        'order': 5,
-        #    },
         
         'pipcl':
             {
@@ -430,15 +408,6 @@ g_package_info = {
                 'order': -2,
                 'pure': True,
             },
-        
-        # Experimental, doesn't work.
-        #'presidio':
-        #    {
-        #        'git_remote': 'git@github.com:ArtifexSoftware/presidio.git',
-        #        'git_branch': 'main',
-        #        'aliases':  list(),
-        #        'order': 4,
-        #    },
         
         'swig':
             {
