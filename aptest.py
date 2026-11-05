@@ -2350,13 +2350,13 @@ def check_identical_versions(state):
         return
     wheel_paths = list()
     versions = set()
-    for path in (
+    wheel_paths = (
             glob.glob(f'{state.wheelhouse}/*.whl')
             + glob.glob(f'{state.wheelhouse}/*.tar.gz')
-            ):
-        wheel_paths.append(path)
+            )
+    for path in wheel_paths:
         leaf_elements = os.path.basename(path).split('-')
-        assert len(leaf_elements) >= 2, f'{paths=} {path=} {leaf_elements=}'
+        assert len(leaf_elements) >= 2, f'{wheel_paths=}\n{path=}\n{leaf_elements=}'
         v = leaf_elements[1]
         versions.add(v)
     if len(versions) != 1:
