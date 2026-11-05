@@ -745,6 +745,7 @@ def make_state():
     state.check_pulled = False
     state.check_pushed = False
     state.check_unchanged = False
+    state.check_identical_versions = False
     state.cibw_ignore_test_failures = False
     state.cibw_name = 'cibuildwheel'
     state.cibw_pyodide = None
@@ -1013,6 +1014,9 @@ def get_args(state, argv):
 
             elif arg == '--check-unchanged':
                 state.check_unchanged = args.get_bool()
+            
+            elif arg == '--check-identical-versions':
+                state.check_identical_versions = args.get_bool()
 
             elif arg == '--cibw-ignore-test-failures':
                 state.cibw_ignore_test_failures = args.get_bool()
@@ -1194,8 +1198,9 @@ def get_args(state, argv):
                 pipcl.log(f'{new_args=}')
                 new_args += ' -r @github'
                 new_args += ' cibw'
-                new_args += ' --check-unchanged'
+                new_args += ' --check-identical-versions'
                 new_args += ' --check-pulled'
+                new_args += ' --check-unchanged'
                 new_args += ' --git-local-detailed=0'
                 
                 # We do not allow --MUPDF to be specified when making releases,
@@ -2368,6 +2373,30 @@ def create_sdist_fail(state, build_error_text, name, version, *args, **kwargs):
     return f'{state.wheelhouse}/{leaf}'
     
 
+def check_identical_versions(state):
+    '''
+    Check versions of all wheels/sdists in wheelhouse.
+    '''
+    if not state.check_identical_versions:
+        return
+    wheel_paths = list()
+    versions = set()
+    for path in (
+            glob.glob(f'{state.wheelhouse}/*.whl')
+            + glob.glob(f'{state.wheelhouse}/*.tar.gz')
+            ):
+        wheel_paths.append(path)
+        leaf_elements = os.path.basename(path).split('-')
+        assert len(leaf_elements) >= 2, f'{paths=} {path=} {leaf_elements=}'
+        v = leaf_elements[1]
+        versions.add(v)
+    if len(versions) != 1:
+        text = '--check-identical-versions was specified but packages have differing versions:\n'
+        for p in sorted(wheel_paths):
+            text += f'    {p}\n'
+        Assert(0, text)
+    
+
 def do_build(state):
     
     set_pseudo_package_env(state)
@@ -2411,6 +2440,8 @@ def do_build(state):
                 prefix='    ',
                 )
     
+    check_identical_versions(state)
+
 
 def read_pytest_junit(path):
     try:
@@ -2885,6 +2916,8 @@ def do_cibw(state):
     
     for package in state.packages_build:
         do_cibw_single(state, package, CIBW_BUILD, cibw_pyodide_args, do_test=0)
+    
+    check_identical_versions(state)
 
     for package in state.packages_test:
         do_cibw_single(state, package, CIBW_BUILD, cibw_pyodide_args, do_test=1)
