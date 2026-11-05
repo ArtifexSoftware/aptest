@@ -2230,7 +2230,7 @@ def do_build_single(state, package):
                     pure=True,
                     description=f'{directory}/README.md',
                     requires_dist=requires_dist,
-                    requires_python='>=3.11',
+                    requires_python=f'>=3.{python_versions_minor[0]}',
                     )
         elif package == 'pymupdfpro':
             ret_wheel = None
