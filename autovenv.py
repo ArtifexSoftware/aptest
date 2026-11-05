@@ -119,6 +119,9 @@ def enter(*,
     # ensure predictable behaviour if we are called multiple times by the same
     # program.
     #
+    if verbose >= 2:
+        log(f'{os.environ.get("AUTOVENV_N")=}')
+        log(f'{os.environ.get("AUTOVENV_N_CURRENT")=}')
     AUTOVENV_N = int(os.environ.get('AUTOVENV_N', '0'))
     AUTOVENV_N_CURRENT = int(os.environ.get('AUTOVENV_N_CURRENT', '0'))
     AUTOVENV_VENV_PATH = os.environ.get('AUTOVENV_VENV_PATH', None)
