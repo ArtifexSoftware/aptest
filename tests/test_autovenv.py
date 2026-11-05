@@ -27,10 +27,6 @@ def _write_code(code, path):
 g_env = os.environ.copy()
 g_env['PYTHONPATH'] = g_root
 
-# Remove some environment state in case we are already running in a autovenv
-# venv.
-g_env.pop('AUTOVENV_VENV_ENTERED', None)
-g_env.pop('AUTOVENV_N', None)
 
 def test_autovenv_default():
     '''
@@ -68,7 +64,7 @@ def test_autovenv_named():
     _write_code(f'''
             import autovenv
             import sys
-            autovenv.enter(venv_path={venv_path!r}, packages='requests', use_existing_venv=0)
+            autovenv.enter(venv_path={venv_path!r}, packages='requests', use_existing_venv=0, verbose=2)
             venv_path = sys.prefix
             import requests
             print(f'test_autovenv_named(): {{sys.prefix=}}')
