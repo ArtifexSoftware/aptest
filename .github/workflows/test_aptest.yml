@@ -1,0 +1,34 @@
+name: test_aptest
+
+on:
+  schedule:
+    - cron: '47 4 * * *'
+  workflow_dispatch:
+    inputs:
+      args:
+        type: string
+        default: ''
+        description: 'Arguments to pass to aptest.py'
+
+jobs:
+
+  test_aptest:
+    name: test_aptest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [
+                ubuntu-latest,
+                windows-2022,
+                macos-15,
+                ]
+      fail-fast: false
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+      - name: test_multiple
+        env:
+          APTEST_args: ${{inputs.args}}
+        run: |
+          python aptest.py --aptest . build test --test-quick -a APTEST_args
