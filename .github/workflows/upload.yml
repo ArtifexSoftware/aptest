@@ -1,0 +1,76 @@
+name: upload
+
+on:
+  workflow_dispatch:
+    inputs:
+      workflow_ids:
+        type: string
+        description: space-separated list of workflow ids.
+      pypi_prefix:
+        type: string
+        default:
+
+jobs:
+
+  get:
+    name: get
+    runs-on: ubuntu-latest
+    steps:
+
+    - uses: actions/checkout@v4
+      with:
+        # Checkout into aptest/.git/ etc instead of ./.git/ so that we are
+        # above the aptest checkout and invoke Aptest with `aptest/aptest.py
+        # ...` instead of `./aptest.py`.
+        #
+        # Otherwise pytest will pick up aptest's pytest.ini file if a package
+        # does not define one itself.
+        path: aptest
+
+    - uses: actions/setup-python@v5
+
+    - name: get
+      env:
+        INPUTS_WORKFLOW_IDS: ${{inputs.workflow_ids}}
+        INPUTS_PYPI_PREFIX: ${{inputs.pypi_prefix}}
+        GH_API_KEY: ${{secrets.GH_API_KEY}}
+      run: |
+        echo inputs.workflow_ids: ${{inputs.workflow_ids}}
+        echo INPUTS_WORKFLOW_IDS: $INPUTS_WORKFLOW_IDS
+        echo $INPUTS_PYPI_PREFIX: $INPUTS_PYPI_PREFIX
+        aptest/aptest.py --key https://api.github.com/ ,GH_API_KEY --remote-github-workflow-ids "$INPUTS_WORKFLOW_IDS" remote-github-wait
+    
+    - name: up
+      uses: actions/upload-artifact@v5
+      with:
+        path: aptest-wheelhouse/
+        name: pypi-wheels
+
+  publish:
+    needs:
+    - get
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write  # IMPORTANT: mandatory for trusted publishing
+    
+    steps:
+    
+    - name: down
+      uses: actions/download-artifact@v6
+      with:
+        name: pypi-wheels
+        path: dist/
+    
+    - name: trim
+      # pypa/gh-action-pypi-publish only accepts .whl and .tar.gz files, so
+      # remove everything else.
+      run: |
+        ls -l dist/
+        rm -r dist/results.json
+        rm -r dist/simple
+        ls -l dist/
+
+    - name: pypi-publish
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        repository-url: https://${{inputs.pypi_prefix}}pypi.org/legacy/
