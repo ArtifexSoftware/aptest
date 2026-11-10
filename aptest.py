@@ -770,7 +770,7 @@ def make_state():
     state.remote_dir = 'artifex-remote'
     state.remote_arg = None
     state.remote_do = True
-    state.remote_github_workflow_id = None
+    state.remote_github_workflow_ids =list()
     state.remote_github_runners = [
             'macos-15',
             #'macos-15-intel',
@@ -1267,7 +1267,10 @@ def get_args(state, argv):
                 apply_deltas(state.remote_github_runners, _deltas, aliasfn=gh_runner_alias)
 
             elif arg == '--remote-github-workflow-id':
-                state.remote_github_workflow_id = next(args).as_text()
+                state.remote_github_workflow_ids.append(next(args).as_text())
+
+            elif arg == '--remote-github-workflow-ids':
+                state.remote_github_workflow_ids += next(args).as_text().split()
 
             elif arg == '--remote-github-yml':
                 _yml = next(args)
@@ -1750,9 +1753,9 @@ def do_remote_github(state, args):
     
     token_github_rest = _get_key_github_rest(state)
 
-    if state.remote_github_workflow_id:
+    if state.remote_github_workflow_ids:
         # Wait for existing workflow instead of creating a new one.
-        workflow_id = state.remote_github_workflow_id
+        workflow_ids = state.remote_github_workflow_ids
         remote_github_workflow_package = 'aptest'
         info = name_info(state, remote_github_workflow_package)
     else:
@@ -1846,16 +1849,17 @@ def do_remote_github(state, args):
                     data,
                     doit=state.remote_do,
                     )
+        workflow_ids = [workflow_id]
             
     if state.remote_do:
         assert isinstance(workflow_id, str)
         url = github_api_url(info)
         upload = 'pypi' if state.github_upload else None
-        pipcl.log(f'Calling github.gh_workflow_download_multiple() with {url=} {workflow_id=} {upload=}.')
+        pipcl.log(f'Calling github.gh_workflow_download_multiple() with {url=} {workflow_ids=} {upload=}.')
         github.gh_workflow_download_multiple(
                 token_github_rest,
                 url,
-                workflow_id,
+                workflow_ids,
                 #extra_wheels=upload_extra_wheels,
                 upload=upload,
                 token_pypi=_get_key_pypi(state) if upload else None,
@@ -3788,10 +3792,13 @@ def main(state, argv):
     #
     paths_to_delete = list()
 
+    #if state.remote_github_workflow_ids:
+    #    return do_remote_github(state, args)
+        
     if state.remote:  # pylint: disable=too-many-nested-blocks
         args.args_eq.set(state.remote_arg, '')  # So we don't recurse.
         if state.remote == '@github':
-            if GITHUB_ACTIONS == 'true':
+            if GITHUB_ACTIONS == 'true' and not state.remote_github_workflow_ids:
                 pipcl.log(
                         f'Ignoring {state.remote=} because already running on Github,'
                             f' {GITHUB_ACTIONS=}.'
@@ -3802,7 +3809,7 @@ def main(state, argv):
             # Use rsync/ssh to sync to/run on remote machine.
             return do_remote(state, args.argv)
         
-    if not state.commands and not state.remote_github_workflow_id:
+    if not state.commands and not state.remote_github_workflow_ids:
         pipcl.log(f'## Warning, no commands specified so nothing to do.')
     
     if state.run_commands and 'run' not in state.commands:
