@@ -13,7 +13,6 @@ on:
 jobs:
 
   test_aptest:
-    name: test_aptest
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -27,7 +26,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-      - name: test_multiple
+      - name: test_aptest
         env:
           APTEST_args: ${{inputs.args}}
         run: |
