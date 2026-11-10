@@ -1741,6 +1741,7 @@ def _check_checkout(state, directory):
 
 
 def do_remote_github(state, args):
+    assert GITHUB_ACTIONS != 'true'
     assert isinstance(args, cli.Args)
     pipcl.run('pip install requests')
     pipcl.run(f'pip install --upgrade piprepo "setuptools<81"')
@@ -1753,7 +1754,7 @@ def do_remote_github(state, args):
     
     token_github_rest = _get_key_github_rest(state)
 
-    if state.remote_github_workflow_ids:
+    if 0 and state.remote_github_workflow_ids:
         # Wait for existing workflow instead of creating a new one.
         workflow_ids = state.remote_github_workflow_ids
         remote_github_workflow_package = 'aptest'
@@ -3794,6 +3795,9 @@ def main(state, argv):
 
     #if state.remote_github_workflow_ids:
     #    return do_remote_github(state, args)
+    
+    if GITHUB_ACTIONS == 'true':
+        assert state.remote != '@github'
         
     if state.remote:  # pylint: disable=too-many-nested-blocks
         args.args_eq.set(state.remote_arg, '')  # So we don't recurse.
@@ -3809,7 +3813,7 @@ def main(state, argv):
             # Use rsync/ssh to sync to/run on remote machine.
             return do_remote(state, args.argv)
         
-    if not state.commands and not state.remote_github_workflow_ids:
+    if not state.commands and not state.remote_github_workflow_ids and not state.remote_github_yml:
         pipcl.log(f'## Warning, no commands specified so nothing to do.')
     
     if state.run_commands and 'run' not in state.commands:
