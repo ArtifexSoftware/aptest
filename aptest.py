@@ -53,6 +53,7 @@ autovenv_packages = [
         'filelock',
         'packaging',
         'piprepo',
+        'requests',
         'setuptools<81',
         'xmltodict',
         ]
@@ -1431,6 +1432,7 @@ def get_args(state, argv):
                     'gnn-show',
                     'gnn-select-show',
                     'gnn-train',
+                    'remote-github-wait',
                     'run',
                     'populate',
                     'sdist',
@@ -1741,6 +1743,7 @@ def _check_checkout(state, directory):
 
 
 def do_remote_github(state, args):
+    assert GITHUB_ACTIONS != 'true'
     assert isinstance(args, cli.Args)
     pipcl.run('pip install requests')
     pipcl.run(f'pip install --upgrade piprepo "setuptools<81"')
@@ -1753,7 +1756,7 @@ def do_remote_github(state, args):
     
     token_github_rest = _get_key_github_rest(state)
 
-    if state.remote_github_workflow_ids:
+    if 0 and state.remote_github_workflow_ids:
         # Wait for existing workflow instead of creating a new one.
         workflow_ids = state.remote_github_workflow_ids
         remote_github_workflow_package = 'aptest'
@@ -1850,9 +1853,16 @@ def do_remote_github(state, args):
                     doit=state.remote_do,
                     )
         workflow_ids = [workflow_id]
-            
+
+    _remote_github_get(state, [workflow_id], info)
+
+
+def _remote_github_get(state, workflow_ids, info=None):
     if state.remote_do:
-        assert isinstance(workflow_id, str)
+        if not info:
+            info = name_info(state, 'aptest')
+        token_github_rest = _get_key_github_rest(state)
+        assert isinstance(workflow_ids, list)
         url = github_api_url(info)
         upload = 'pypi' if state.github_upload else None
         pipcl.log(f'Calling github.gh_workflow_download_multiple() with {url=} {workflow_ids=} {upload=}.')
@@ -1869,6 +1879,7 @@ def do_remote_github(state, args):
                 f'piprepo build {state.wheelhouse}',
                 prefix='piprepo build: ',
                 )
+
 
 def do_remote(state, argv):
     remote = state.remote
@@ -3794,6 +3805,9 @@ def main(state, argv):
 
     #if state.remote_github_workflow_ids:
     #    return do_remote_github(state, args)
+    
+    if GITHUB_ACTIONS == 'true':
+        assert state.remote != '@github'
         
     if state.remote:  # pylint: disable=too-many-nested-blocks
         args.args_eq.set(state.remote_arg, '')  # So we don't recurse.
@@ -3809,7 +3823,7 @@ def main(state, argv):
             # Use rsync/ssh to sync to/run on remote machine.
             return do_remote(state, args.argv)
         
-    if not state.commands and not state.remote_github_workflow_ids:
+    if not state.commands and not state.remote_github_workflow_ids and not state.remote_github_yml:
         pipcl.log(f'## Warning, no commands specified so nothing to do.')
     
     if state.run_commands and 'run' not in state.commands:
@@ -3962,6 +3976,11 @@ def main(state, argv):
                                 directory = _get_local(package, state)
                                 pipcl.log(f'Local directory for {package=} is: {directory!r}')
 
+                
+                elif command == 'remote-github-wait':
+                    _remote_github_get(state, state.remote_github_workflow_ids)
+                    
+                
                 elif command == 'test-gnn':
                     do_test_gnn(state)
 
