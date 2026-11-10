@@ -1,0 +1,28 @@
+name: upload
+
+on:
+  workflow_dispatch:
+    inputs:
+      workflow_ids:
+        type: string
+        default: ''
+        description: 'space-separated workflow ids from which to download artifacts.'
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: aptest
+      - uses: actions/setup-python@v5
+      - name: upload
+        env:
+          APTEST_WORKFLOW_IDS: --remote-github-workflow-ids "${{inputs.workflow_ids}}"
+          ARTIFEX_SOFTWARE_SSH_KEY: ${{secrets.ARTIFEX_SOFTWARE_SSH_KEY}}
+        run: |
+          #python aptest/aptest.py --remote-github-workflow-ids -a APTEST_WORKFLOW_IDS -r @github draft --remote-github-runners linux --draft-location julian@ghostscript.com:public_html/wheels-2.x_test --key julian@ghostscript.com: ,ARTIFEX_SOFTWARE_SSH_KEY
+          #python aptest/aptest.py --remote-github-workflow-ids -a APTEST_WORKFLOW_IDS -r @github       --draft-location julian@ghostscript.com:public_html/wheels-2.x_test --key julian@ghostscript.com: ,ARTIFEX_SOFTWARE_SSH_KEY
+          #python aptest/aptest.py  -a APTEST_WORKFLOW_IDS -r @github                                    --draft-location julian@ghostscript.com:public_html/wheels-2.x_test --key julian@ghostscript.com: ,ARTIFEX_SOFTWARE_SSH_KEY
+          python aptest/aptest.py  -a APTEST_WORKFLOW_IDS --draft-location julian@ghostscript.com:public_html/wheels-2.x_test --key julian@ghostscript.com: ,ARTIFEX_SOFTWARE_SSH_KEY
+          ls -ld aptest-wheelhouse/*
