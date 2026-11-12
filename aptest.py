@@ -53,6 +53,7 @@ autovenv_packages = [
         'filelock',
         'packaging',
         'piprepo',
+        'requests',
         'setuptools<81',
         'xmltodict',
         ]
@@ -1431,6 +1432,7 @@ def get_args(state, argv):
                     'gnn-show',
                     'gnn-select-show',
                     'gnn-train',
+                    'remote-github-wait',
                     'run',
                     'populate',
                     'sdist',
@@ -1851,9 +1853,16 @@ def do_remote_github(state, args):
                     doit=state.remote_do,
                     )
         workflow_ids = [workflow_id]
-            
+
+    _remote_github_get(state, [workflow_id], info)
+
+
+def _remote_github_get(state, workflow_ids, info=None):
     if state.remote_do:
-        assert isinstance(workflow_id, str)
+        if not info:
+            info = name_info(state, 'aptest')
+        token_github_rest = _get_key_github_rest(state)
+        assert isinstance(workflow_ids, list)
         url = github_api_url(info)
         upload = 'pypi' if state.github_upload else None
         pipcl.log(f'Calling github.gh_workflow_download_multiple() with {url=} {workflow_ids=} {upload=}.')
@@ -1870,6 +1879,7 @@ def do_remote_github(state, args):
                 f'piprepo build {state.wheelhouse}',
                 prefix='piprepo build: ',
                 )
+
 
 def do_remote(state, argv):
     remote = state.remote
@@ -3966,6 +3976,11 @@ def main(state, argv):
                                 directory = _get_local(package, state)
                                 pipcl.log(f'Local directory for {package=} is: {directory!r}')
 
+                
+                elif command == 'remote-github-wait':
+                    _remote_github_get(state, state.remote_github_workflow_ids)
+                    
+                
                 elif command == 'test-gnn':
                     do_test_gnn(state)
 
