@@ -423,6 +423,42 @@ g_package_info = {
                 'git_branch': 'main',
                 'aliases':  ['pb'],
                 'order': 4,
+            },
+        
+        'pymupdf_sign':
+            {
+                'git_remote': None,
+                'pipcl_package': (
+                    (
+                        'pymupdf_sign',
+                        time.strftime('%Y.%m.%d.%H.%M.%S').replace('.0', '.'),
+                    ),
+                    {
+                        'pure': True,
+                        'description': 'test package\n',
+                    }
+                    ),
+                'aliases': ['psign'],
+                'order': 5,
+                'pure': True,
+            },
+
+        'pymupdf_sign2':
+            {
+                'git_remote': None,
+                'pipcl_package': (
+                    (
+                        'pymupdf_sign2',
+                        time.strftime('%Y.%m.%d.%H.%M.%S').replace('.0', '.'),
+                    ),
+                    {
+                        'pure': True,
+                        'description': 'test package\n',
+                    }
+                    ),
+                'aliases': ['psign2'],
+                'order': 5,
+                'pure': True,
             }
         }
 
@@ -772,6 +808,7 @@ def make_state():
     state.remote_arg = None
     state.remote_do = True
     state.remote_github_workflow_ids =list()
+    state.remote_github_workflow_identity = None
     state.remote_github_runners = [
             'macos-15',
             #'macos-15-intel',
@@ -1172,6 +1209,7 @@ def get_args(state, argv):
                 new_args += ' --check-pulled'
                 new_args += ' --check-unchanged'
                 new_args += ' --git-local-detailed=0'
+                new_args += f' --remote-github-workflow-identity={arg.as_str()}'
                 
                 # We do not allow --MUPDF to be specified when making releases,
                 # because we should use pymupdf's hard-coded default.
@@ -1202,6 +1240,12 @@ def get_args(state, argv):
                 elif arg == '--release-test':
                     # Undocumented test option, for quick test of github.
                     new_args += ' --bt -'
+                
+                elif arg == '--release-test-1':
+                    new_args += ' --psign "" --bt psign'
+                
+                elif arg == '--release-test-2':
+                    new_args += ' --psign2 "" --bt psign2'
                 
                 elif arg == '--release-1':
                     # pymupdf: windows-x64, linux-x64, macos-arm64.
@@ -1260,7 +1304,7 @@ def get_args(state, argv):
                 state.remote_do = args.get_bool()
             
             elif arg == '--remote-sync':
-                state.remote_sync.append(args.next().as_text())
+                state.remote_sync.append(next(args).as_text())
 
             elif arg == '--remote-github-runners':
                 _deltas = next(args).as_text()
@@ -1269,6 +1313,9 @@ def get_args(state, argv):
 
             elif arg == '--remote-github-workflow-id':
                 state.remote_github_workflow_ids.append(next(args).as_text())
+            
+            elif arg == '--remote-github-workflow-identity':
+                state.remote_github_workflow_identity = next(args).as_text()
 
             elif arg == '--remote-github-workflow-ids':
                 state.remote_github_workflow_ids += next(args).as_text().split()
@@ -1439,6 +1486,9 @@ def get_args(state, argv):
                     'test',
                     'test-gnn',
                     'upload',
+                    'upload-test',
+                    'upload2',
+                    'upload2-test',
                     'windows-show-vs-instances',
                     ):
                 state.commands.append(arg.as_str())
@@ -1505,8 +1555,11 @@ def _get_key_github_rest(state, on_error='raise'):
     return _get_key2(state, 'https://api.github.com/', on_error).strip()
 
 
-def _get_key_pypi(state, on_error='raise'):
-    return _get_key2(state, 'https://upload.pypi.org/', on_error).strip()
+def _get_key_pypi(state, on_error='raise', test=False):
+    if test:
+        return _get_key2(state, 'https://upload.test.pypi.org/', on_error).strip()
+    else:
+        return _get_key2(state, 'https://upload.pypi.org/', on_error).strip()
 
 
 def do_piprepo(wheelhouse):
@@ -1742,7 +1795,7 @@ def _check_checkout(state, directory):
         git_assert_pushed(directory)
 
 
-def do_remote_github(state, args):
+def do_remote_github(state, args, *, yml=None, inputs=None):
     assert GITHUB_ACTIONS != 'true'
     assert isinstance(args, cli.Args)
     pipcl.run('pip install requests')
@@ -1777,22 +1830,25 @@ def do_remote_github(state, args):
                 pipcl.log(f'{package_name=}.')
                 pipcl.log(f'{info["git_remote"]=}.')
                 remote = info['git_remote']
-                init = 'https://github.com/'
-                if remote.startswith(init):
-                    # Convert https://github.com/... to git@github.com:... so we can push.
-                    remote = f'git@github.com:{remote[len(init):]}'
-                git_push(package_location, remote, branch, state, doit=state.remote_do)
-                args.args_eq.set(args_pos, f'git:-b {branch} {info["git_remote"]}')
+                if remote:
+                    init = 'https://github.com/'
+                    if remote.startswith(init):
+                        # Convert https://github.com/... to git@github.com:... so we can push.
+                        remote = f'git@github.com:{remote[len(init):]}'
+                    git_push(package_location, remote, branch, state, doit=state.remote_do)
+                    args.args_eq.set(args_pos, f'git:-b {branch} {info["git_remote"]}')
 
-        if state.remote_github_yml:
+        if not yml:
+            yml = state.remote_github_yml
+        
+        if yml:
             # Run specific .yml directly.
             pipcl.log(f'Running .yml instead of aptest.py: {state.remote_github_yml}')
-            if c := state.remote_github_yml.find(':') >= 0:
+            if c := yml.find(':') >= 0:
                 package, yml = state.remote_github_yml[:c], state.remote_github_yml[c+1:]
                 package = package_alias(package)
                 info = name_info(state, package)
             else:
-                yml = state.remote_github_yml
                 if not state.packages:
                     # Run on aptest.
                     info = name_info(state, 'aptest')
@@ -1804,15 +1860,17 @@ def do_remote_github(state, args):
                     Assert(0, f'Running yml directly requires exactly zero or one package, but {len(state.packages)=}.')
             data = dict()
             data['ref'] = branch
-            if state.remote_github_yml_inputs:
-                inputs = dict()
-                for nv in state.remote_github_yml_inputs.split(','):
+            if not inputs:
+                inputs = state.remote_github_yml_inputs
+            inputs2 = dict()
+            if inputs:
+                for nv in inputs.split(','):
                     try:
                         n, v = nv.split('=', 1)
                     except Exception as e:
                         raise Exception(f'Expected <name>=<value> in {nv!r} from {state.remote_github_yml_inputs=}.') from e
-                    inputs[n] = v
-                data['inputs'] = inputs
+                    inputs2[n] = v
+            data['inputs'] = inputs2
             workflow_id = github.gh_run_workflow(
                     token_github_rest,
                     github_api_url(info),
@@ -1836,9 +1894,9 @@ def do_remote_github(state, args):
             data = dict(
                     ref = branch,
                     inputs = dict(
-                            args=args_string,
-                            matrix=matrix_json),
-                            
+                        args=args_string,
+                        matrix=matrix_json
+                        ),
                     )
             pipcl.log(f'args_string is:')
             args_string_lines = '\n-'.join(args_string.split(' -'))
@@ -1855,6 +1913,22 @@ def do_remote_github(state, args):
         workflow_ids = [workflow_id]
 
     _remote_github_get(state, [workflow_id], info)
+    
+    if state.remote_github_workflow_identity:
+        path = f'{state.wheelhouse_release}/remote_github_workflow_identities.json'
+        with filelock.FileLock(f'{path}.lock'):
+            if os.path.isfile(path) and os.stat(path).st_size:
+                with open(path) as f:
+                    workflow_identities = json.load(f)
+            else:
+                workflow_identities = dict()
+            id_prev_date = workflow_identities.get(state.remote_github_workflow_identity)
+            if id_prev_date:
+                id_prev, date_time = id_prev_date
+                pipcl.log(f'Overwriting existing identity {id_prev}: {date_time}.')
+            workflow_identities[state.remote_github_workflow_identity] = (workflow_id, g_date_time)
+            with open(path, 'w') as f:
+                json.dump(workflow_identities, f, indent='    ')
 
 
 def _remote_github_get(state, workflow_ids, info=None):
@@ -2133,8 +2207,9 @@ def do_build_single(state, package):
     pip_index_url = pip_index_url.replace('\\', '/')
     
     ret_wheel = None
+    package_info = name_info(state, package)
     location, _args_pos = state.packages[package]
-    if not location:
+    if not location and 'pipcl_package' not in package_info:
         return ret_wheel
     if package == 'aptest':
         return ret_wheel
@@ -2221,6 +2296,10 @@ def do_build_single(state, package):
                     requires_dist=requires_dist,
                     requires_python=f'>=3.{python_versions_minor[0]}',
                     )
+        elif pipcl_package := package_info.get('pipcl_package'):
+            pipcl.log(f'{pipcl_package=}')
+            args, kwargs = pipcl_package
+            ret_wheel = create_wheel(state, *args, **kwargs)
         elif package == 'pymupdfpro':
             ret_wheel = None
             pipcl.log(f'{ret_wheel=}')
@@ -2369,6 +2448,7 @@ def check_identical_versions(state):
             glob.glob(f'{state.wheelhouse}/*.whl')
             + glob.glob(f'{state.wheelhouse}/*.tar.gz')
             )
+    pipcl.log(f'{wheel_paths=}')
     for path in wheel_paths:
         leaf_elements = os.path.basename(path).split('-')
         assert len(leaf_elements) >= 2, f'{wheel_paths=}\n{path=}\n{leaf_elements=}'
@@ -2455,8 +2535,9 @@ def do_cibw_single(state, package, CIBW_BUILD, cibw_pyodide_args, *, do_test=1):
     pipcl.log(f'{do_test=}')
     
     directory = _get_local(package, state)
-    
-    if not directory:
+    if package.startswith('pymupdf_sign'):
+        pass
+    elif not directory:
         directory = _get_local(package, state, test=1)
         if not directory:
             pipcl.log(f'Unable to process with cibuildwheel because location is pip: {package=} and no second location')
@@ -2471,8 +2552,9 @@ def do_cibw_single(state, package, CIBW_BUILD, cibw_pyodide_args, *, do_test=1):
         pip_location2 = f'{package}{pip_location[4:]}'
         state.env_extra[f'PIPCL_PREBUILT_WHEEL_{package}'] = pip_location2
 
-    pipcl.log(f'{package} _get_local() => {directory=}')
-    directory_abs = os.path.abspath(directory)
+    if directory:
+        pipcl.log(f'{package} _get_local() => {directory=}')
+        directory_abs = os.path.abspath(directory)
 
     if package == 'mupdf':
         if platform.system() == 'Linux' and not state.cibw_pyodide:
@@ -2550,6 +2632,8 @@ def do_cibw_single(state, package, CIBW_BUILD, cibw_pyodide_args, *, do_test=1):
         if do_test and package in state.packages_test:
             if package in ('pymupdf_layout', 'pymupdf4llm'):
                 pipcl.log(f'Not testing {package=} directly - this is done as part of test of pymupdf.')
+            elif package.startswith(f'pymupdf_sign'):
+                pipcl.log(f'Not testing {package=} directly.')
             else:
                 pip_index_url = f'file://{os.path.abspath(state.wheelhouse)}/simple'
                 pip_index_url = pip_index_url.replace('\\', '/')
@@ -3629,7 +3713,7 @@ def main(state, argv):
             n_pymupdf_packages += 1
     Assert(
             n_pymupdf_packages in (0, 1),
-            f'Only one of `pymupdf`, `pymupdf_mid` and `pymupdf_lite` may be specified',
+            f'Only one of `pymupdf`, `pymupdf_mid` and `pymupdf_lite` may be specified: {state.packages_build=}',
             )
     
     # Update convenience link to venv.
@@ -3979,7 +4063,6 @@ def main(state, argv):
                 
                 elif command == 'remote-github-wait':
                     _remote_github_get(state, state.remote_github_workflow_ids)
-                    
                 
                 elif command == 'test-gnn':
                     do_test_gnn(state)
@@ -4012,7 +4095,8 @@ def main(state, argv):
                 elif command == 'test':
                     do_test(state)
                 
-                elif command == 'upload':
+                elif command in ('upload', 'upload-test'):
+                    test_pypi_org = (command == 'upload-test')
                     if state.wheelhouse_release:
                         Assert(state.wheelhouse_release != state.wheelhouse, f'{state.wheelhouse_release=} is set but is not different from {state.wheelhouse=}.')
                         wheelhouse = state.wheelhouse_release
@@ -4033,9 +4117,27 @@ def main(state, argv):
                         else:
                             pipcl.log(f'Ignoring wheel/sdist: {path}')
                     github.upload_pypi(
-                            token_pypi=_get_key_pypi(state),
+                            token_pypi=_get_key_pypi(state, test=test_pypi_org),
                             paths=paths,
+                            pypi_test=test_pypi_org,
                             )
+                
+                elif command in ('upload2', 'upload2-test'):
+                    path = f'{state.wheelhouse_release}/remote_github_workflow_identities.json'
+                    with filelock.FileLock(f'{path}.lock'):
+                        with open(path) as f:
+                            workflow_identities = json.load(f)
+                    pipcl.log(f'workflow_identities:')
+                    for n, v in workflow_identities.items():
+                        pipcl.log(f'    {n}: {v}')
+                    workflow_ids = ' '.join(id_ for (id_, date_time) in workflow_identities.values())
+                    pipcl.log(f'{workflow_ids=}')
+                    inputs=f'workflow_ids={workflow_ids}'
+                    if command == 'upload2-test':
+                        inputs += f',pypi_prefix=test.'
+                    else:
+                        inputs += f',pypi_prefix='
+                    do_remote_github(state, args, yml='upload.yml', inputs=inputs)
                 
                 elif command == 'windows-show-vs-instances':
                     pipcl.log(f'{command}:')
