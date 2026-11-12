@@ -66,6 +66,7 @@ jobs:
         env:
           APTEST_args: ${{inputs.args}}
           ARTIFEX_SOFTWARE_SSH_KEY: ${{secrets.ARTIFEX_SOFTWARE_SSH_KEY}}
+          GH_API_KEY: ${{secrets.GH_API_KEY}}
           PYMUPDFPRO_SETUP_SOT_KEY: ${{secrets.PYMUPDFPRO_SETUP_SOT_KEY}}
         run:
           python aptest/aptest.py -a APTEST_args
