@@ -3,26 +3,70 @@ name: upload
 on:
   workflow_dispatch:
     inputs:
-      workflow_ids:
+      args:
         type: string
         default: ''
-        description: 'space-separated workflow ids from which to download artifacts.'
+        description: 'Arguments to pass to scripts/test.py'
+      matrix:
+        type: string
 
 jobs:
-  upload:
+
+  get:
+    name: get
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with:
-          path: aptest
-      - uses: actions/setup-python@v5
-      - name: upload
-        env:
-          APTEST_WORKFLOW_IDS: --remote-github-workflow-ids "${{inputs.workflow_ids}}"
-          ARTIFEX_SOFTWARE_SSH_KEY: ${{secrets.ARTIFEX_SOFTWARE_SSH_KEY}}
-        run: |
-          #python aptest/aptest.py --remote-github-workflow-ids -a APTEST_WORKFLOW_IDS -r @github draft --remote-github-runners linux --draft-location julian@ghostscript.com:public_html/wheels-2.x_test --key julian@ghostscript.com: ,ARTIFEX_SOFTWARE_SSH_KEY
-          #python aptest/aptest.py --remote-github-workflow-ids -a APTEST_WORKFLOW_IDS -r @github       --draft-location julian@ghostscript.com:public_html/wheels-2.x_test --key julian@ghostscript.com: ,ARTIFEX_SOFTWARE_SSH_KEY
-          #python aptest/aptest.py  -a APTEST_WORKFLOW_IDS -r @github                                    --draft-location julian@ghostscript.com:public_html/wheels-2.x_test --key julian@ghostscript.com: ,ARTIFEX_SOFTWARE_SSH_KEY
-          python aptest/aptest.py  -a APTEST_WORKFLOW_IDS --draft-location julian@ghostscript.com:public_html/wheels-2.x_test --key julian@ghostscript.com: ,ARTIFEX_SOFTWARE_SSH_KEY
-          ls -ld aptest-wheelhouse/*
+
+    - uses: actions/checkout@v4
+      with:
+        # Checkout into aptest/.git/ etc instead of ./.git/ so that we are
+        # above the aptest checkout and invoke Aptest with `aptest/aptest.py
+        # ...` instead of `./aptest.py`.
+        #
+        # Otherwise pytest will pick up aptest's pytest.ini file if a package
+        # does not define one itself.
+        path: aptest
+
+    - uses: actions/setup-python@v5
+
+    - name: get
+      env:
+        APTEST_args: ${{inputs.args}}
+        #ARTIFEX_SOFTWARE_SSH_KEY: ${{secrets.ARTIFEX_SOFTWARE_SSH_KEY}}
+        GH_API_KEY: ${{secrets.GH_API_KEY}}
+      run:
+        #python aptest/aptest.py --wheelhouse dist -a APTEST_args
+        aptest/aptest.py --psign '' build
+    
+    - name: up
+      uses: actions/upload-artifact@v5
+      with:
+        path: aptest-wheelhouse/
+        name: pypi-wheels
+
+  publish:
+    needs:
+    - get
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write  # IMPORTANT: mandatory for trusted publishing
+    
+    steps:
+    
+    - name: down
+      uses: actions/download-artifact@v6
+      with:
+        name: pypi-wheels
+        path: dist/
+    
+    - name: trim
+      run: |
+        ls -l dist/
+        rm -r dist/results.json
+        rm -r dist/simple
+        ls -l dist/
+
+    - name: pypi-publish
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        repository-url: https://test.pypi.org/legacy/

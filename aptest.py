@@ -423,6 +423,23 @@ g_package_info = {
                 'git_branch': 'main',
                 'aliases':  ['pb'],
                 'order': 4,
+            },
+        
+        'pymupdf_sign':
+            {
+                'git_remote': None,
+                'pipcl_package': (
+                    (
+                        'pymupdf_sign',
+                        time.strftime('%Y.%m.%d.%H.%M.%S').replace('.0', '.'),
+                    ),
+                    {
+                        'pure': True,
+                        'description': 'test package\n',
+                    }
+                    ),
+                'aliases': ['psign'],
+                'order': 5,
             }
         }
 
@@ -1439,6 +1456,7 @@ def get_args(state, argv):
                     'test',
                     'test-gnn',
                     'upload',
+                    'upload-test',
                     'windows-show-vs-instances',
                     ):
                 state.commands.append(arg.as_str())
@@ -1505,8 +1523,11 @@ def _get_key_github_rest(state, on_error='raise'):
     return _get_key2(state, 'https://api.github.com/', on_error).strip()
 
 
-def _get_key_pypi(state, on_error='raise'):
-    return _get_key2(state, 'https://upload.pypi.org/', on_error).strip()
+def _get_key_pypi(state, on_error='raise', test=False):
+    if test:
+        return _get_key2(state, 'https://upload.test.pypi.org/', on_error).strip()
+    else:
+        return _get_key2(state, 'https://upload.pypi.org/', on_error).strip()
 
 
 def do_piprepo(wheelhouse):
@@ -1777,12 +1798,13 @@ def do_remote_github(state, args):
                 pipcl.log(f'{package_name=}.')
                 pipcl.log(f'{info["git_remote"]=}.')
                 remote = info['git_remote']
-                init = 'https://github.com/'
-                if remote.startswith(init):
-                    # Convert https://github.com/... to git@github.com:... so we can push.
-                    remote = f'git@github.com:{remote[len(init):]}'
-                git_push(package_location, remote, branch, state, doit=state.remote_do)
-                args.args_eq.set(args_pos, f'git:-b {branch} {info["git_remote"]}')
+                if remote:
+                    init = 'https://github.com/'
+                    if remote.startswith(init):
+                        # Convert https://github.com/... to git@github.com:... so we can push.
+                        remote = f'git@github.com:{remote[len(init):]}'
+                    git_push(package_location, remote, branch, state, doit=state.remote_do)
+                    args.args_eq.set(args_pos, f'git:-b {branch} {info["git_remote"]}')
 
         if state.remote_github_yml:
             # Run specific .yml directly.
@@ -2133,8 +2155,9 @@ def do_build_single(state, package):
     pip_index_url = pip_index_url.replace('\\', '/')
     
     ret_wheel = None
+    package_info = name_info(state, package)
     location, _args_pos = state.packages[package]
-    if not location:
+    if not location and 'pipcl_package' not in package_info:
         return ret_wheel
     if package == 'aptest':
         return ret_wheel
@@ -2221,6 +2244,10 @@ def do_build_single(state, package):
                     requires_dist=requires_dist,
                     requires_python=f'>=3.{python_versions_minor[0]}',
                     )
+        elif pipcl_package := package_info.get('pipcl_package'):
+            pipcl.log(f'{pipcl_package=}')
+            args, kwargs = pipcl_package
+            ret_wheel = create_wheel(state, *args, **kwargs)
         elif package == 'pymupdfpro':
             ret_wheel = None
             pipcl.log(f'{ret_wheel=}')
@@ -4012,7 +4039,8 @@ def main(state, argv):
                 elif command == 'test':
                     do_test(state)
                 
-                elif command == 'upload':
+                elif command in ('upload', 'upload-test'):
+                    test_pypi_org = (command == 'upload-test')
                     if state.wheelhouse_release:
                         Assert(state.wheelhouse_release != state.wheelhouse, f'{state.wheelhouse_release=} is set but is not different from {state.wheelhouse=}.')
                         wheelhouse = state.wheelhouse_release
@@ -4033,8 +4061,9 @@ def main(state, argv):
                         else:
                             pipcl.log(f'Ignoring wheel/sdist: {path}')
                     github.upload_pypi(
-                            token_pypi=_get_key_pypi(state),
+                            token_pypi=_get_key_pypi(state, test=test_pypi_org),
                             paths=paths,
+                            pypi_test=test_pypi_org,
                             )
                 
                 elif command == 'windows-show-vs-instances':
