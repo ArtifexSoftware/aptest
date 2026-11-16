@@ -1323,6 +1323,20 @@ populate
     * `--clean-setup-all`_
 
 
+remote-github-wait
+..................
+    Waits for workflows specified by `--remote-github-workflow-id`_ or `--remote-github-workflow-ids`_.
+    
+    * On success we copy Github logs and artifacts
+      and extracted wheels etc to local directory:
+      
+          ``gh_workflow_YYYY-mm-dd-<workflowid>``
+          
+      Wheels are also copied in flat format into:
+      
+          ``gh_workflow_YYYY-mm-dd-<workflowid>-union/``.
+
+
 sdist
 .....
     Build sdist's (packages selected with `-b`_).
@@ -1409,6 +1423,34 @@ upload
     * If `--wheelhouse-release`_ is not specified,
       we use the default wheelhouse
       (which may have been overridden with `--wheelhouse`_).
+
+
+upload-test
+...........
+    As `upload`_ except upload to https://test.pypi.org.
+
+
+upload2
+.......
+    Experimental.
+    
+    Uploads to https://pypi.org.
+    
+    * Creates pypi.org providence.
+    * Runs on Github.
+    * Gets wheels from from previously-run workflows,
+      using ids stored from `--remote-github-workflow-identity`_.
+    
+    Also see:
+    
+    * `--release-*`_f
+
+
+upload2-test
+............
+    Experimental.
+    
+    As `upload2`_ except uploads to https://test.pypi.org.
 
 
 windows-show-vs-instances
@@ -1735,13 +1777,8 @@ Options
       repositories.
 
     * On success we copy Github logs and artifacts
-      and extracted wheels etc to local directory:
-      
-          ``gh_workflow_YYYY-mm-dd-<workflowid>``
-          
-      Wheels are also copied in flat format into:
-      
-          ``gh_workflow_YYYY-mm-dd-<workflowid>-union/``.
+      and extracted wheels etc to local directory,
+      effectively using an internal `remote-github-wait`_ command.
     
     * ``-r@github`` is ignored if we are already running on Github
       (``GITHUB_ACTIONS=='true'``).
@@ -1750,9 +1787,10 @@ Options
     
       * `--remote-github-runners`_
       * `--remote-github-workflow-id`_
-      * `--remote-github-yml`_
       * `--remote-github-yml-inputs`_
+      * `--remote-github-yml`_
       * `--wheelhouse-release`_
+      * `remote-github-wait`_
     
     Otherwise ``<remote>`` should specify a remote machine on which to run
     Aptest:
@@ -2303,6 +2341,10 @@ Options
     * A match is only made if ``<prefix>`` or ``<env>`` exist.
     * ``<path>`` is the path of a file containing the key.
     * ``<env>`` is the name of an environment variable containing the key.
+    * Special pseudo-urls for uploading to pypi.org with twine:
+    
+      * ``https://upload.pypi.org/``
+      * ``https://upload.test.pypi.org/``
 
     For example:
 
@@ -2729,6 +2771,8 @@ General notes:
 
 * We fail if ``--MUPDF`` is specified - release builds must use ``pymupdf_core``'s hard-coded default mupdf.
 
+* We use `--remote-github-workflow-identity`_ to gather Github workflow ids for later use with `upload2`_.
+
 Also see:
 
 * `Release procedure`_.
@@ -2859,21 +2903,58 @@ Also see:
         --remote-github-os -,+windows-arm
 
 
+.. _--remote-github-workflow-check:
+
+--remote-github-workflow-check (bool)
+.....................................
+    If true (the default), we do not download artifacts from a failed workflow.
+
+    Otherwise we download artifacts regardless of whether the workflow failed.
+
+    Also see:
+    
+    * `remote-github-wait`_
+    * `-r`_
+
+
 .. _--remote-github-workflow-id:
 
 --remote-github-workflow-id <workflow_id>
 .........................................
-    Changes the behaviour of `-r @github`_. Don't start a new run on Github,
-    instead continue from a previous `-r @github`_ invocation by waiting for
-    ``<workflow_id>`` to finish and downloading logs and wheels etc to the
-    local machine.
-    
-    * One still needs to specify `-r @github`_.
+    Used with `remote-github-wait`_, specifies a workflow id to wait for and
+    download from.
     
     Previous downloads are not repeated unnecessarily:
     
     * Downloads are made to a temporary file that is then atomically renamed.
     * Files that already exist locally are not downloaded again.
+    
+    Can be specified multiple times to wait for multiple workflows.
+    
+    Also see:
+    
+    * `--remote-github-workflow-ids`_
+
+
+.. _--remote-github-workflow-ids:
+
+--remote-github-workflow-id <workflow_ids>
+..........................................
+    Like `--remote-github-workflow-id`_,
+    but allows specification of multiple (space-separated) ids.
+
+
+.. _--remote-github-workflow-identity:
+
+--remote-github-workflow-identity <name>
+........................................
+    Adds mapping from ``<name>`` to id of Github workflow created by `-r @github`_,
+    to ``<wheelhouse>/remote_github_workflow_identities.json``.
+    
+    Also see:
+    
+    * `upload2`_.
+    * `upload2-test`_.
 
 
 .. _--remote-github-yml:
@@ -3328,6 +3409,21 @@ completion
 
 Changelog
 ---------
+
+* `--key`_ - added support for test.pypi.org.
+* `--remote-github-workflow-check`_ - new.
+* `--remote-github-workflow-id`_ - can now be specified multiple times.
+* `--remote-github-workflow-identity`_ - new.
+* `--remote-github-workflow-ids`_ - new.
+* `remote-github-wait`_ - new command to wait for existing github workflows.
+  Allows waiting for existing workflow when running on github itself.
+* `upload-test`_ - new.
+* Improved how we cope with varying availability of ``onxxruntime``.
+* Experimental changes to allow releases to pypi with providence.
+  
+  * `upload2`_ - new.
+  * `upload2-test`_ - new.
+
 
 **2026-11-06**
 
