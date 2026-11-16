@@ -763,7 +763,7 @@ def _check_identical_wheels(leaf_to_paths):
             extracted_paths = []
             path_to_use = None
             for i, path in enumerate(paths):
-                if path.endswith('.xml'):
+                if not path.endswith(('.whl', '.tar.gz')):
                     continue
                 st = os.stat(path)
                 with open(path, 'rb') as f:
