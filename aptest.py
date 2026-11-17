@@ -2612,15 +2612,7 @@ def do_cibw_single(state, package, CIBW_BUILD, cibw_pyodide_args, *, do_test=1):
     # As of 2026-03-23, no onnxruntime wheel is available for macos-intel
     # python-3.14. For python<=3.13, wheels for older releases are
     # available.
-    if (1
-            and python_version_tuple == (3, 14)
-            and package in ('pdf4llm', 'pymupdf4llm')
-            and platform.system() == 'Darwin'
-            and platform.machine() == 'x86_64'
-            ):
-        pipcl.log(f'Not doing build/test on macos/intel/python-3.14 because onnxruntime not available: {package=}')
-
-    elif g_package_info[package].get('pure'):   # pylint: disable=too-many-nested-blocks
+    if g_package_info[package].get('pure'):   # pylint: disable=too-many-nested-blocks
         # Build/test directly because pure python.
         pipcl.log(f'Not using cibuildwheel for {package=} because cibuildwheel does not support pure python wheels.')
         new_files = pipcl.NewFiles(f'{state.wheelhouse}/*.whl')
@@ -2637,8 +2629,18 @@ def do_cibw_single(state, package, CIBW_BUILD, cibw_pyodide_args, *, do_test=1):
             else:
                 pip_index_url = f'file://{os.path.abspath(state.wheelhouse)}/simple'
                 pip_index_url = pip_index_url.replace('\\', '/')
-                pipcl.run(f'pip install --extra-index-url {pip_index_url} {wheel_path}')
-                do_test_single(state, package, failed_packages)
+                if not _onnxruntime_available():
+                    e = pipcl.run(
+                            f'pip install --extra-index-url {pip_index_url} {wheel_path}',
+                            check=0,
+                            )
+                    assert e, (
+                            f'Did not get expected error from install of {wheel_path=}.'
+                            f' Has onnxruntime made a new release?'
+                            )
+                else:
+                    pipcl.run(f'pip install --extra-index-url {pip_index_url} {wheel_path}')
+                    do_test_single(state, package, failed_packages)
 
         if failed_packages:
             raise Exception(f'Test failed for {package=}.')
@@ -2838,6 +2840,39 @@ def abspath(state, path, cibw):
     return path
 
 
+def _onnxruntime_CIBW_BUILD(CIBW_BUILD):
+    '''
+    Returns CIBW_BUILD modified to cope with onnxruntime availability.
+    
+    As of 2026-10-14 onnxruntime is not available for python3.15, so we remove
+    any `cp315*` from CIBW_BUILD, otherwise cibw tests will fail.
+    '''
+    CIBW_BUILD_0 = CIBW_BUILD
+    CIBW_BUILD_1 = CIBW_BUILD.replace('cp315*', '').strip()
+    CIBW_BUILD = CIBW_BUILD_1
+    if CIBW_BUILD != CIBW_BUILD_0:
+        pipcl.log(f'### Have changed CIBW_BUILD:')
+        pipcl.log(f'    {CIBW_BUILD_0=}')
+        pipcl.log(f'    {CIBW_BUILD_1=}')
+    return CIBW_BUILD
+    
+
+def _onnxruntime_available():
+    if pipcl.python_version_tuple()[:2] == (3, 15):
+        return False
+    if (0
+            and pipcl.python_version_tuple()[:2] == (3, 14)
+            and pipcl.darwin()
+            and platform.machine() == 'x86_64'
+            ):
+        # As of 2026-03-23, no onnxruntime wheel is available for macos-intel
+        # python-3.14. For python<3.14, wheels for older releases are
+        # available.
+        return False
+    
+    return True
+
+
 def do_cibw(state):
     '''
     Build wheels for each package with cibuildwheel, adding to wheelhouse,
@@ -2950,16 +2985,7 @@ def do_cibw(state):
         state.env_extra['CIBW_ENABLE'] = 'pyodide-prerelease'
     
     if 'pymupdf' in state.packages_test:
-        # As of 2026-10-14 onnxruntime is not available for python3.15, so we
-        # need to remove any `cp315*` from CIBW_BUILD, otherwise tests will
-        # fail.
-        CIBW_BUILD_0 = CIBW_BUILD
-        CIBW_BUILD_1 = CIBW_BUILD.replace('cp315*', '').strip()
-        CIBW_BUILD = CIBW_BUILD_1
-        if CIBW_BUILD != CIBW_BUILD_0:
-            pipcl.log(f'### Have changed CIBW_BUILD:')
-            pipcl.log(f'    {CIBW_BUILD_0=}')
-            pipcl.log(f'    {CIBW_BUILD_1=}')
+        CIBW_BUILD = _onnxruntime_CIBW_BUILD(CIBW_BUILD)
     
     # 2026-09-16:
     #
