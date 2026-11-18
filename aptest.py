@@ -807,7 +807,8 @@ def make_state():
     state.remote_dir = 'artifex-remote'
     state.remote_arg = None
     state.remote_do = True
-    state.remote_github_workflow_ids =list()
+    state.remote_github_workflow_check = True
+    state.remote_github_workflow_ids = list()
     state.remote_github_workflow_identity = None
     state.remote_github_runners = [
             'macos-15',
@@ -1311,6 +1312,9 @@ def get_args(state, argv):
                 _deltas = _deltas.split(',') if _deltas else list()
                 apply_deltas(state.remote_github_runners, _deltas, aliasfn=gh_runner_alias)
 
+            elif arg == '--remote-github-workflow-check':
+                state.remote_github_workflow_check = args.get_bool()
+            
             elif arg == '--remote-github-workflow-id':
                 state.remote_github_workflow_ids.append(next(args).as_text())
             
@@ -1912,8 +1916,9 @@ def do_remote_github(state, args, *, yml=None, inputs=None):
                     )
         workflow_ids = [workflow_id]
 
-    _remote_github_get(state, [workflow_id], info)
+    _remote_github_get(state, [workflow_id], info=info)
     
+    pipcl.log(f'{state.remote_github_workflow_identity=}')
     if state.remote_github_workflow_identity:
         path = f'{state.wheelhouse_release}/remote_github_workflow_identities.json'
         with filelock.FileLock(f'{path}.lock'):
@@ -1925,13 +1930,14 @@ def do_remote_github(state, args, *, yml=None, inputs=None):
             id_prev_date = workflow_identities.get(state.remote_github_workflow_identity)
             if id_prev_date:
                 id_prev, date_time = id_prev_date
-                pipcl.log(f'Overwriting existing identity {id_prev}: {date_time}.')
+                pipcl.log(f'Overwriting existing identity {state.remote_github_workflow_identity=}: {id_prev=} {date_time=}.')
+            pipcl.log(f'Setting workflow identity {state.remote_github_workflow_identity=}: {workflow_id=} {g_date_time=}.')
             workflow_identities[state.remote_github_workflow_identity] = (workflow_id, g_date_time)
             with open(path, 'w') as f:
                 json.dump(workflow_identities, f, indent='    ')
 
 
-def _remote_github_get(state, workflow_ids, info=None):
+def _remote_github_get(state, workflow_ids, *, info=None, check=1):
     if state.remote_do:
         if not info:
             info = name_info(state, 'aptest')
@@ -1948,6 +1954,7 @@ def _remote_github_get(state, workflow_ids, info=None):
                 upload=upload,
                 token_pypi=_get_key_pypi(state) if upload else None,
                 local_dir_union=state.wheelhouse,
+                check=check,
                 )
         pipcl.run(
                 f'piprepo build {state.wheelhouse}',
@@ -4088,7 +4095,7 @@ def main(state, argv):
 
                 
                 elif command == 'remote-github-wait':
-                    _remote_github_get(state, state.remote_github_workflow_ids)
+                    _remote_github_get(state, state.remote_github_workflow_ids, check=state.remote_github_workflow_check)
                 
                 elif command == 'test-gnn':
                     do_test_gnn(state)
