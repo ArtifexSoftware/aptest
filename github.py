@@ -368,6 +368,7 @@ def gh_workflow_download(
         id_='newest',
         block=True,
         local_dir=None,
+        check=1,
         ):
     '''
     Waits for workflow to finish if it is in progress, then downloads the
@@ -477,7 +478,7 @@ def gh_workflow_download(
     pipcl.log(f'{local_dir=} {path_logs=}')
     ghlogs_links(local_dir, path_logs)
     
-    if workflow['conclusion'] != 'success':
+    if check and workflow['conclusion'] != 'success':
         raise Exception(f'{workflow.get("html_url")}: Workflow run failed')
     
     pipcl.log(f'{workflow.get("html_url")}: returning {root=}.')
@@ -595,6 +596,7 @@ def gh_workflow_download_multiple(
         upload='',
         token_pypi=None,
         local_dir_union=None,
+        check=1,
         ):
     '''
     Wait for workflows to finish, downloads to local machine, uploads to
@@ -651,7 +653,7 @@ def gh_workflow_download_multiple(
             directory = None
             if download:
                 try:
-                    workflow, directory = gh_workflow_download(token, url_base, id_=id_, block=False, local_dir=local_dir)
+                    workflow, directory = gh_workflow_download(token, url_base, id_=id_, block=False, local_dir=local_dir, check=check)
                 except Exception as ee:
                     e = ee
                     text = io.StringIO()
@@ -723,7 +725,10 @@ def gh_workflow_download_multiple(
         pipcl.log(f'    {local_dir_union}/{leaf}')
     
     if errors:
-        raise Exception(f'One or more workflows failed: {errors}')
+        if check:
+            raise Exception(f'One or more workflows failed: {errors}')
+        else:
+            pipcl.log(f'Ignoring failure of one or more workflows: {errors}')
 
     if 0:
         # Create pypi-style 'simple' directory within local_dir_union.
