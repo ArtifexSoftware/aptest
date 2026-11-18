@@ -1937,7 +1937,7 @@ def do_remote_github(state, args, *, yml=None, inputs=None):
                 json.dump(workflow_identities, f, indent='    ')
 
 
-def _remote_github_get(state, workflow_ids, *, info=None, check=1):
+def _remote_github_get(state, workflow_ids, *, info=None):
     if state.remote_do:
         if not info:
             info = name_info(state, 'aptest')
@@ -1954,7 +1954,7 @@ def _remote_github_get(state, workflow_ids, *, info=None, check=1):
                 upload=upload,
                 token_pypi=_get_key_pypi(state) if upload else None,
                 local_dir_union=state.wheelhouse,
-                check=check,
+                check=state.remote_github_workflow_check,
                 )
         pipcl.run(
                 f'piprepo build {state.wheelhouse}',
@@ -4095,7 +4095,7 @@ def main(state, argv):
 
                 
                 elif command == 'remote-github-wait':
-                    _remote_github_get(state, state.remote_github_workflow_ids, check=state.remote_github_workflow_check)
+                    _remote_github_get(state, state.remote_github_workflow_ids)
                 
                 elif command == 'test-gnn':
                     do_test_gnn(state)
