@@ -51,6 +51,7 @@ def test_pylint():
             C0114: Missing module docstring (missing-module-docstring)
             R0801: Similar lines in 2 files
             R1727: (condition-evals-to-constant)
+            R1720: Unnecessary "else" after "raise", remove the "else" and de-indent the code inside it (no-else-raise)
             '''
             )
     ignores_list = list()
