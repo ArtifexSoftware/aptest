@@ -1813,108 +1813,101 @@ def do_remote_github(state, args, *, yml=None, inputs=None):
     
     token_github_rest = _get_key_github_rest(state)
 
-    if 0 and state.remote_github_workflow_ids:
-        # Wait for existing workflow instead of creating a new one.
-        workflow_ids = state.remote_github_workflow_ids
-        remote_github_workflow_package = 'aptest'
-        info = name_info(state, remote_github_workflow_package)
-    else:
-        # Push ourselves to Git.
-        git_push(g_root, 'git@github.com:ArtifexSoftware/aptest.git', branch, state, doit=state.remote_do)
+    # Push ourselves to Git.
+    git_push(g_root, 'git@github.com:ArtifexSoftware/aptest.git', branch, state, doit=state.remote_do)
 
-        # Push specified local packages to Github and update args to point to
-        # new location.
-        for package_name, (package_location, args_pos) in list(state.packages.items()) + list(state.packages2.items()):
-            if not package_location.startswith(('git:', 'pip:')):
-                # Push to a Github branch and update argv[] to refer to this
-                # Github branch.
-                _check_checkout(state, package_location)
-                
-                info = name_info(state, package_name)
-                pipcl.log(f'{package_name=}.')
-                pipcl.log(f'{info["git_remote"]=}.')
-                remote = info['git_remote']
-                if remote:
-                    init = 'https://github.com/'
-                    if remote.startswith(init):
-                        # Convert https://github.com/... to git@github.com:... so we can push.
-                        remote = f'git@github.com:{remote[len(init):]}'
-                    git_push(package_location, remote, branch, state, doit=state.remote_do)
-                    args.args_eq.set(args_pos, f'git:-b {branch} {info["git_remote"]}')
+    # Push specified local packages to Github and update args to point to
+    # new location.
+    for package_name, (package_location, args_pos) in list(state.packages.items()) + list(state.packages2.items()):
+        if not package_location.startswith(('git:', 'pip:')):
+            # Push to a Github branch and update argv[] to refer to this
+            # Github branch.
+            _check_checkout(state, package_location)
 
-        if not yml:
-            yml = state.remote_github_yml
-        
-        if yml:
-            # Run specific .yml directly.
-            pipcl.log(f'Running .yml instead of aptest.py: {state.remote_github_yml}')
-            if c := yml.find(':') >= 0:
-                package, yml = state.remote_github_yml[:c], state.remote_github_yml[c+1:]
-                package = package_alias(package)
-                info = name_info(state, package)
-            else:
-                if not state.packages:
-                    # Run on aptest.
-                    info = name_info(state, 'aptest')
-                elif len(state.packages) == 1:
-                    for package_name, (package_location, args_pos) in state.packages.items():
-                        pass
-                    info = name_info(state, package_name)
-                else:
-                    Assert(0, f'Running yml directly requires exactly zero or one package, but {len(state.packages)=}.')
-            data = dict()
-            data['ref'] = branch
-            if not inputs:
-                inputs = state.remote_github_yml_inputs
-            inputs2 = dict()
-            if inputs:
-                for nv in inputs.split(','):
-                    try:
-                        n, v = nv.split('=', 1)
-                    except Exception as e:
-                        raise Exception(f'Expected <name>=<value> in {nv!r} from {state.remote_github_yml_inputs=}.') from e
-                    inputs2[n] = v
-            data['inputs'] = inputs2
-            workflow_id = github.gh_run_workflow(
-                    token_github_rest,
-                    github_api_url(info),
-                    yml,
-                    data,
-                    doit=state.remote_do,
-                    )
+            info = name_info(state, package_name)
+            pipcl.log(f'{package_name=}.')
+            pipcl.log(f'{info["git_remote"]=}.')
+            remote = info['git_remote']
+            if remote:
+                init = 'https://github.com/'
+                if remote.startswith(init):
+                    # Convert https://github.com/... to git@github.com:... so we can push.
+                    remote = f'git@github.com:{remote[len(init):]}'
+                git_push(package_location, remote, branch, state, doit=state.remote_do)
+                args.args_eq.set(args_pos, f'git:-b {branch} {info["git_remote"]}')
+
+    if not yml:
+        yml = state.remote_github_yml
+
+    if yml:
+        # Run specific .yml directly.
+        pipcl.log(f'Running .yml instead of aptest.py: {state.remote_github_yml}')
+        if c := yml.find(':') >= 0:
+            package, yml = state.remote_github_yml[:c], state.remote_github_yml[c+1:]
+            package = package_alias(package)
+            info = name_info(state, package)
         else:
-            # Run ourselves on Github using test.yml, passing argv.
-            info = name_info(state, 'aptest')
-            args_string = shlex.join(args.args_eq.argv[1:])
-            # Force a fixed wheelhouse so we can download artifacts easily.
-            args_string += ' --wheelhouse aptest-wheelhouse'
-            # We define the .yml's `matrix: os: ...` by passing in a dict encoded with json, as
-            # expected by test.yml's workflow_dispatch:inputs:matrix
-            Assert(state.remote_github_runners, f'No Github runners specified.')
-            matrix = {
-                    'os': state.remote_github_runners,
-                    }
-            matrix_json = json.dumps(matrix)
-            data = dict(
-                    ref = branch,
-                    inputs = dict(
-                        args=args_string,
-                        matrix=matrix_json
-                        ),
-                    )
-            pipcl.log(f'args_string is:')
-            args_string_lines = '\n-'.join(args_string.split(' -'))
-            pipcl.log(textwrap.indent(args_string_lines, '    '))
-            yml = 'test.yml'
-            key = _get_key_github_rest(state)
-            workflow_id = github.gh_run_workflow(
-                    key,
-                    github_api_url(info),
-                    yml,
-                    data,
-                    doit=state.remote_do,
-                    )
-        workflow_ids = [workflow_id]
+            if not state.packages:
+                # Run on aptest.
+                info = name_info(state, 'aptest')
+            elif len(state.packages) == 1:
+                for package_name, (package_location, args_pos) in state.packages.items():
+                    pass
+                info = name_info(state, package_name)
+            else:
+                Assert(0, f'Running yml directly requires exactly zero or one package, but {len(state.packages)=}.')
+        data = dict()
+        data['ref'] = branch
+        if not inputs:
+            inputs = state.remote_github_yml_inputs
+        inputs2 = dict()
+        if inputs:
+            for nv in inputs.split(','):
+                try:
+                    n, v = nv.split('=', 1)
+                except Exception as e:
+                    raise Exception(f'Expected <name>=<value> in {nv!r} from {state.remote_github_yml_inputs=}.') from e
+                inputs2[n] = v
+        data['inputs'] = inputs2
+        workflow_id = github.gh_run_workflow(
+                token_github_rest,
+                github_api_url(info),
+                yml,
+                data,
+                doit=state.remote_do,
+                )
+    else:
+        # Run ourselves on Github using test.yml, passing argv.
+        info = name_info(state, 'aptest')
+        args_string = shlex.join(args.args_eq.argv[1:])
+        # Force a fixed wheelhouse so we can download artifacts easily.
+        args_string += ' --wheelhouse aptest-wheelhouse'
+        # We define the .yml's `matrix: os: ...` by passing in a dict encoded with json, as
+        # expected by test.yml's workflow_dispatch:inputs:matrix
+        Assert(state.remote_github_runners, f'No Github runners specified.')
+        matrix = {
+                'os': state.remote_github_runners,
+                }
+        matrix_json = json.dumps(matrix)
+        data = dict(
+                ref = branch,
+                inputs = dict(
+                    args=args_string,
+                    matrix=matrix_json
+                    ),
+                )
+        pipcl.log(f'args_string is:')
+        args_string_lines = '\n-'.join(args_string.split(' -'))
+        pipcl.log(textwrap.indent(args_string_lines, '    '))
+        yml = 'test.yml'
+        key = _get_key_github_rest(state)
+        workflow_id = github.gh_run_workflow(
+                key,
+                github_api_url(info),
+                yml,
+                data,
+                doit=state.remote_do,
+                )
 
     _remote_github_get(state, [workflow_id], info=info)
     
@@ -2562,6 +2555,8 @@ def do_cibw_single(state, package, CIBW_BUILD, cibw_pyodide_args, *, do_test=1):
     if directory:
         pipcl.log(f'{package} _get_local() => {directory=}')
         directory_abs = os.path.abspath(directory)
+    else:
+        directory_abs = None
 
     if package == 'mupdf':
         if platform.system() == 'Linux' and not state.cibw_pyodide:
@@ -2610,11 +2605,6 @@ def do_cibw_single(state, package, CIBW_BUILD, cibw_pyodide_args, *, do_test=1):
             pipcl.fs_remove(f'{directory_abs}/epage/cmake-build/lib/CMakeCache.txt')
 
         return
-
-    python_version_tuple = (
-            int(platform.python_version_tuple()[0]),
-            int(platform.python_version_tuple()[1]),
-            )
 
     # As of 2026-03-23, no onnxruntime wheel is available for macos-intel
     # python-3.14. For python<=3.13, wheels for older releases are
@@ -4093,7 +4083,6 @@ def main(state, argv):
                                 directory = _get_local(package, state)
                                 pipcl.log(f'Local directory for {package=} is: {directory!r}')
 
-                
                 elif command == 'remote-github-wait':
                     _remote_github_get(state, state.remote_github_workflow_ids)
                 
