@@ -1434,12 +1434,37 @@ upload2
 .......
     Experimental.
     
-    Uploads to https://pypi.org.
+    Uploads to https://pypi.org with providence.
     
     * Runs on Github so that pypi.org providence can be automatically created.
-    * https://docs.pypi.org/attestations/
+    * See https://docs.pypi.org/attestations/
     * Gets wheels from from previously-run workflows,
       using workflow ids stored in local release wheelhouse from `--remote-github-workflow-identity`_.
+    * Uses Aptest's ``.github/workflows/upload.yml`` to upload to pypi.org with providence.
+    * The providence information is only for the upload.yml workflow,
+      it does not include any providence information for the workflows that created the wheels etc
+      (though the providence information might contain their workflow ids).
+    
+    For this to work, the pypi project(s) need to be configured to trust
+    publishing from Aptest's ``upload.yml`` Github workflow:
+    
+    * Log in to pypi.org or test.pypi.org.
+    * For each pypi project:
+    
+      * Go to ``Manage project / Publishing / Add a new publisher / Github``.
+      * Set:
+      
+        * Owner: ``ArtifexSoftware``
+        * Repository name: ``aptest``
+        * Workflow name: ``upload.yml``
+        * Environment name: leave blank
+      * Click on ``Add``.
+    
+    Providence limitations:
+    
+    * The providence information only contains information about the ``upload.yml`` workflow.
+    * Wheels are built in the other workflows,
+      about which ``upload.yml`` only knows the workflow ids.
     
     Also see:
     
@@ -3481,6 +3506,14 @@ completion
 
 Changelog
 ---------
+
+**2026-11-23**
+
+* Fix to cope with removal of piprepo from pypi.org.
+
+  * We now use our own code to create <wheelhouse>/simple/.
+* `upload2`_: added information about configuring pypi projecs to create providence information.
+
 
 **2026-11-19**
 
