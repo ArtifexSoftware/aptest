@@ -3,12 +3,17 @@ name: upload
 on:
   workflow_dispatch:
     inputs:
+      doit:
+        type: string
+        default: 0
       workflow_ids:
         type: string
         description: space-separated list of workflow ids.
       pypi_prefix:
         type: string
         default:
+      modify:
+        type: string
 
 jobs:
 
@@ -36,9 +41,11 @@ jobs:
         GH_API_KEY: ${{secrets.GH_API_KEY}}
       run: |
         echo inputs.workflow_ids: ${{inputs.workflow_ids}}
+        echo inputs.doit: ${{inputs.doit}}
         echo INPUTS_WORKFLOW_IDS: $INPUTS_WORKFLOW_IDS
         echo $INPUTS_PYPI_PREFIX: $INPUTS_PYPI_PREFIX
         aptest/aptest.py --key https://api.github.com/ ,GH_API_KEY --remote-github-workflow-ids "$INPUTS_WORKFLOW_IDS" remote-github-wait
+        aptest/aptest.py wheelhouse-modify --wheelhouse-modify-deltas '${{inputs.modify}}'
     
     - name: up
       uses: actions/upload-artifact@v5
@@ -69,8 +76,12 @@ jobs:
         rm -r dist/results.json
         rm -r dist/simple
         ls -l dist/
+        echo inputs.doit=${{inputs.doit}}
+        echo inputs.doit=${{inputs.pypi_prefix}}
 
     - name: pypi-publish
+      if:
+        ${{inputs.doit == '1'}}
       uses: pypa/gh-action-pypi-publish@release/v1
       with:
         repository-url: https://${{inputs.pypi_prefix}}pypi.org/legacy/

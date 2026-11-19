@@ -1436,10 +1436,10 @@ upload2
     
     Uploads to https://pypi.org.
     
-    * Creates pypi.org providence.
-    * Runs on Github.
+    * Runs on Github so that pypi.org providence can be automatically created.
+    * https://docs.pypi.org/attestations/
     * Gets wheels from from previously-run workflows,
-      using ids stored from `--remote-github-workflow-identity`_.
+      using workflow ids stored in local release wheelhouse from `--remote-github-workflow-identity`_.
     
     Also see:
     
