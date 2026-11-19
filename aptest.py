@@ -6,6 +6,7 @@ See README.rst for details.
 '''
 
 import atexit
+import fnmatch
 import glob
 import importlib.metadata
 import json
@@ -595,6 +596,25 @@ def dummy_completion3():
     '''
 
 
+def fnmatch_deltas_subtract(items, deltas):
+    if not deltas:
+        return set()
+    items2 = items.copy()
+    for delta in deltas:
+        assert delta.startswith('+') or delta.startswith('-'), (
+                f'{delta=} {deltas=}'
+                )
+        pm, g = delta[0], delta[1:]
+        for p in fnmatch.filter(items, g):
+            if pm == '+':
+                items2.add(p)
+            else:
+                items2.discard(p)
+    assert items2.issubset(items)
+    items_removed = items.difference(items2)
+    return items_removed
+
+
 def apply_deltas(items, deltas, check=1, aliasfn=lambda name: name, sortfn=None):
     '''
     Modifies <items> according to <deltas>.
@@ -843,6 +863,8 @@ def make_state():
     state.test_gnn_push = 0
     state.test_quick = False
     state.ticker = 0
+    state.upload2_doit = False
+    state.upload2_modify = ''
     state.venv = 2
     state.venv_name = None
     
@@ -852,6 +874,9 @@ def make_state():
     
     state.wheelhouse = 'aptest-wheelhouse'
     state.wheelhouse_release = None
+    
+    state.wheelhouse_modify_deltas = ''
+    state.wheelhouse_modify_doit = True
     
     # Prevent future additions to items in <state>. We can still modify
     # existing values.
@@ -1452,6 +1477,12 @@ def get_args(state, argv):
             elif arg == '-u':
                 state.github_upload = args.get_bool()
             
+            elif arg == '--upload2-doit':
+                state.upload2_doit = args.get_bool()
+            
+            elif arg == '--upload2-modify':
+                state.upload2_modify = next(args).as_str()
+            
             elif arg == '-v':
                 _venv = next(args)
                 Assert(_venv in ('0', '1', '2', '3'), f'Invalid venv={_venv.text}.')
@@ -1471,6 +1502,12 @@ def get_args(state, argv):
                     assert _wheelhouse, f'With `@`, `--wheelhouse-release` must be specified.'
                 state.wheelhouse = _wheelhouse
 
+            elif arg == '--wheelhouse-modify-deltas':
+                state.wheelhouse_modify_deltas = next(args).as_str()
+            
+            elif arg == '--wheelhouse-modify-doit':
+                state.wheelhouse_modify_doit = args.get_bool()
+            
             elif arg == '--wheelhouse-release':
                 state.wheelhouse_release = next(args).as_str()
 
@@ -1493,6 +1530,7 @@ def get_args(state, argv):
                     'upload-test',
                     'upload2',
                     'upload2-test',
+                    'wheelhouse-modify',
                     'windows-show-vs-instances',
                     ):
                 state.commands.append(arg.as_str())
@@ -1860,14 +1898,17 @@ def do_remote_github(state, args, *, yml=None, inputs=None):
         data['ref'] = branch
         if not inputs:
             inputs = state.remote_github_yml_inputs
-        inputs2 = dict()
-        if inputs:
-            for nv in inputs.split(','):
-                try:
-                    n, v = nv.split('=', 1)
-                except Exception as e:
-                    raise Exception(f'Expected <name>=<value> in {nv!r} from {state.remote_github_yml_inputs=}.') from e
-                inputs2[n] = v
+        if isinstance(inputs, dict):
+            inputs2 = inputs
+        else:
+            inputs2 = dict()
+            if inputs:
+                for nv in inputs.split(','):
+                    try:
+                        n, v = nv.split('=', 1)
+                    except Exception as e:
+                        raise Exception(f'Expected <name>=<value> in {nv!r} from {state.remote_github_yml_inputs=}.') from e
+                    inputs2[n] = v
         data['inputs'] = inputs2
         workflow_id = github.gh_run_workflow(
                 token_github_rest,
@@ -4154,12 +4195,35 @@ def main(state, argv):
                         pipcl.log(f'    {n}: {v}')
                     workflow_ids = ' '.join(id_ for (id_, date_time) in workflow_identities.values())
                     pipcl.log(f'{workflow_ids=}')
-                    inputs=f'workflow_ids={workflow_ids}'
+                    inputs = dict()
+                    inputs['workflow_ids'] = workflow_ids
+                    inputs['doit'] = '1' if state.upload2_doit else '0'
+                    inputs['modify'] = state.upload2_modify
                     if command == 'upload2-test':
-                        inputs += f',pypi_prefix=test.'
+                        inputs['pypi_prefix'] = 'test.'
                     else:
-                        inputs += f',pypi_prefix='
+                        inputs['pypi_prefix'] = ''
                     do_remote_github(state, args, yml='upload.yml', inputs=inputs)
+                
+                elif command == 'wheelhouse-modify':
+                    if state.wheelhouse_modify_deltas:
+                        deltas = state.wheelhouse_modify_deltas.split(',')
+                    else:
+                        deltas = list()
+                    items = set()
+                    for p in glob.glob(f'{state.wheelhouse}/*.whl') + glob.glob(f'{state.wheelhouse}/*.tar.gz'):
+                        items.add(os.path.basename(p))
+                    items_removed = fnmatch_deltas_subtract(items, deltas)
+                    if not items_removed:
+                        pipcl.log(f'Nothing to remove.')
+                    for ir in items_removed:
+                        p = f'{state.wheelhouse}/{ir}'
+                        assert os.path.exists(p)
+                        if state.wheelhouse_modify_doit:
+                            pipcl.log(f'removing: {p}')
+                            pipcl.fs_remove(p)
+                        else:
+                            pipcl.log(f'Would remove: {p}')
                 
                 elif command == 'windows-show-vs-instances':
                     pipcl.log(f'{command}:')
