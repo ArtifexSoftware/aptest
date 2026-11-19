@@ -3482,6 +3482,8 @@ completion
 Changelog
 ---------
 
+**2026-11-19**
+
 * `--key`_ - added support for test.pypi.org.
 * `--remote-github-workflow-check`_ - new.
 * `--remote-github-workflow-id`_ - can now be specified multiple times.
