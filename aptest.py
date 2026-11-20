@@ -426,6 +426,14 @@ g_package_info = {
                 'order': 4,
             },
         
+        'pymupdf_chart':
+            {
+                'git_remote': 'git@github.com:pymupdf/pymupdf-chart.git',
+                'git_branch': 'main',
+                'aliases':  ['chart'],
+                'order': 4,
+            },
+        
         'pymupdf_sign':
             {
                 'git_remote': None,
