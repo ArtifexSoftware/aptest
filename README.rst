@@ -3507,6 +3507,12 @@ completion
 Changelog
 ---------
 
+**2026-11-23 b**
+
+* Fixed `pip install` of aptest - need to include new file
+  simple_repository.py.
+
+
 **2026-11-23**
 
 * Fix to cope with removal of piprepo from pypi.org.
