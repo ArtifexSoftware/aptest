@@ -1117,13 +1117,19 @@ If this file exists, its contents are inserted before the command-line arguments
 
 The contents are extracted as follows:
 
+* Arguments are extracted from each line using `shlex.split()
+  <https://docs.python.org/3/library/shlex.html#shlex.split>`__.
+
 * Lines starting with ``#`` are ignored.
-* Arguments are extracted using `shlex.split()
-  <https://docs.python.org/3/library/shlex.html#shlex.split>`__,
-  so are separated by whitespace
-  (e.g. space and newlines characters)
+
+So:
+
+* Args are separated by whitespace (e.g. space and newline characters)
   unless escaped or inside quotes etc.
 
+* Args never span two or more lines.
+
+* Posix quoting is always used, even on Windows.
 
 .. _$APTEST_options:
   
@@ -2375,9 +2381,10 @@ Options
     Specify a key file and/or environment variable,
     to be used for matching URLs or git remotes etc.
 
-    * The longest matching prefix is used.
+    * The longest matching <prefix> is used.
     * A match is only made if ``<prefix>`` or ``<env>`` exist.
     * ``<path>`` is the path of a file containing the key.
+    * ``<path>`` is ignored if it is an empty string.
     * ``<env>`` is the name of an environment variable containing the key.
     * Special pseudo-urls for uploading to pypi.org with twine:
     
@@ -3507,6 +3514,11 @@ completion
 Changelog
 ---------
 
+**2026-11-24**
+
+* Lint fixes.
+
+
 **2026-11-23 b**
 
 * Fixed `pip install` of aptest - need to include new file
@@ -3518,7 +3530,7 @@ Changelog
 * Fix to cope with removal of piprepo from pypi.org.
 
   * We now use our own code to create <wheelhouse>/simple/.
-* `upload2`_: added information about configuring pypi projecs to create providence information.
+* `upload2`_: added information about configuring pypi projects to create providence information.
 
 
 **2026-11-19**
