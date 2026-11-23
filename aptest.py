@@ -53,7 +53,6 @@ autovenv_packages = [
         APTEST_PIPCL or 'pipcl',
         'filelock',
         'packaging',
-        'piprepo',
         'requests',
         'setuptools<81',
         'xmltodict',
@@ -94,12 +93,14 @@ try:
     import doct
     import graph
     import github
+    import simple_repository
 except ImportError:
     from . import backtrace
     from . import cli
     from . import doct
     from . import graph
     from . import github
+    from . import simple_repository
 
 
 # Get improved display of exceptions and stacktraces.
@@ -1625,12 +1626,7 @@ def do_piprepo(wheelhouse):
         if name not in g_package_info:
             pipcl.log(f'Deleting: {p}')
             pipcl.fs_remove(p)
-    # We want to completely recreate.
-    pipcl.fs_remove(f'{wheelhouse}/simple')
-    pipcl.run(
-            f'piprepo build {wheelhouse}',
-            prefix='piprepo build: ',
-            )
+    simple_repository.make(wheelhouse)
 
 
 def wheel_metadata(wheel_path):
@@ -1849,8 +1845,8 @@ def do_remote_github(state, args, *, yml=None, inputs=None):
     assert GITHUB_ACTIONS != 'true'
     assert isinstance(args, cli.Args)
     pipcl.run('pip install requests')
-    pipcl.run(f'pip install --upgrade piprepo "setuptools<81"')
-    pipcl.run('pip install piprepo')
+    #pipcl.run(f'pip install --upgrade piprepo "setuptools<81"')
+    #pipcl.run('pip install piprepo')
     if platform.system() == 'Windows':
         branch = f'aptest-{os.environ["USERNAME"]}'
     else:
@@ -1998,10 +1994,7 @@ def _remote_github_get(state, workflow_ids, *, info=None):
                 local_dir_union=state.wheelhouse,
                 check=state.remote_github_workflow_check,
                 )
-        pipcl.run(
-                f'piprepo build {state.wheelhouse}',
-                prefix='piprepo build: ',
-                )
+        simple_repository.make(state.wheelhouse)
 
 
 def do_remote(state, argv):
@@ -2528,10 +2521,7 @@ def do_build(state):
         pipcl.log(f'{package=}')
         wheel = do_build_single(state, package)
         package_to_wheel[package] = wheel
-        pipcl.run(
-                f'piprepo build {state.wheelhouse}',
-                prefix='piprepo build: ',
-                )
+        simple_repository.make(state.wheelhouse)
     
     # We use `pip --extra-index-url {pip_index_url}` so that pip
     # finds prerequisite wheels in state.wheelhouse.
@@ -2857,7 +2847,7 @@ def do_cibw_single(state, package, CIBW_BUILD, cibw_pyodide_args, *, do_test=1):
     pipcl.log(f'Build/test succeeded for {package=}.')
 
     pipcl.run(f'ls -ld {state.wheelhouse}/*')
-    pipcl.run(f'piprepo build {state.wheelhouse}')
+    simple_repository.make(state.wheelhouse)
 
     if 1:
         pipcl.log(f'Contents of: {state.wheelhouse=} are:')
@@ -2922,7 +2912,7 @@ def _onnxruntime_available():
 def do_cibw(state):
     '''
     Build wheels for each package with cibuildwheel, adding to wheelhouse,
-    and using piprepo to update a local pypi-style tree.
+    and using simple_repository.make() to update a local pypi-style tree.
     
     Writes pytest results into state.results['packages'][package]['junit'].
     '''
@@ -4051,12 +4041,8 @@ def main(state, argv):
                 if command in ('build', 'cibw'):
                     # 2025-11-14: piprepo seems to also required setuptools.
                     # 2026-02-08: we need setuptools<81 otherwise there is no pkg_resources module.
-                    pipcl.run(f'pip install --upgrade piprepo "setuptools<81"')
                     #pipcl.fs_ensure_empty_dir(state.wheelhouse)
-                    pipcl.run(
-                            f'piprepo build {state.wheelhouse}',
-                            prefix='piprepo build: ',
-                            )
+                    simple_repository.make(state.wheelhouse)
                 if 0:
                     pass
 
