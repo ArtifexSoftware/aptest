@@ -24,7 +24,7 @@ def make(path):
 
         for p in glob.glob(f'{path}/*.whl'):
             leaf = os.path.basename(p)
-            name, version, build_number, tags = packaging.utils.parse_wheel_filename(leaf)
+            name, _version, _build_number, _tags = packaging.utils.parse_wheel_filename(leaf)
             print(f'<a href="simple/{name}/">name</a>', file=f)
             os.mkdir(f'{path}/simple/{name}/')
             with open(f'{path}/simple/{name}/index.html', 'w') as fp:
