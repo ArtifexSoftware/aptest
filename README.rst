@@ -1440,16 +1440,16 @@ upload2
 .......
     Experimental.
     
-    Uploads to https://pypi.org with providence.
+    Uploads to https://pypi.org with provenance.
     
-    * Runs on Github so that pypi.org providence can be automatically created.
+    * Runs on Github so that pypi.org provenance can be automatically created.
     * See https://docs.pypi.org/attestations/
-    * Gets wheels from from previously-run workflows,
+    * Gets wheels from from previously-run Aptest workflows,
       using workflow ids stored in local release wheelhouse from `--remote-github-workflow-identity`_.
-    * Uses Aptest's ``.github/workflows/upload.yml`` to upload to pypi.org with providence.
-    * The providence information is only for the upload.yml workflow,
-      it does not include any providence information for the workflows that created the wheels etc
-      (though the providence information might contain their workflow ids).
+    * Uses Aptest's ``.github/workflows/upload.yml``.
+    * The provenance information is only for the upload.yml workflow,
+      it does not include any provenance information for the workflows that created the wheels etc
+      (though the provenance information might contain their workflow ids).
     
     For this to work, the pypi project(s) need to be configured to trust
     publishing from Aptest's ``upload.yml`` Github workflow:
@@ -1466,9 +1466,9 @@ upload2
         * Environment name: leave blank
       * Click on ``Add``.
     
-    Providence limitations:
+    Provenance limitations:
     
-    * The providence information only contains information about the ``upload.yml`` workflow.
+    * The provenance information only contains information about the ``upload.yml`` workflow.
     * Wheels are built in the other workflows,
       about which ``upload.yml`` only knows the workflow ids.
     
@@ -3514,6 +3514,12 @@ completion
 Changelog
 ---------
 
+**2026-11-24 b**
+
+* Fixed spelling of 'provenance'.
+* Fixed .github/workflows/test_aptest.py on macos.
+
+
 **2026-11-24**
 
 * Lint fixes.
@@ -3530,7 +3536,7 @@ Changelog
 * Fix to cope with removal of piprepo from pypi.org.
 
   * We now use our own code to create <wheelhouse>/simple/.
-* `upload2`_: added information about configuring pypi projects to create providence information.
+* `upload2`_: added information about configuring pypi projects to create provenance information.
 
 
 **2026-11-19**
@@ -3547,7 +3553,7 @@ Changelog
 * `upload-test`_ - new.
 * `wheelhouse-modify`_ - new.
 * Improved how we cope with varying availability of ``onxxruntime``.
-* Experimental changes to allow releases to pypi with providence.
+* Experimental changes to allow releases to pypi with provenance.
   
   * `upload2`_ - new.
   * `upload2-test`_ - new.
