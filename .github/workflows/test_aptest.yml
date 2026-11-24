@@ -26,6 +26,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
+        with:
+          # 2026-11-24: avoid python3.15 because onnxruntime not yet available on
+          # macos.
+          python-version: '3.14' 
       - name: test_aptest
         env:
           APTEST_args: ${{inputs.args}}
