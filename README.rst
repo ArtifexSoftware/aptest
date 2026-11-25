@@ -449,6 +449,9 @@ Instructions for releasing wheels for:
 
     https://github.com/pymupdf/PyMuPDF
         Settings / Branches / main / ... / Edit / Lock branch
+    
+    [For other repositories, one might need to create a classic branch
+    protection rule if one doesn't already exist.]
 
 * Build wheels for all packages:
 
@@ -3513,6 +3516,11 @@ completion
 
 Changelog
 ---------
+
+**2026-11-25**
+
+* Fixed generation of aptest-wheelhouse/simple/ with multiple architectures.
+
 
 **2026-11-24 b**
 
