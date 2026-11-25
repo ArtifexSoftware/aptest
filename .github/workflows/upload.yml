@@ -83,5 +83,5 @@ jobs:
       if:
         ${{inputs.doit == '1'}}
       uses: pypa/gh-action-pypi-publish@release/v1
-      with:
-        repository-url: https://${{inputs.pypi_prefix}}pypi.org/legacy/
+      #with:
+      #  repository-url: https://${{inputs.pypi_prefix}}pypi.org/legacy/
