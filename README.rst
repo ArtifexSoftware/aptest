@@ -3517,6 +3517,12 @@ completion
 Changelog
 ---------
 
+**2026-11-25 b**
+
+* Fixed uploads to pypi.org.
+  However currently `upload2-test`_ uploads to pypi.org, same as `upload2`_.
+
+
 **2026-11-25**
 
 * Fixed generation of aptest-wheelhouse/simple/ with multiple architectures.
