@@ -21,17 +21,23 @@ def make(path):
         print(f'<!DOCTYPE html>', file=f)
         print(f'<html>', file=f)
         print(f'<body>', file=f)
+        
+        name_to_leafs = dict()
 
         for p in glob.glob(f'{path}/*.whl'):
             leaf = os.path.basename(p)
             name, _version, _build_number, _tags = packaging.utils.parse_wheel_filename(leaf)
-            print(f'<a href="simple/{name}/">name</a>', file=f)
+            name_to_leafs.setdefault(name, list()).append(leaf)
+        
+        for name, leafs in name_to_leafs.items():
+            print(f'<a href="{name}/">{name}</a><br>', file=f)
             os.mkdir(f'{path}/simple/{name}/')
             with open(f'{path}/simple/{name}/index.html', 'w') as fp:
                 print(f'<!DOCTYPE html>', file=fp)
                 print(f'<html>', file=fp)
                 print(f'<body>', file=fp)
-                print(f'<a href="../../{leaf}">{leaf}</a></br>', file=fp)
+                for leaf in leafs:
+                    print(f'<a href="../../{leaf}">{leaf}</a><br>', file=fp)
                 print(f'</body>', file=fp)
                 print(f'</html>', file=fp)
         
